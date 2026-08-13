@@ -457,29 +457,125 @@ void STM32Worker::workerLoop()
 
     while (running)
     {
-        if (stm32)
+        /*
+         * ====================================================
+         * Si no tenemos interfaz, intentar reconectar.
+         * ====================================================
+         */
+        if (!stm32)
         {
-            auto now =
-                steady_clock::now();
+            try
+            {
+                std::cout
+                    << "Intentando reconectar STM32..."
+                    << std::endl;
 
-            auto elapsed =
-                duration_cast<milliseconds>(
-                    now - lastHeartbeat
+                stm32 =
+                    std::make_unique<stm32canbus_serialif>(
+                        port,
+                        baudrate
+                    );
+
+                configureCallbacks();
+
+                stm32->start();
+
+                lastHeartbeat =
+                    steady_clock::now();
+
+                std::cout
+                    << "STM32 reconectada."
+                    << std::endl;
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr
+                    << "STM32 aun no disponible: "
+                    << e.what()
+                    << std::endl;
+
+                stm32.reset();
+
+                std::this_thread::sleep_for(
+                    seconds(1)
                 );
 
-            /*
-             * Heartbeat hacia STM32.
-             *
-             * Se mantiene separado de la GUI,
-             * visión e IA.
-             */
-            if (elapsed.count() >= 100)
+                continue;
+            }
+        }
+
+
+        /*
+         * ====================================================
+         * Comunicación normal
+         * ====================================================
+         */
+
+        auto now =
+            steady_clock::now();
+
+        auto elapsed =
+            duration_cast<milliseconds>(
+                now - lastHeartbeat
+            );
+
+        if (elapsed.count() >= 100)
+        {
+            try
             {
                 stm32->send_heartbeat();
 
                 lastHeartbeat = now;
             }
+            catch (const std::exception& e)
+            {
+                std::cerr
+                    << "STM32 desconectada: "
+                    << e.what()
+                    << std::endl;
+
+
+                /*
+                 * Actualizar estado visible por GUI.
+                 */
+                if (state != nullptr)
+                {
+                    HagieState::SystemState system =
+                        state->getSystemState();
+
+                    system.stm32_connected = false;
+                    system.can_ok = false;
+                    system.imu_valid = false;
+
+                    state->setSystemState(system);
+                }
+
+
+                /*
+                 * Cerrar la interfaz dañada.
+                 */
+                try
+                {
+                    stm32->stop();
+                }
+                catch (...)
+                {
+                }
+
+                stm32.reset();
+
+
+                /*
+                 * Esperar antes del próximo intento.
+                 */
+                std::this_thread::sleep_for(
+                    seconds(1)
+                );
+
+                continue;
+            }
         }
+
 
         std::this_thread::sleep_for(
             milliseconds(10)

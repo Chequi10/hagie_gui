@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     */
     STM32Worker stm32Worker(
         &hagieState,
-        "/dev/ttyACM0",
+        "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0670FF525649898367224551-if02",
         115200
     );
 

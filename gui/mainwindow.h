@@ -30,6 +30,8 @@ private:
 
     QTimer *dashboardTimer;
 
+    QLabel *systemStatusLabel;
+
     std::array<QLabel *, HagieState::BODY_COUNT> heightLabels {};
     std::array<QLabel *, HagieState::BODY_COUNT> targetLabels {};
     std::array<QLabel *, HagieState::BODY_COUNT> modeLabels {};
@@ -37,6 +39,8 @@ private:
     std::array<QLabel *, HagieState::BODY_COUNT> faultLabels {};
 
     void updateDashboard();
+
+    void updateSystemStatus();
 
     QWidget *createDashboardPage();
     QWidget *createCamerasPage();

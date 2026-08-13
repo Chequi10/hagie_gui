@@ -750,12 +750,15 @@ QWidget *MainWindow::createConfigurationPage()
 
 void MainWindow::createStatusBar()
 {
-    statusBar()->showMessage(
-        "STM32: desconectada | "
-        "CAN: --- | "
-        "IMU: --- | "
-        "IA: detenida"
+    systemStatusLabel =
+        new QLabel(this);
+
+    statusBar()->addPermanentWidget(
+        systemStatusLabel,
+        1
     );
+
+    updateSystemStatus();
 }
 
 void MainWindow::updateDashboard()
@@ -811,4 +814,47 @@ void MainWindow::updateDashboard()
             );
         }
     }
+    updateSystemStatus();
+}
+
+void MainWindow::updateSystemStatus()
+{
+    if (state == nullptr ||
+        systemStatusLabel == nullptr)
+    {
+        return;
+    }
+
+    HagieState::SystemState system =
+        state->getSystemState();
+
+    QString stm32Text =
+        system.stm32_connected
+            ? "STM32: CONECTADA"
+            : "STM32: DESCONECTADA";
+
+    QString canText =
+        system.can_ok
+            ? "CAN: OK"
+            : "CAN: FALLA";
+
+    QString imuText =
+        system.imu_valid
+            ? "IMU: OK"
+            : "IMU: NO VÁLIDA";
+
+    QString aiText =
+        system.ai_running
+            ? "IA: ACTIVA"
+            : "IA: DETENIDA";
+
+    systemStatusLabel->setText(
+        stm32Text
+        + " | "
+        + canText
+        + " | "
+        + imuText
+        + " | "
+        + aiText
+    );
 }
