@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(hagie_gui LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+add_executable(hagie_gui
+    main.cpp
+
+    gui/mainwindow.cpp
+    gui/mainwindow.h
+
+    core/hagie_state.cpp
+    core/hagie_state.h
+
+    stm32/protocol.cpp
+    stm32/protocol.h
+
+    stm32/stm32canbusif.cpp
+    stm32/stm32canbusif.h
+
+    stm32/stm32_worker.cpp
+    stm32/stm32_worker.h
+)
+
+target_include_directories(hagie_gui
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(hagie_gui
+    PRIVATE
+    Qt6::Widgets
+)
