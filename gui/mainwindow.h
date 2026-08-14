@@ -15,6 +15,9 @@ class QTimer;
 class STM32Worker;
 class QFrame;
 class QPushButton;
+class QSpinBox;
+class QDoubleSpinBox;
+class QComboBox;
 
 class MainWindow : public QMainWindow
 {
@@ -97,6 +100,29 @@ private:
 
     std::array<int8_t, HagieState::BODY_COUNT>
         testEncoderDirection {};
+
+
+     /*Para configuracion*/  
+
+    std::array<QSpinBox *, HagieState::BODY_COUNT>
+        configMinHeightSpin {};
+
+    std::array<QSpinBox *, HagieState::BODY_COUNT>
+        configMaxHeightSpin {};
+
+    std::array<QDoubleSpinBox *, HagieState::BODY_COUNT>
+        configEncoderScaleSpin {};
+
+    std::array<QComboBox *, HagieState::BODY_COUNT>
+        configEncoderDirectionCombo {};  
+        
+    QSpinBox *configMoveThresholdSpin = nullptr;
+
+    QDoubleSpinBox *configMinMovementSpin = nullptr;
+
+    QSpinBox *configNoMovementTimeoutSpin = nullptr;
+
+    QSpinBox *configTargetTimeoutSpin = nullptr;
 
        
 

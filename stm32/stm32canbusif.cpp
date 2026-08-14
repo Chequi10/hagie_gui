@@ -622,26 +622,346 @@ void stm32canbus_serialif::set_target_height(
     protocol::packet_encoder::send(4);
 }
 
-    // 'J' - Reconocer / limpiar falla NO_MOVEMENT
+// 'J' - Reconocer / limpiar falla NO_MOVEMENT
 
-    void stm32canbus_serialif::clear_body_fault(
-        uint8_t body)
+void stm32canbus_serialif::clear_body_fault(
+    uint8_t body)
+{
+    if (body >= BODY_COUNT)
     {
-        if (body >= BODY_COUNT)
-        {
-            return;
-        }
-
-        uint8_t* payload =
-            protocol::packet_encoder::
-                get_payload_buffer();
-
-        payload[0] = 'J';
-        payload[1] = body;
-
-        protocol::packet_encoder::send(2);
+        return;
     }
 
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'J';
+    payload[1] = body;
+
+    protocol::packet_encoder::send(2);
+}
+
+// ============================================================
+// OPCODE 'K' - Configuración runtime STM32
+// ============================================================
+
+
+// ------------------------------------------------------------
+// K 0x01 - Límites de altura por cuerpo
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_body_limits(
+    uint8_t body,
+    uint16_t min_height_mm,
+    uint16_t max_height_mm)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    if (min_height_mm >= max_height_mm)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x01;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (min_height_mm >> 8) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            min_height_mm & 0xFF
+        );
+
+    payload[5] =
+        static_cast<uint8_t>(
+            (max_height_mm >> 8) & 0xFF
+        );
+
+    payload[6] =
+        static_cast<uint8_t>(
+            max_height_mm & 0xFF
+        );
+
+    protocol::packet_encoder::send(7);
+}
+
+
+// ------------------------------------------------------------
+// K 0x02 - Umbral de comando
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_move_command_threshold(
+    uint16_t threshold)
+{
+    if (threshold == 0 ||
+        threshold > 1000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x02;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (threshold >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            threshold & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x03 - Movimiento mínimo en mm
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_min_body_movement(
+    float movement_mm)
+{
+    if (movement_mm <= 0.0f)
+    {
+        return;
+    }
+
+    uint32_t scaled =
+        static_cast<uint32_t>(
+            movement_mm * 100.0f + 0.5f
+        );
+
+    if (scaled == 0 ||
+        scaled > 65535)
+    {
+        return;
+    }
+
+    uint16_t raw =
+        static_cast<uint16_t>(scaled);
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x03;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x04 - Timeout NO_MOVEMENT
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_no_movement_timeout(
+    uint32_t timeout_ms)
+{
+    if (timeout_ms < 100 ||
+        timeout_ms > 60000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x04;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 24) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 16) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 8) & 0xFF
+        );
+
+    payload[5] =
+        static_cast<uint8_t>(
+            timeout_ms & 0xFF
+        );
+
+    protocol::packet_encoder::send(6);
+}
+
+
+// ------------------------------------------------------------
+// K 0x05 - Timeout de consigna AUTO
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_target_timeout(
+    uint32_t timeout_ms)
+{
+    if (timeout_ms < 100 ||
+        timeout_ms > 60000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x05;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 24) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 16) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            (timeout_ms >> 8) & 0xFF
+        );
+
+    payload[5] =
+        static_cast<uint8_t>(
+            timeout_ms & 0xFF
+        );
+
+    protocol::packet_encoder::send(6);
+}
+
+
+// ------------------------------------------------------------
+// K 0x06 - Sentido del encoder
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_encoder_direction(
+    uint8_t body,
+    uint8_t direction)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    if (direction > 1)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x06;
+    payload[2] = body;
+    payload[3] = direction;
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x07 - Escala encoder en mm/pulso
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_encoder_scale(
+    uint8_t body,
+    float mm_per_pulse)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    if (mm_per_pulse <= 0.0f)
+    {
+        return;
+    }
+
+    double scaled =
+        static_cast<double>(
+            mm_per_pulse
+        ) * 100000.0;
+
+    if (scaled < 1.0 ||
+        scaled > 4294967295.0)
+    {
+        return;
+    }
+
+    uint32_t raw =
+        static_cast<uint32_t>(
+            scaled + 0.5
+        );
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x07;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (raw >> 24) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            (raw >> 16) & 0xFF
+        );
+
+    payload[5] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[6] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(7);
+}
 
 // ============================================================
 // Envío físico por Boost.Asio

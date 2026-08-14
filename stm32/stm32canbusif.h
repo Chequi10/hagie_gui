@@ -182,9 +182,6 @@ public:
     // OPCODE 'D'
     // body: 0..5
     // height_mm: altura objetivo en milímetros
-        // OPCODE 'D'
-    // body: 0..5
-    // height_mm: altura objetivo en milímetros
     void set_target_height(
         uint8_t body,
         uint16_t height_mm
@@ -199,7 +196,63 @@ public:
         uint8_t body
     );
 
+    // ============================================================
+    // OPCODE 'K' - Configuración runtime STM32
+    // ============================================================
 
+    // K 0x01
+    // Límites mínimo y máximo de un cuerpo.
+    void set_body_limits(
+        uint8_t body,
+        uint16_t min_height_mm,
+        uint16_t max_height_mm
+    );
+
+
+    // K 0x02
+    // Umbral mínimo de comando para considerar movimiento.
+    void set_move_command_threshold(
+        uint16_t threshold
+    );
+
+
+    // K 0x03
+    // Movimiento mínimo esperado, expresado en mm.
+    void set_min_body_movement(
+        float movement_mm
+    );
+
+
+    // K 0x04
+    // Timeout NO_MOVEMENT en milisegundos.
+    void set_no_movement_timeout(
+        uint32_t timeout_ms
+    );
+
+
+    // K 0x05
+    // Timeout de actualización de consigna AUTO, en ms.
+    void set_target_timeout(
+        uint32_t timeout_ms
+    );
+
+
+    // K 0x06
+    // direction:
+    // 0 = normal
+    // 1 = invertido
+    void set_encoder_direction(
+        uint8_t body,
+        uint8_t direction
+    );
+
+
+    // K 0x07
+    // Escala del encoder en mm/pulso.
+    void set_encoder_scale(
+        uint8_t body,
+        float mm_per_pulse
+    );
 
 private:
 

@@ -17,6 +17,9 @@
 #include "stm32/stm32_worker.h"
 #include <QStringList>
 #include <QComboBox>
+#include <QSpinBox>
+#include <QDoubleSpinBox>
+#include <QSettings>
 
 
 MainWindow::MainWindow(
@@ -1134,13 +1137,13 @@ QWidget *MainWindow::createConfigurationPage()
     QWidget *page =
         new QWidget();
 
-    QVBoxLayout *layout =
+    QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
 
     QLabel *title =
         new QLabel(
-            "CONFIGURACIÓN DEL SISTEMA"
+            "CONFIGURACIÓN DE CUERPOS"
         );
 
     title->setAlignment(
@@ -1152,59 +1155,567 @@ QWidget *MainWindow::createConfigurationPage()
         "font-weight: bold;"
     );
 
-    layout->addWidget(title);
+    mainLayout->addWidget(title);
 
 
-    QPushButton *machine =
-        new QPushButton(
-            "Configuración de máquina"
+    QGridLayout *bodyGrid =
+        new QGridLayout();
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        QFrame *frame =
+            new QFrame();
+
+        frame->setFrameShape(
+            QFrame::StyledPanel
         );
 
-    QPushButton *bodies =
-        new QPushButton(
-            "Configuración de cuerpos"
+        QVBoxLayout *bodyLayout =
+            new QVBoxLayout(frame);
+
+
+        QLabel *bodyTitle =
+            new QLabel(
+                QString("CUERPO %1")
+                    .arg(body + 1)
+            );
+
+        bodyTitle->setAlignment(
+            Qt::AlignCenter
         );
 
-    QPushButton *encoders =
-        new QPushButton(
-            "Configuración de encoders"
+        bodyTitle->setStyleSheet(
+            "font-size: 16px;"
+            "font-weight: bold;"
         );
 
-    QPushButton *cameras =
-        new QPushButton(
-            "Configuración de cámaras"
-        );
-
-    QPushButton *ai =
-        new QPushButton(
-            "Configuración de IA"
-        );
-
-    QPushButton *stm32 =
-        new QPushButton(
-            "Configuración STM32"
-        );
-
-    QPushButton *can =
-        new QPushButton(
-            "CAN / Axiomatic"
+        bodyLayout->addWidget(
+            bodyTitle
         );
 
 
-    layout->addWidget(machine);
-    layout->addWidget(bodies);
-    layout->addWidget(encoders);
-    layout->addWidget(cameras);
-    layout->addWidget(ai);
-    layout->addWidget(stm32);
-    layout->addWidget(can);
+        /*
+         * Altura mínima.
+         */
+        QLabel *minLabel =
+            new QLabel(
+                "Altura mínima (mm)"
+            );
 
-    layout->addStretch();
+        configMinHeightSpin[body] =
+            new QSpinBox();
+
+        configMinHeightSpin[body]
+            ->setRange(
+                0,
+                2000
+            );
+
+        configMinHeightSpin[body]
+            ->setValue(
+                50
+            );
+
+
+        /*
+         * Altura máxima.
+         */
+        QLabel *maxLabel =
+            new QLabel(
+                "Altura máxima (mm)"
+            );
+
+        configMaxHeightSpin[body] =
+            new QSpinBox();
+
+        configMaxHeightSpin[body]
+            ->setRange(
+                0,
+                2000
+            );
+
+        configMaxHeightSpin[body]
+            ->setValue(
+                700
+            );
+
+
+        /*
+         * Escala encoder.
+         */
+        QLabel *scaleLabel =
+            new QLabel(
+                "Escala encoder (mm/pulso)"
+            );
+
+        configEncoderScaleSpin[body] =
+            new QDoubleSpinBox();
+
+        configEncoderScaleSpin[body]
+            ->setDecimals(5);
+
+        configEncoderScaleSpin[body]
+            ->setRange(
+                0.00001,
+                100.0
+            );
+
+        configEncoderScaleSpin[body]
+            ->setSingleStep(
+                0.001
+            );
+
+        configEncoderScaleSpin[body]
+            ->setValue(
+                1.0
+            );
+
+
+        /*
+         * Sentido encoder.
+         */
+        QLabel *directionLabel =
+            new QLabel(
+                "Sentido encoder"
+            );
+
+        configEncoderDirectionCombo[body] =
+            new QComboBox();
+
+        configEncoderDirectionCombo[body]
+            ->addItem(
+                "Normal",
+                1
+            );
+
+        configEncoderDirectionCombo[body]
+            ->addItem(
+                "Invertido",
+                -1
+            );
+
+
+        bodyLayout->addWidget(
+            minLabel
+        );
+
+        bodyLayout->addWidget(
+            configMinHeightSpin[body]
+        );
+
+        bodyLayout->addWidget(
+            maxLabel
+        );
+
+        bodyLayout->addWidget(
+            configMaxHeightSpin[body]
+        );
+
+        bodyLayout->addWidget(
+            scaleLabel
+        );
+
+        bodyLayout->addWidget(
+            configEncoderScaleSpin[body]
+        );
+
+        bodyLayout->addWidget(
+            directionLabel
+        );
+
+        bodyLayout->addWidget(
+            configEncoderDirectionCombo[body]
+        );
+
+
+        bodyGrid->addWidget(
+            frame,
+            body / 3,
+            body % 3
+        );
+    }
+
+
+    mainLayout->addLayout(
+        bodyGrid
+    );
+
+
+    /*
+    * ========================================================
+    * PARÁMETROS GLOBALES DE CONTROL Y SEGURIDAD
+    * ========================================================
+    */
+
+    QFrame *controlFrame =
+        new QFrame();
+
+    controlFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QGridLayout *controlLayout =
+        new QGridLayout(controlFrame);
+
+
+    QLabel *controlTitle =
+        new QLabel(
+            "PARÁMETROS DE CONTROL Y SEGURIDAD"
+        );
+
+    controlTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    controlLayout->addWidget(
+        controlTitle,
+        0,
+        0,
+        1,
+        4
+    );
+
+
+    /*
+    * K 0x02
+    * Umbral mínimo de comando.
+    */
+    QLabel *moveThresholdLabel =
+        new QLabel(
+            "Umbral comando movimiento"
+        );
+
+    configMoveThresholdSpin =
+        new QSpinBox();
+
+    configMoveThresholdSpin->setRange(
+        1,
+        1000
+    );
+
+    configMoveThresholdSpin->setValue(
+        100
+    );
+
+
+    /*
+    * K 0x03
+    * Movimiento mínimo esperado.
+    */
+    QLabel *minMovementLabel =
+        new QLabel(
+            "Movimiento mínimo (mm)"
+        );
+
+    configMinMovementSpin =
+        new QDoubleSpinBox();
+
+    configMinMovementSpin->setDecimals(
+        2
+    );
+
+    configMinMovementSpin->setRange(
+        0.01,
+        100.0
+    );
+
+    configMinMovementSpin->setSingleStep(
+        0.1
+    );
+
+    configMinMovementSpin->setValue(
+        2.0
+    );
+
+
+    /*
+    * K 0x04
+    * Timeout NO_MOVEMENT.
+    */
+    QLabel *noMovementTimeoutLabel =
+        new QLabel(
+            "Timeout NO_MOVEMENT (ms)"
+        );
+
+    configNoMovementTimeoutSpin =
+        new QSpinBox();
+
+    configNoMovementTimeoutSpin->setRange(
+        100,
+        60000
+    );
+
+    configNoMovementTimeoutSpin->setSingleStep(
+        100
+    );
+
+    configNoMovementTimeoutSpin->setValue(
+        1000
+    );
+
+
+    /*
+    * K 0x05
+    * Timeout de consigna AUTO.
+    */
+    QLabel *targetTimeoutLabel =
+        new QLabel(
+            "Timeout consigna AUTO (ms)"
+        );
+
+    configTargetTimeoutSpin =
+        new QSpinBox();
+
+    configTargetTimeoutSpin->setRange(
+        100,
+        60000
+    );
+
+    configTargetTimeoutSpin->setSingleStep(
+        100
+    );
+
+    configTargetTimeoutSpin->setValue(
+        1000
+    );
+
+
+    /*
+    * Primera fila de parámetros.
+    */
+    controlLayout->addWidget(
+        moveThresholdLabel,
+        1,
+        0
+    );
+
+    controlLayout->addWidget(
+        configMoveThresholdSpin,
+        1,
+        1
+    );
+
+    controlLayout->addWidget(
+        minMovementLabel,
+        1,
+        2
+    );
+
+    controlLayout->addWidget(
+        configMinMovementSpin,
+        1,
+        3
+    );
+
+
+    /*
+    * Segunda fila.
+    */
+    controlLayout->addWidget(
+        noMovementTimeoutLabel,
+        2,
+        0
+    );
+
+    controlLayout->addWidget(
+        configNoMovementTimeoutSpin,
+        2,
+        1
+    );
+
+    controlLayout->addWidget(
+        targetTimeoutLabel,
+        2,
+        2
+    );
+
+    controlLayout->addWidget(
+        configTargetTimeoutSpin,
+        2,
+        3
+    );
+
+
+    mainLayout->addWidget(
+        controlFrame
+    );
+
+
+    QPushButton *saveButton =
+            new QPushButton(
+                "GUARDAR CONFIGURACIÓN"
+            );
+
+        saveButton->setMinimumHeight(
+            50
+        );
+
+        saveButton->setStyleSheet(
+            "font-size: 18px;"
+            "font-weight: bold;"
+        );
+
+        connect(
+        saveButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            if (stm32Worker == nullptr)
+            {
+                return;
+            }
+
+            /*
+            * ====================================================
+            * K 0x01
+            * Límites mínimo / máximo de cada cuerpo
+            * ====================================================
+            */
+            for (std::size_t body = 0;
+                body < HagieState::BODY_COUNT;
+                ++body)
+            {
+                uint16_t minHeight =
+                    static_cast<uint16_t>(
+                        configMinHeightSpin[body]->value()
+                    );
+
+                uint16_t maxHeight =
+                    static_cast<uint16_t>(
+                        configMaxHeightSpin[body]->value()
+                    );
+
+                /*
+                * Validación antes de enviar.
+                */
+                if (minHeight >= maxHeight)
+                {
+                    return;
+                }
+
+                stm32Worker->setBodyLimits(
+                    static_cast<uint8_t>(body),
+                    minHeight,
+                    maxHeight
+                );
+            }
+
+
+            /*
+            * ====================================================
+            * K 0x02
+            * Umbral de comando para considerar movimiento
+            * ====================================================
+            */
+            stm32Worker->setMoveCommandThreshold(
+                static_cast<uint16_t>(
+                    configMoveThresholdSpin->value()
+                )
+            );
+
+
+            /*
+            * ====================================================
+            * K 0x03
+            * Movimiento mínimo esperado
+            * ====================================================
+            */
+            stm32Worker->setMinBodyMovement(
+                static_cast<float>(
+                    configMinMovementSpin->value()
+                )
+            );
+
+
+            /*
+            * ====================================================
+            * K 0x04
+            * Timeout NO_MOVEMENT
+            * ====================================================
+            */
+            stm32Worker->setNoMovementTimeout(
+                static_cast<uint32_t>(
+                    configNoMovementTimeoutSpin->value()
+                )
+            );
+
+
+            /*
+            * ====================================================
+            * K 0x05
+            * Timeout de consigna AUTO
+            * ====================================================
+            */
+            stm32Worker->setTargetTimeout(
+                static_cast<uint32_t>(
+                    configTargetTimeoutSpin->value()
+                )
+            );
+
+            /*
+            * ====================================================
+            * K 0x06
+            * Sentido de cada encoder
+            * ====================================================
+            */
+            for (std::size_t body = 0;
+                body < HagieState::BODY_COUNT;
+                ++body)
+            {
+                int directionData =
+                    configEncoderDirectionCombo[body]
+                        ->currentData()
+                        .toInt();
+
+                uint8_t protocolDirection =
+                    (directionData == 1)
+                        ? 0       // Normal
+                        : 1;      // Invertido
+
+                stm32Worker->setEncoderDirection(
+                    static_cast<uint8_t>(body),
+                    protocolDirection
+                );
+            }
+
+
+            /*
+            * ====================================================
+            * K 0x07
+            * Escala de cada encoder
+            * ====================================================
+            */
+            for (std::size_t body = 0;
+                body < HagieState::BODY_COUNT;
+                ++body)
+            {
+                float scale =
+                    static_cast<float>(
+                        configEncoderScaleSpin[body]
+                            ->value()
+                    );
+
+                stm32Worker->setEncoderScale(
+                    static_cast<uint8_t>(body),
+                    scale
+                );
+            }
+        }
+    );
+
+    
+    mainLayout->addWidget(
+        saveButton
+    );
 
 
     return page;
 }
-
 
 /*
  * ============================================================

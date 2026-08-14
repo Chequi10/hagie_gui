@@ -67,6 +67,42 @@ public:
         uint8_t body
     );
 
+    // ========================================================
+    // Configuración runtime STM32 - OPCODE 'K'
+    // ========================================================
+
+    void setBodyLimits(
+        uint8_t body,
+        uint16_t min_height_mm,
+        uint16_t max_height_mm
+    );
+
+    void setMoveCommandThreshold(
+        uint16_t threshold
+    );
+
+    void setMinBodyMovement(
+        float movement_mm
+    );
+
+    void setNoMovementTimeout(
+        uint32_t timeout_ms
+    );
+
+    void setTargetTimeout(
+        uint32_t timeout_ms
+    );
+
+    void setEncoderDirection(
+        uint8_t body,
+        uint8_t direction
+    );
+
+    void setEncoderScale(
+        uint8_t body,
+        float mm_per_pulse
+    );
+
 
 private:
     // ========================================================
@@ -85,7 +121,16 @@ private:
         SET_TARGET_HEIGHT,
         SET_VALVE_COMMAND,
         STOP_ALL_VALVES,
-        CLEAR_BODY_FAULT
+        CLEAR_BODY_FAULT,
+
+        // OPCODE 'K'
+        SET_BODY_LIMITS,
+        SET_MOVE_COMMAND_THRESHOLD,
+        SET_MIN_BODY_MOVEMENT,
+        SET_NO_MOVEMENT_TIMEOUT,
+        SET_TARGET_TIMEOUT,
+        SET_ENCODER_DIRECTION,
+        SET_ENCODER_SCALE
     };
 
     struct Command
@@ -93,7 +138,28 @@ private:
         CommandType type;
 
         uint8_t body = 0;
+
+        /*
+        * Usado por comandos de válvula
+        * y algunos valores simples.
+        */
         int16_t value = 0;
+
+        /*
+        * Dos uint16_t para límites min/max.
+        */
+        uint16_t value_u16_1 = 0;
+        uint16_t value_u16_2 = 0;
+
+        /*
+        * Timeouts.
+        */
+        uint32_t value_u32 = 0;
+
+        /*
+        * Movimiento mínimo y escala encoder.
+        */
+        float value_float = 0.0f;
     };
 
     void enqueueCommand(

@@ -154,6 +154,76 @@ void STM32Worker::processTxQueue()
 
                 break;
             }
+
+            case CommandType::SET_BODY_LIMITS:
+            {
+                stm32->set_body_limits(
+                    command.body,
+                    command.value_u16_1,
+                    command.value_u16_2
+                );
+
+                break;
+            }
+
+            case CommandType::SET_MOVE_COMMAND_THRESHOLD:
+            {
+                stm32->set_move_command_threshold(
+                    command.value_u16_1
+                );
+
+                break;
+            }
+
+            case CommandType::SET_MIN_BODY_MOVEMENT:
+            {
+                stm32->set_min_body_movement(
+                    command.value_float
+                );
+
+                break;
+            }
+
+            case CommandType::SET_NO_MOVEMENT_TIMEOUT:
+            {
+                stm32->set_no_movement_timeout(
+                    command.value_u32
+                );
+
+                break;
+            }
+
+            case CommandType::SET_TARGET_TIMEOUT:
+            {
+                stm32->set_target_timeout(
+                    command.value_u32
+                );
+
+                break;
+            }
+
+            case CommandType::SET_ENCODER_DIRECTION:
+            {
+                stm32->set_encoder_direction(
+                    command.body,
+                    static_cast<uint8_t>(
+                        command.value
+                    )
+                );
+
+                break;
+            }
+
+            case CommandType::SET_ENCODER_SCALE:
+            {
+                stm32->set_encoder_scale(
+                    command.body,
+                    command.value_float
+                );
+
+                break;
+            }
+
         }
     }
 }
@@ -330,6 +400,165 @@ void STM32Worker::clearBodyFault(
     );
 }
 
+
+
+
+void STM32Worker::setBodyLimits(
+    uint8_t body,
+    uint16_t min_height_mm,
+    uint16_t max_height_mm)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_BODY_LIMITS;
+
+    command.body =
+        body;
+
+    command.value_u16_1 =
+        min_height_mm;
+
+    command.value_u16_2 =
+        max_height_mm;
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setMoveCommandThreshold(
+    uint16_t threshold)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_MOVE_COMMAND_THRESHOLD;
+
+    command.value_u16_1 =
+        threshold;
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setMinBodyMovement(
+    float movement_mm)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_MIN_BODY_MOVEMENT;
+
+    command.value_float =
+        movement_mm;
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setNoMovementTimeout(
+    uint32_t timeout_ms)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_NO_MOVEMENT_TIMEOUT;
+
+    command.value_u32 =
+        timeout_ms;
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setTargetTimeout(
+    uint32_t timeout_ms)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_TARGET_TIMEOUT;
+
+    command.value_u32 =
+        timeout_ms;
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setEncoderDirection(
+    uint8_t body,
+    uint8_t direction)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_ENCODER_DIRECTION;
+
+    command.body =
+        body;
+
+    command.value =
+        static_cast<int16_t>(
+            direction
+        );
+
+    enqueueCommand(command);
+}
+
+
+void STM32Worker::setEncoderScale(
+    uint8_t body,
+    float mm_per_pulse)
+{
+    if (!running)
+    {
+        return;
+    }
+
+    Command command;
+
+    command.type =
+        CommandType::SET_ENCODER_SCALE;
+
+    command.body =
+        body;
+
+    command.value_float =
+        mm_per_pulse;
+
+    enqueueCommand(command);
+}
 // ============================================================
 // CALLBACKS RX
 // ============================================================
