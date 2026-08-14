@@ -10,6 +10,7 @@
 class QStackedWidget;
 class QLabel;
 class QTimer;
+class STM32Worker;
 
 class MainWindow : public QMainWindow
 {
@@ -18,6 +19,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(
         HagieState *hagieState,
+        STM32Worker *stm32Worker,
         QWidget *parent = nullptr
     );
 
@@ -26,11 +28,21 @@ public:
 private:
     HagieState *state;
 
+    STM32Worker *stm32Worker;
+
     QStackedWidget *centralStack;
 
     QTimer *dashboardTimer;
 
     QLabel *systemStatusLabel;
+
+    QLabel *systemFaultsLabel = nullptr;
+
+    
+    std::array<QLabel *, HagieState::BODY_COUNT>
+        bodyFaultDetailLabels {};
+
+    void updateFaultPage();
 
     std::array<QLabel *, HagieState::BODY_COUNT> heightLabels {};
     std::array<QLabel *, HagieState::BODY_COUNT> targetLabels {};

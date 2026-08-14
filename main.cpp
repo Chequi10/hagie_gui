@@ -42,7 +42,10 @@ int main(int argc, char *argv[])
      *
      * Le entregamos una referencia al estado central.
      */
-    MainWindow window(&hagieState);
+    MainWindow window(
+        &hagieState,
+        &stm32Worker
+    );
     
 
     window.show();

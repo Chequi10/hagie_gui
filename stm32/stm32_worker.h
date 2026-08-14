@@ -10,6 +10,10 @@
 #include "core/hagie_state.h"
 #include "stm32/stm32canbusif.h"
 
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+
 
 class STM32Worker
 {
@@ -73,6 +77,33 @@ private:
 
 
     // ========================================================
+    // Cola de comandos TX
+    // ========================================================
+
+    enum class CommandType
+    {
+        SET_TARGET_HEIGHT,
+        SET_VALVE_COMMAND,
+        STOP_ALL_VALVES,
+        CLEAR_BODY_FAULT
+    };
+
+    struct Command
+    {
+        CommandType type;
+
+        uint8_t body = 0;
+        int16_t value = 0;
+    };
+
+    void enqueueCommand(
+        const Command& command
+    );
+
+    void processTxQueue();
+
+
+    // ========================================================
     // Configuración de callbacks RX
     // ========================================================
 
@@ -108,6 +139,9 @@ private:
     std::atomic<bool> running;
 
     std::thread workerThread;
+    std::mutex txMutex;
+
+    std::deque<Command> txQueue;
 };
 
 

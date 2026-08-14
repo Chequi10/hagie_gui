@@ -14,13 +14,17 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QTimer>
+#include "stm32/stm32_worker.h"
+#include <QStringList>
 
 
 MainWindow::MainWindow(
     HagieState *hagieState,
+    STM32Worker *stm32Worker,
     QWidget *parent)
     : QMainWindow(parent),
       state(hagieState),
+      stm32Worker(stm32Worker),
       centralStack(nullptr)
 {
     setWindowTitle("Hagie Control");
@@ -78,6 +82,9 @@ MainWindow::MainWindow(
     createMenus();
     createStatusBar();
     updateDashboard();
+    updateFaultPage();
+
+
     /*
     * Actualización periódica de la interfaz.
     *
@@ -543,7 +550,7 @@ QWidget *MainWindow::createFaultsPage()
     QWidget *page =
         new QWidget();
 
-    QVBoxLayout *layout =
+    QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
 
@@ -561,28 +568,126 @@ QWidget *MainWindow::createFaultsPage()
         "font-weight: bold;"
     );
 
-    layout->addWidget(title);
+    mainLayout->addWidget(title);
 
 
-    QLabel *faults =
+    /*
+     * Fallas globales.
+     */
+    systemFaultsLabel =
         new QLabel(
-            "SYSTEM FAULTS: 0x00000000\n\n"
-            "Cuerpo 1: OK\n"
-            "Cuerpo 2: OK\n"
-            "Cuerpo 3: OK\n"
-            "Cuerpo 4: OK\n"
-            "Cuerpo 5: OK\n"
-            "Cuerpo 6: OK"
+            "Fallas globales: ---"
         );
 
-    faults->setStyleSheet(
+    systemFaultsLabel->setStyleSheet(
         "font-size: 18px;"
+        "font-weight: bold;"
     );
 
-    layout->addWidget(faults);
+    mainLayout->addWidget(
+        systemFaultsLabel
+    );
 
-    layout->addStretch();
 
+    /*
+     * Fallas individuales.
+     */
+    QGridLayout *faultGrid =
+        new QGridLayout();
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        QFrame *frame =
+            new QFrame();
+
+        frame->setFrameShape(
+            QFrame::StyledPanel
+        );
+
+        QVBoxLayout *layout =
+            new QVBoxLayout(frame);
+
+
+        QLabel *bodyTitle =
+            new QLabel(
+                QString("CUERPO %1")
+                    .arg(body + 1)
+            );
+
+        bodyTitle->setAlignment(
+            Qt::AlignCenter
+        );
+
+        bodyTitle->setStyleSheet(
+            "font-size: 16px;"
+            "font-weight: bold;"
+        );
+
+
+        bodyFaultDetailLabels[body] =
+            new QLabel("OK");
+
+        bodyFaultDetailLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+        bodyFaultDetailLabels[body]
+            ->setWordWrap(true);
+
+
+        QPushButton *clearButton =
+            new QPushButton(
+                "Borrar NO_MOVEMENT"
+            );
+
+        connect(
+            clearButton,
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->clearBodyFault(
+                    static_cast<uint8_t>(body)
+                );
+            }
+        );
+
+
+        layout->addWidget(
+            bodyTitle
+        );
+
+        layout->addWidget(
+            bodyFaultDetailLabels[body]
+        );
+
+        layout->addWidget(
+            clearButton
+        );
+
+
+        faultGrid->addWidget(
+            frame,
+            body / 3,
+            body % 3
+        );
+    }
+
+
+    mainLayout->addLayout(
+        faultGrid
+    );
+
+    mainLayout->addStretch();
 
     return page;
 }
@@ -625,6 +730,8 @@ QWidget *MainWindow::createTestsPage()
             "Test de válvulas"
         );
 
+     
+
     QPushButton *encoders =
         new QPushButton(
             "Test de encoders"
@@ -651,6 +758,7 @@ QWidget *MainWindow::createTestsPage()
     layout->addWidget(stm32);
     layout->addWidget(imu);
     layout->addWidget(cameras);
+    
 
     layout->addStretch();
 
@@ -815,6 +923,7 @@ void MainWindow::updateDashboard()
         }
     }
     updateSystemStatus();
+    updateFaultPage();
 }
 
 void MainWindow::updateSystemStatus()
@@ -857,4 +966,142 @@ void MainWindow::updateSystemStatus()
         + " | "
         + aiText
     );
+}
+
+void MainWindow::updateFaultPage()
+{
+    if (state == nullptr)
+    {
+        return;
+    }
+
+    /*
+     * ========================================================
+     * FALLAS GLOBALES
+     * ========================================================
+     */
+
+    HagieState::SystemState system =
+        state->getSystemState();
+
+    QStringList systemFaultList;
+
+    if ((system.system_faults & 0x01U) != 0)
+    {
+        systemFaultList
+            << "JETSON_TIMEOUT";
+    }
+
+    if ((system.system_faults & 0x02U) != 0)
+    {
+        systemFaultList
+            << "IMU_TIMEOUT";
+    }
+
+    if ((system.system_faults & 0x04U) != 0)
+    {
+        systemFaultList
+            << "UART_RX";
+    }
+
+    if ((system.system_faults & 0x08U) != 0)
+    {
+        systemFaultList
+            << "UART_TX";
+    }
+
+    if ((system.system_faults & 0x10U) != 0)
+    {
+        systemFaultList
+            << "CAN";
+    }
+
+
+    if (systemFaultList.isEmpty())
+    {
+        systemFaultsLabel->setText(
+            "Fallas globales: OK"
+        );
+    }
+    else
+    {
+        systemFaultsLabel->setText(
+            "Fallas globales: "
+            + systemFaultList.join(" | ")
+        );
+    }
+
+
+    /*
+     * ========================================================
+     * FALLAS POR CUERPO
+     * ========================================================
+     */
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        HagieState::BodyState bodyState =
+            state->getBodyState(body);
+
+        QStringList faults;
+
+
+        if ((bodyState.faults & 0x01U) != 0)
+        {
+            faults
+                << "ENCODER_TIMEOUT";
+        }
+
+        if ((bodyState.faults & 0x02U) != 0)
+        {
+            faults
+                << "ENCODER_RANGE";
+        }
+
+        if ((bodyState.faults & 0x04U) != 0)
+        {
+            faults
+                << "NO_MOVEMENT";
+        }
+
+        if ((bodyState.faults & 0x08U) != 0)
+        {
+            faults
+                << "MIN_LIMIT";
+        }
+
+        if ((bodyState.faults & 0x10U) != 0)
+        {
+            faults
+                << "MAX_LIMIT";
+        }
+
+        if ((bodyState.faults & 0x20U) != 0)
+        {
+            faults
+                << "TARGET_TIMEOUT";
+        }
+
+        if ((bodyState.faults & 0x40U) != 0)
+        {
+            faults
+                << "VALVE_ERROR";
+        }
+
+
+        if (faults.isEmpty())
+        {
+            bodyFaultDetailLabels[body]
+                ->setText("OK");
+        }
+        else
+        {
+            bodyFaultDetailLabels[body]
+                ->setText(
+                    faults.join("\n")
+                );
+        }
+    }
 }

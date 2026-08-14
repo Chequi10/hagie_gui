@@ -83,6 +83,81 @@ bool STM32Worker::start()
 }
 
 
+void STM32Worker::enqueueCommand(
+    const Command& command)
+{
+    std::lock_guard<std::mutex> lock(txMutex);
+
+    txQueue.push_back(command);
+}
+
+
+void STM32Worker::processTxQueue()
+{
+    if (!stm32)
+    {
+        return;
+    }
+
+    while (true)
+    {
+        Command command;
+
+        {
+            std::lock_guard<std::mutex> lock(txMutex);
+
+            if (txQueue.empty())
+            {
+                break;
+            }
+
+            command = txQueue.front();
+            txQueue.pop_front();
+        }
+
+        switch (command.type)
+        {
+            case CommandType::SET_TARGET_HEIGHT:
+            {
+                stm32->set_target_height(
+                    command.body,
+                    static_cast<uint16_t>(
+                        command.value
+                    )
+                );
+
+                break;
+            }
+
+            case CommandType::SET_VALVE_COMMAND:
+            {
+                stm32->set_valve_command(
+                    command.body,
+                    command.value
+                );
+
+                break;
+            }
+
+            case CommandType::STOP_ALL_VALVES:
+            {
+                stm32->stop_all_valves();
+
+                break;
+            }
+
+            case CommandType::CLEAR_BODY_FAULT:
+            {
+                stm32->clear_body_fault(
+                    command.body
+                );
+
+                break;
+            }
+        }
+    }
+}
+
 void STM32Worker::stop()
 {
     if (!running)
@@ -149,14 +224,19 @@ void STM32Worker::setTargetHeight(
     uint8_t body,
     uint16_t height_mm)
 {
-    if (!running || !stm32)
+    if (!running)
     {
         return;
     }
 
-    stm32->set_target_height(
-        body,
-        height_mm
+    enqueueCommand(
+        {
+            CommandType::SET_TARGET_HEIGHT,
+            body,
+            static_cast<int16_t>(
+                height_mm
+            )
+        }
     );
 
     if (state != nullptr &&
@@ -179,23 +259,22 @@ void STM32Worker::setValveCommand(
     uint8_t body,
     int16_t command)
 {
-    if (!running || !stm32)
+    if (!running)
     {
         return;
     }
 
-    stm32->set_valve_command(
-        body,
-        command
+    enqueueCommand(
+        {
+            CommandType::SET_VALVE_COMMAND,
+            body,
+            command
+        }
     );
 
     if (state != nullptr &&
         body < HagieState::BODY_COUNT)
     {
-        /*
-         * OPCODE 'B' coloca el cuerpo
-         * en modo MANUAL en STM32.
-         */
         state->setBodyAutoMode(
             body,
             false
@@ -206,12 +285,18 @@ void STM32Worker::setValveCommand(
 
 void STM32Worker::stopAllValves()
 {
-    if (!running || !stm32)
+    if (!running)
     {
         return;
     }
 
-    stm32->stop_all_valves();
+    enqueueCommand(
+        {
+            CommandType::STOP_ALL_VALVES,
+            0,
+            0
+        }
+    );
 
     if (state != nullptr)
     {
@@ -231,16 +316,19 @@ void STM32Worker::stopAllValves()
 void STM32Worker::clearBodyFault(
     uint8_t body)
 {
-    if (!running || !stm32)
+    if (!running)
     {
         return;
     }
 
-    stm32->clear_body_fault(
-        body
+    enqueueCommand(
+        {
+            CommandType::CLEAR_BODY_FAULT,
+            body,
+            0
+        }
     );
 }
-
 
 // ============================================================
 // CALLBACKS RX
@@ -519,6 +607,14 @@ void STM32Worker::workerLoop()
                 now - lastHeartbeat
             );
 
+
+        /*
+         * ----------------------------------------------------
+         * Heartbeat
+         * ----------------------------------------------------
+         *
+         * Se transmite desde ESTE MISMO HILO.
+         */
         if (elapsed.count() >= 100)
         {
             try
@@ -530,10 +626,9 @@ void STM32Worker::workerLoop()
             catch (const std::exception& e)
             {
                 std::cerr
-                    << "STM32 desconectada: "
+                    << "STM32 desconectada durante heartbeat: "
                     << e.what()
                     << std::endl;
-
 
                 /*
                  * Actualizar estado visible por GUI.
@@ -550,7 +645,6 @@ void STM32Worker::workerLoop()
                     state->setSystemState(system);
                 }
 
-
                 /*
                  * Cerrar la interfaz dañada.
                  */
@@ -564,9 +658,8 @@ void STM32Worker::workerLoop()
 
                 stm32.reset();
 
-
                 /*
-                 * Esperar antes del próximo intento.
+                 * Esperar antes de volver a intentar.
                  */
                 std::this_thread::sleep_for(
                     seconds(1)
@@ -577,6 +670,77 @@ void STM32Worker::workerLoop()
         }
 
 
+        /*
+         * ----------------------------------------------------
+         * Cola de comandos TX
+         * ----------------------------------------------------
+         *
+         * Todos los comandos provenientes de:
+         *
+         * - GUI
+         * - IA
+         * - control
+         * - tests
+         *
+         * terminan en txQueue.
+         *
+         * ESTE es el único hilo autorizado a transmitir
+         * hacia la STM32.
+         */
+        try
+        {
+            processTxQueue();
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr
+                << "Error TX STM32: "
+                << e.what()
+                << std::endl;
+
+            /*
+             * Marcar comunicación caída.
+             */
+            if (state != nullptr)
+            {
+                HagieState::SystemState system =
+                    state->getSystemState();
+
+                system.stm32_connected = false;
+                system.can_ok = false;
+                system.imu_valid = false;
+
+                state->setSystemState(system);
+            }
+
+            /*
+             * Cerrar la interfaz actual.
+             */
+            try
+            {
+                stm32->stop();
+            }
+            catch (...)
+            {
+            }
+
+            stm32.reset();
+
+            /*
+             * Esperar antes de intentar reconectar.
+             */
+            std::this_thread::sleep_for(
+                seconds(1)
+            );
+
+            continue;
+        }
+
+
+        /*
+         * Ciclo del worker:
+         * aproximadamente 100 Hz.
+         */
         std::this_thread::sleep_for(
             milliseconds(10)
         );
