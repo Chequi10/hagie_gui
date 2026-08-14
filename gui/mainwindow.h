@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <array>
+#include <chrono>
 
 
 #include "core/hagie_state.h"
@@ -41,7 +42,7 @@ private:
 
     QLabel *systemFaultsLabel = nullptr;
 
-    int testValveCommand = 100;
+    int testValveCommand = 300;
 
     std::array<QFrame *, HagieState::BODY_COUNT>
     testBodyFrames {};
@@ -64,6 +65,40 @@ private:
 
     std::array<QPushButton *, HagieState::BODY_COUNT>
     testDownButtons {};
+
+    /*
+    * ========================================================
+    * Diagnóstico de encoders en Panel de Test
+    * ========================================================
+    */
+
+    std::array<QLabel *, HagieState::BODY_COUNT>
+        testEncoderStatusLabels {};
+
+    std::array<QLabel *, HagieState::BODY_COUNT>
+        testEncoderDeltaLabels {};
+
+    /*
+    * Última altura observada de cada encoder.
+    */
+    std::array<uint16_t, HagieState::BODY_COUNT>
+        testPreviousHeight {};
+
+    /*
+    * Indica si ya tenemos una primera muestra válida.
+    */
+    std::array<bool, HagieState::BODY_COUNT>
+        testEncoderInitialized {};
+
+        /*para que no quede siemrpe quieto*/
+
+    std::array<std::chrono::steady_clock::time_point, HagieState::BODY_COUNT>
+        testLastEncoderMovementTime {};
+
+    std::array<int8_t, HagieState::BODY_COUNT>
+        testEncoderDirection {};
+
+       
 
     void updateTestPage();
 

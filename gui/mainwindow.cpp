@@ -843,6 +843,26 @@ QWidget *MainWindow::createTestsPage()
                 "Estado: OK"
             );
 
+            testEncoderStatusLabels[body] =
+                new QLabel(
+                    "Encoder: ---"
+                );
+
+            testEncoderDeltaLabels[body] =
+                new QLabel(
+                    "Cambio: 0 mm"
+                );
+
+            testEncoderStatusLabels[body]
+                ->setAlignment(
+                    Qt::AlignCenter
+                );
+
+            testEncoderDeltaLabels[body]
+                ->setAlignment(
+                    Qt::AlignCenter
+                );
+
         testFaultLabels[body]
             ->setAlignment(
                 Qt::AlignCenter
@@ -1027,6 +1047,14 @@ QWidget *MainWindow::createTestsPage()
         );
 
         bodyLayout->addWidget(
+            testEncoderStatusLabels[body]
+        );
+
+        bodyLayout->addWidget(
+            testEncoderDeltaLabels[body]
+        );
+
+        bodyLayout->addWidget(
             testValveLabels[body]
         );
 
@@ -1037,7 +1065,6 @@ QWidget *MainWindow::createTestsPage()
         bodyLayout->addLayout(
             buttonLayout
         );
-
 
         bodyGrid->addWidget(
             frame,
@@ -1442,12 +1469,147 @@ void MainWindow::updateTestPage()
         return;
     }
 
+    constexpr int32_t ENCODER_MOVEMENT_THRESHOLD_MM = 2;
+    constexpr int64_t ENCODER_STILL_TIMEOUT_MS = 300;
+
+    auto now =
+        std::chrono::steady_clock::now();
+
     for (std::size_t body = 0;
          body < HagieState::BODY_COUNT;
          ++body)
     {
         HagieState::BodyState bodyState =
             state->getBodyState(body);
+
+
+        /*
+         * ========================================================
+         * DIAGNÓSTICO DEL ENCODER
+         * ========================================================
+         */
+
+        if (!testEncoderInitialized[body])
+        {
+            testPreviousHeight[body] =
+                bodyState.height_mm;
+
+            testEncoderInitialized[body] =
+                true;
+
+            testEncoderDirection[body] =
+                0;
+
+            testLastEncoderMovementTime[body] =
+                now;
+
+            testEncoderStatusLabels[body]->setText(
+                "Encoder: QUIETO"
+            );
+
+            testEncoderStatusLabels[body]->setStyleSheet(
+                "font-weight: bold;"
+                "color: gray;"
+            );
+
+            testEncoderDeltaLabels[body]->setText(
+                "Cambio: 0 mm"
+            );
+        }
+        else
+        {
+            int32_t delta =
+                static_cast<int32_t>(
+                    bodyState.height_mm
+                )
+                -
+                static_cast<int32_t>(
+                    testPreviousHeight[body]
+                );
+
+            if (delta >= ENCODER_MOVEMENT_THRESHOLD_MM)
+            {
+                testEncoderDirection[body] = 1;
+
+                testLastEncoderMovementTime[body] =
+                    now;
+
+                testEncoderStatusLabels[body]->setText(
+                    "Encoder: SUBIENDO"
+                );
+
+                testEncoderStatusLabels[body]->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: green;"
+                );
+
+                testEncoderDeltaLabels[body]->setText(
+                    QString("Cambio: +%1 mm")
+                        .arg(delta)
+                );
+
+                testPreviousHeight[body] =
+                    bodyState.height_mm;
+            }
+            else if (delta <= -ENCODER_MOVEMENT_THRESHOLD_MM)
+            {
+                testEncoderDirection[body] = -1;
+
+                testLastEncoderMovementTime[body] =
+                    now;
+
+                testEncoderStatusLabels[body]->setText(
+                    "Encoder: BAJANDO"
+                );
+
+                testEncoderStatusLabels[body]->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: green;"
+                );
+
+                testEncoderDeltaLabels[body]->setText(
+                    QString("Cambio: %1 mm")
+                        .arg(delta)
+                );
+
+                testPreviousHeight[body] =
+                    bodyState.height_mm;
+            }
+            else
+            {
+                auto elapsed =
+                    std::chrono::duration_cast<
+                        std::chrono::milliseconds>(
+                            now -
+                            testLastEncoderMovementTime[body]
+                        ).count();
+
+                if (elapsed >= ENCODER_STILL_TIMEOUT_MS)
+                {
+                    testEncoderDirection[body] = 0;
+
+                    testEncoderStatusLabels[body]->setText(
+                        "Encoder: QUIETO"
+                    );
+
+                    testEncoderStatusLabels[body]->setStyleSheet(
+                        "font-weight: bold;"
+                        "color: gray;"
+                    );
+
+                    testEncoderDeltaLabels[body]->setText(
+                        "Cambio: 0 mm"
+                    );
+                }
+            }
+        }
+
+
+        /*
+         * ========================================================
+         * TODO ESTO ES LA LÓGICA QUE YA FUNCIONABA
+         * ========================================================
+         */
 
         testHeightLabels[body]->setText(
             QString("Altura: %1 mm")
@@ -1473,10 +1635,11 @@ void MainWindow::updateTestPage()
             testBodyFrames[body]->setStyleSheet(
                 ""
             );
+
             /*
-            * Sin fallas:
-            * permitir movimiento manual.
-            */
+             * Sin fallas:
+             * permitir movimiento manual.
+             */
             testUpButtons[body]->setEnabled(true);
             testDownButtons[body]->setEnabled(true);
         }
@@ -1534,6 +1697,7 @@ void MainWindow::updateTestPage()
                 "border: 2px solid red;"
                 "}"
             );
+
             testUpButtons[body]->setEnabled(false);
             testDownButtons[body]->setEnabled(false);
         }
