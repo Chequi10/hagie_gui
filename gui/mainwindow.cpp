@@ -16,6 +16,7 @@
 #include <QTimer>
 #include "stm32/stm32_worker.h"
 #include <QStringList>
+#include <QComboBox>
 
 
 MainWindow::MainWindow(
@@ -704,13 +705,13 @@ QWidget *MainWindow::createTestsPage()
     QWidget *page =
         new QWidget();
 
-    QVBoxLayout *layout =
+    QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
 
     QLabel *title =
         new QLabel(
-            "PANEL DE TEST"
+            "PANEL DE TEST - VÁLVULAS Y ENCODERS"
         );
 
     title->setAlignment(
@@ -722,50 +723,378 @@ QWidget *MainWindow::createTestsPage()
         "font-weight: bold;"
     );
 
-    layout->addWidget(title);
+    mainLayout->addWidget(title);
 
+    /*
+    * Selector de intensidad del comando
+    * para las pruebas manuales.
+    */
+    QHBoxLayout *commandLayout =
+        new QHBoxLayout();
 
-    QPushButton *valves =
-        new QPushButton(
-            "Test de válvulas"
+    QLabel *commandLabel =
+        new QLabel(
+            "Comando de válvula:"
         );
 
-     
+    QComboBox *commandCombo =
+        new QComboBox();
 
-    QPushButton *encoders =
-        new QPushButton(
-            "Test de encoders"
+    commandCombo->addItem("100", 100);
+    commandCombo->addItem("200", 200);
+    commandCombo->addItem("300", 300);
+    commandCombo->addItem("400", 400);
+    commandCombo->addItem("500", 500);
+    commandCombo->addItem("750", 750);
+    commandCombo->addItem("1000", 1000);
+
+    /*
+    * Valor inicial = 300.
+    */
+    commandCombo->setCurrentIndex(2);
+
+    connect(
+        commandCombo,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this, commandCombo](int)
+        {
+            testValveCommand =
+                commandCombo
+                    ->currentData()
+                    .toInt();
+        }
+    );
+
+    commandLayout->addStretch();
+
+    commandLayout->addWidget(
+        commandLabel
+    );
+
+    commandLayout->addWidget(
+        commandCombo
+    );
+
+    commandLayout->addStretch();
+
+    mainLayout->addLayout(
+        commandLayout
+    );
+
+
+    /*
+     * Grid de los 6 cuerpos.
+     */
+    QGridLayout *bodyGrid =
+        new QGridLayout();
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        testBodyFrames[body] =
+            new QFrame();
+
+        QFrame *frame =
+            testBodyFrames[body];
+
+        frame->setFrameShape(
+            QFrame::StyledPanel
         );
 
-    QPushButton *stm32 =
-        new QPushButton(
-            "Test comunicación STM32"
+
+        QVBoxLayout *bodyLayout =
+            new QVBoxLayout(frame);
+
+
+        QLabel *bodyTitle =
+            new QLabel(
+                QString("CUERPO %1")
+                    .arg(body + 1)
+            );
+
+        bodyTitle->setAlignment(
+            Qt::AlignCenter
         );
 
-    QPushButton *imu =
-        new QPushButton(
-            "Test IMU"
-        );
-
-    QPushButton *cameras =
-        new QPushButton(
-            "Test cámaras"
+        bodyTitle->setStyleSheet(
+            "font-size: 16px;"
+            "font-weight: bold;"
         );
 
 
-    layout->addWidget(valves);
-    layout->addWidget(encoders);
-    layout->addWidget(stm32);
-    layout->addWidget(imu);
-    layout->addWidget(cameras);
-    
+        testHeightLabels[body] =
+            new QLabel(
+                "Altura: --- mm"
+            );
 
-    layout->addStretch();
+        testValveLabels[body] =
+            new QLabel(
+                "Válvula: 0"
+            );
+
+
+            testFaultLabels[body] =
+            new QLabel(
+                "Estado: OK"
+            );
+
+        testFaultLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+        testFaultLabels[body]
+            ->setStyleSheet(
+                "font-weight: bold;"
+            );
+
+
+        testHeightLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+        testValveLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+
+        /*
+         * Botones de movimiento.
+         */
+        QHBoxLayout *buttonLayout =
+            new QHBoxLayout();
+
+
+        testDownButtons[body] =
+            new QPushButton(
+                "BAJAR"
+            );
+
+        QPushButton *stopButton =
+            new QPushButton(
+                "STOP"
+            );
+
+        testUpButtons[body] =
+            new QPushButton(
+                "SUBIR"
+            );
+
+        /*
+        * Alias locales para no tener que modificar
+        * el resto de los connect().
+        */
+        QPushButton *downButton =
+            testDownButtons[body];
+
+        QPushButton *upButton =
+            testUpButtons[body];
+
+
+        /*
+        * BAJAR mientras se mantiene presionado.
+        */
+        connect(
+            downButton,
+            &QPushButton::pressed,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    static_cast<int16_t>(
+                        -testValveCommand
+                    )
+                );
+            }
+        );
+
+        connect(
+            downButton,
+            &QPushButton::released,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        /*
+         * STOP
+         */
+        connect(
+            stopButton,
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        
+        /*
+        * SUBIR mientras se mantiene presionado.
+        */
+        connect(
+            upButton,
+            &QPushButton::pressed,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->setValveCommand(
+                static_cast<uint8_t>(body),
+                static_cast<int16_t>(
+                    testValveCommand
+                )
+            );
+            }
+        );
+
+        connect(
+            upButton,
+            &QPushButton::released,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        buttonLayout->addWidget(
+            downButton
+        );
+
+        buttonLayout->addWidget(
+            stopButton
+        );
+
+        buttonLayout->addWidget(
+            upButton
+        );
+
+
+        bodyLayout->addWidget(
+            bodyTitle
+        );
+
+        bodyLayout->addWidget(
+            testHeightLabels[body]
+        );
+
+        bodyLayout->addWidget(
+            testValveLabels[body]
+        );
+
+        bodyLayout->addWidget(
+            testFaultLabels[body]
+        );
+
+        bodyLayout->addLayout(
+            buttonLayout
+        );
+
+
+        bodyGrid->addWidget(
+            frame,
+            body / 3,
+            body % 3
+        );
+    }
+
+
+    mainLayout->addLayout(
+        bodyGrid
+    );
+
+
+    /*
+     * Botón global de seguridad.
+     */
+    QPushButton *stopAllButton =
+        new QPushButton(
+            "DETENER TODAS LAS VÁLVULAS"
+        );
+
+    stopAllButton->setMinimumHeight(
+        60
+    );
+
+    stopAllButton->setStyleSheet(
+        "font-size: 18px;"
+        "font-weight: bold;"
+        "background-color: red;"
+        "color: white;"
+    );
+
+
+    connect(
+        stopAllButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            if (stm32Worker == nullptr)
+            {
+                return;
+            }
+
+            stm32Worker->stopAllValves();
+        }
+    );
+
+
+    mainLayout->addWidget(
+        stopAllButton
+    );
 
 
     return page;
 }
-
 
 /*
  * ============================================================
@@ -924,6 +1253,7 @@ void MainWindow::updateDashboard()
     }
     updateSystemStatus();
     updateFaultPage();
+    updateTestPage();
 }
 
 void MainWindow::updateSystemStatus()
@@ -1102,6 +1432,110 @@ void MainWindow::updateFaultPage()
                 ->setText(
                     faults.join("\n")
                 );
+        }
+    }
+}
+void MainWindow::updateTestPage()
+{
+    if (state == nullptr)
+    {
+        return;
+    }
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        HagieState::BodyState bodyState =
+            state->getBodyState(body);
+
+        testHeightLabels[body]->setText(
+            QString("Altura: %1 mm")
+                .arg(bodyState.height_mm)
+        );
+
+        testValveLabels[body]->setText(
+            QString("Válvula: %1")
+                .arg(bodyState.valve_command)
+        );
+
+        if (bodyState.faults == 0)
+        {
+            testFaultLabels[body]->setText(
+                "Estado: OK"
+            );
+
+            testFaultLabels[body]->setStyleSheet(
+                "font-weight: bold;"
+                "color: green;"
+            );
+
+            testBodyFrames[body]->setStyleSheet(
+                ""
+            );
+            /*
+            * Sin fallas:
+            * permitir movimiento manual.
+            */
+            testUpButtons[body]->setEnabled(true);
+            testDownButtons[body]->setEnabled(true);
+        }
+        else
+        {
+            QStringList faults;
+
+            if ((bodyState.faults & 0x01U) != 0)
+            {
+                faults << "ENCODER_TIMEOUT";
+            }
+
+            if ((bodyState.faults & 0x02U) != 0)
+            {
+                faults << "ENCODER_RANGE";
+            }
+
+            if ((bodyState.faults & 0x04U) != 0)
+            {
+                faults << "NO_MOVEMENT";
+            }
+
+            if ((bodyState.faults & 0x08U) != 0)
+            {
+                faults << "MIN_LIMIT";
+            }
+
+            if ((bodyState.faults & 0x10U) != 0)
+            {
+                faults << "MAX_LIMIT";
+            }
+
+            if ((bodyState.faults & 0x20U) != 0)
+            {
+                faults << "TARGET_TIMEOUT";
+            }
+
+            if ((bodyState.faults & 0x40U) != 0)
+            {
+                faults << "VALVE_ERROR";
+            }
+
+            testFaultLabels[body]->setText(
+                "FALLA: "
+                + faults.join(" | ")
+            );
+
+            testFaultLabels[body]->setStyleSheet(
+                "font-weight: bold;"
+                "color: red;"
+            );
+
+            testBodyFrames[body]->setStyleSheet(
+                "QFrame {"
+                "border: 2px solid red;"
+                "}"
+            );
+            testUpButtons[body]->setEnabled(false);
+            testDownButtons[body]->setEnabled(false);
         }
     }
 }
