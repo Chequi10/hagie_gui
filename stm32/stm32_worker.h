@@ -13,6 +13,7 @@
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <array>
 
 
 class STM32Worker
@@ -105,6 +106,48 @@ public:
 
 
 private:
+     // ========================================================
+    // Copia de configuración para resincronizar al reconectar
+    // ========================================================
+
+    struct RuntimeConfiguration
+    {
+        bool valid = false;
+
+        std::array<uint16_t, HagieState::BODY_COUNT>
+            min_height_mm {};
+
+        std::array<uint16_t, HagieState::BODY_COUNT>
+            max_height_mm {};
+
+        std::array<uint8_t, HagieState::BODY_COUNT>
+            encoder_direction {};
+
+        std::array<float, HagieState::BODY_COUNT>
+            encoder_scale {};
+
+        uint16_t move_command_threshold = 100;
+
+        float min_body_movement_mm = 2.0f;
+
+        uint32_t no_movement_timeout_ms = 1000;
+
+        uint32_t target_timeout_ms = 1000;
+    };
+
+
+    RuntimeConfiguration runtimeConfig;
+
+
+    /*
+    * Reenvía la última configuración conocida
+    * después de una reconexión STM32.
+    */
+    void enqueueRuntimeConfiguration();   
+    
+
+  
+
     // ========================================================
     // Hilo principal STM32
     // ========================================================
@@ -208,6 +251,8 @@ private:
     std::mutex txMutex;
 
     std::deque<Command> txQueue;
+
+    std::mutex configMutex;
 };
 
 

@@ -148,6 +148,10 @@ private:
 
     void createMenus();
     void createStatusBar();
+
+    void saveConfiguration();
+    void loadConfiguration();
+    void syncConfigurationToWorker();
 };
 
 #endif

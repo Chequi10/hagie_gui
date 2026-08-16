@@ -83,6 +83,9 @@ MainWindow::MainWindow(
         centralStack
     );
 
+    loadConfiguration();
+    syncConfigurationToWorker();
+
     createMenus();
     createStatusBar();
     updateDashboard();
@@ -1570,6 +1573,10 @@ QWidget *MainWindow::createConfigurationPage()
                 return;
             }
 
+            saveConfiguration();
+
+            syncConfigurationToWorker();
+
             /*
             * ====================================================
             * K 0x01
@@ -2212,5 +2219,297 @@ void MainWindow::updateTestPage()
             testUpButtons[body]->setEnabled(false);
             testDownButtons[body]->setEnabled(false);
         }
+    }
+}
+
+void MainWindow::saveConfiguration()
+{
+    QSettings settings(
+        "hagie_config.ini",
+        QSettings::IniFormat
+    );
+
+    /*
+     * ========================================================
+     * Configuración por cuerpo
+     * ========================================================
+     */
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        QString group =
+            QString("Body%1")
+                .arg(body + 1);
+
+        settings.beginGroup(group);
+
+        settings.setValue(
+            "min_height_mm",
+            configMinHeightSpin[body]->value()
+        );
+
+        settings.setValue(
+            "max_height_mm",
+            configMaxHeightSpin[body]->value()
+        );
+
+        settings.setValue(
+            "encoder_scale_mm_per_pulse",
+            configEncoderScaleSpin[body]->value()
+        );
+
+        settings.setValue(
+            "encoder_direction",
+            configEncoderDirectionCombo[body]
+                ->currentData()
+                .toInt()
+        );
+
+        settings.endGroup();
+    }
+
+
+    /*
+     * ========================================================
+     * Parámetros globales
+     * ========================================================
+     */
+
+    settings.beginGroup(
+        "Control"
+    );
+
+    settings.setValue(
+        "move_command_threshold",
+        configMoveThresholdSpin->value()
+    );
+
+    settings.setValue(
+        "min_body_movement_mm",
+        configMinMovementSpin->value()
+    );
+
+    settings.setValue(
+        "no_movement_timeout_ms",
+        configNoMovementTimeoutSpin->value()
+    );
+
+    settings.setValue(
+        "target_timeout_ms",
+        configTargetTimeoutSpin->value()
+    );
+
+    settings.endGroup();
+
+    /*
+     * Forzar escritura en disco.
+     */
+    settings.sync();
+}
+
+void MainWindow::loadConfiguration()
+{
+    QSettings settings(
+        "hagie_config.ini",
+        QSettings::IniFormat
+    );
+
+    /*
+     * ========================================================
+     * Configuración por cuerpo
+     * ========================================================
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        QString group =
+            QString("Body%1")
+                .arg(body + 1);
+
+        settings.beginGroup(group);
+
+        configMinHeightSpin[body]->setValue(
+            settings.value(
+                "min_height_mm",
+                50
+            ).toInt()
+        );
+
+        configMaxHeightSpin[body]->setValue(
+            settings.value(
+                "max_height_mm",
+                700
+            ).toInt()
+        );
+
+        configEncoderScaleSpin[body]->setValue(
+            settings.value(
+                "encoder_scale_mm_per_pulse",
+                1.0
+            ).toDouble()
+        );
+
+        int direction =
+            settings.value(
+                "encoder_direction",
+                1
+            ).toInt();
+
+        int index =
+            configEncoderDirectionCombo[body]
+                ->findData(direction);
+
+        if (index >= 0)
+        {
+            configEncoderDirectionCombo[body]
+                ->setCurrentIndex(index);
+        }
+
+        settings.endGroup();
+    }
+
+
+    /*
+     * ========================================================
+     * Parámetros globales
+     * ========================================================
+     */
+    settings.beginGroup(
+        "Control"
+    );
+
+    configMoveThresholdSpin->setValue(
+        settings.value(
+            "move_command_threshold",
+            100
+        ).toInt()
+    );
+
+    configMinMovementSpin->setValue(
+        settings.value(
+            "min_body_movement_mm",
+            2.0
+        ).toDouble()
+    );
+
+    configNoMovementTimeoutSpin->setValue(
+        settings.value(
+            "no_movement_timeout_ms",
+            1000
+        ).toInt()
+    );
+
+    configTargetTimeoutSpin->setValue(
+        settings.value(
+            "target_timeout_ms",
+            1000
+        ).toInt()
+    );
+
+    settings.endGroup();
+}
+void MainWindow::syncConfigurationToWorker()
+{
+    if (stm32Worker == nullptr)
+    {
+        return;
+    }
+
+    /*
+     * K01 - Límites por cuerpo
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        uint16_t minHeight =
+            static_cast<uint16_t>(
+                configMinHeightSpin[body]->value()
+            );
+
+        uint16_t maxHeight =
+            static_cast<uint16_t>(
+                configMaxHeightSpin[body]->value()
+            );
+
+        if (minHeight >= maxHeight)
+        {
+            continue;
+        }
+
+        stm32Worker->setBodyLimits(
+            static_cast<uint8_t>(body),
+            minHeight,
+            maxHeight
+        );
+    }
+
+    /*
+     * K02
+     */
+    stm32Worker->setMoveCommandThreshold(
+        static_cast<uint16_t>(
+            configMoveThresholdSpin->value()
+        )
+    );
+
+    /*
+     * K03
+     */
+    stm32Worker->setMinBodyMovement(
+        static_cast<float>(
+            configMinMovementSpin->value()
+        )
+    );
+
+    /*
+     * K04
+     */
+    stm32Worker->setNoMovementTimeout(
+        static_cast<uint32_t>(
+            configNoMovementTimeoutSpin->value()
+        )
+    );
+
+    /*
+     * K05
+     */
+    stm32Worker->setTargetTimeout(
+        static_cast<uint32_t>(
+            configTargetTimeoutSpin->value()
+        )
+    );
+
+    /*
+     * K06 y K07
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        int directionData =
+            configEncoderDirectionCombo[body]
+                ->currentData()
+                .toInt();
+
+        uint8_t protocolDirection =
+            (directionData == 1)
+                ? 0
+                : 1;
+
+        stm32Worker->setEncoderDirection(
+            static_cast<uint8_t>(body),
+            protocolDirection
+        );
+
+        stm32Worker->setEncoderScale(
+            static_cast<uint8_t>(body),
+            static_cast<float>(
+                configEncoderScaleSpin[body]->value()
+            )
+        );
     }
 }

@@ -408,6 +408,25 @@ void STM32Worker::setBodyLimits(
     uint16_t min_height_mm,
     uint16_t max_height_mm)
 {
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.min_height_mm[body] =
+            min_height_mm;
+
+        runtimeConfig.max_height_mm[body] =
+            max_height_mm;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -434,6 +453,17 @@ void STM32Worker::setBodyLimits(
 void STM32Worker::setMoveCommandThreshold(
     uint16_t threshold)
 {
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.move_command_threshold =
+            threshold;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -454,6 +484,17 @@ void STM32Worker::setMoveCommandThreshold(
 void STM32Worker::setMinBodyMovement(
     float movement_mm)
 {
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.min_body_movement_mm =
+            movement_mm;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -470,10 +511,20 @@ void STM32Worker::setMinBodyMovement(
     enqueueCommand(command);
 }
 
-
 void STM32Worker::setNoMovementTimeout(
     uint32_t timeout_ms)
 {
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.no_movement_timeout_ms =
+            timeout_ms;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -489,11 +540,20 @@ void STM32Worker::setNoMovementTimeout(
 
     enqueueCommand(command);
 }
-
-
 void STM32Worker::setTargetTimeout(
     uint32_t timeout_ms)
 {
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.target_timeout_ms =
+            timeout_ms;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -515,6 +575,22 @@ void STM32Worker::setEncoderDirection(
     uint8_t body,
     uint8_t direction)
 {
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.encoder_direction[body] =
+            direction;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -541,6 +617,22 @@ void STM32Worker::setEncoderScale(
     uint8_t body,
     float mm_per_pulse)
 {
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        runtimeConfig.encoder_scale[body] =
+            mm_per_pulse;
+
+        runtimeConfig.valid = true;
+    }
+
     if (!running)
     {
         return;
@@ -559,6 +651,164 @@ void STM32Worker::setEncoderScale(
 
     enqueueCommand(command);
 }
+
+void STM32Worker::enqueueRuntimeConfiguration()
+{
+    RuntimeConfiguration configCopy;
+
+    {
+        std::lock_guard<std::mutex> lock(
+            configMutex
+        );
+
+        if (!runtimeConfig.valid)
+        {
+            return;
+        }
+
+        configCopy =
+            runtimeConfig;
+    }
+
+
+    /*
+     * K 0x01
+     * Límites por cuerpo.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_BODY_LIMITS;
+
+        command.body =
+            static_cast<uint8_t>(body);
+
+        command.value_u16_1 =
+            configCopy.min_height_mm[body];
+
+        command.value_u16_2 =
+            configCopy.max_height_mm[body];
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x02
+     */
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_MOVE_COMMAND_THRESHOLD;
+
+        command.value_u16_1 =
+            configCopy.move_command_threshold;
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x03
+     */
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_MIN_BODY_MOVEMENT;
+
+        command.value_float =
+            configCopy.min_body_movement_mm;
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x04
+     */
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_NO_MOVEMENT_TIMEOUT;
+
+        command.value_u32 =
+            configCopy.no_movement_timeout_ms;
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x05
+     */
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_TARGET_TIMEOUT;
+
+        command.value_u32 =
+            configCopy.target_timeout_ms;
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x06
+     * Sentido encoder.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_ENCODER_DIRECTION;
+
+        command.body =
+            static_cast<uint8_t>(body);
+
+        command.value =
+            static_cast<int16_t>(
+                configCopy.encoder_direction[body]
+            );
+
+        enqueueCommand(command);
+    }
+
+
+    /*
+     * K 0x07
+     * Escala encoder.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        Command command;
+
+        command.type =
+            CommandType::SET_ENCODER_SCALE;
+
+        command.body =
+            static_cast<uint8_t>(body);
+
+        command.value_float =
+            configCopy.encoder_scale[body];
+
+        enqueueCommand(command);
+    }
+}
+
 // ============================================================
 // CALLBACKS RX
 // ============================================================
@@ -799,6 +1049,12 @@ void STM32Worker::workerLoop()
 
                 lastHeartbeat =
                     steady_clock::now();
+
+                /*
+                * Reenviar configuración runtime
+                * después de reconectar.
+                */
+                enqueueRuntimeConfiguration();
 
                 std::cout
                     << "STM32 reconectada."
