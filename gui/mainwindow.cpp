@@ -15,6 +15,7 @@
 #include <QWidget>
 #include <QTimer>
 #include "stm32/stm32_worker.h"
+#include "core/height_target_controller.h"
 #include <QStringList>
 #include <QComboBox>
 #include <QSpinBox>
@@ -27,10 +28,12 @@
 MainWindow::MainWindow(
     HagieState *hagieState,
     STM32Worker *stm32Worker,
+    HeightTargetController *heightTargetController,
     QWidget *parent)
     : QMainWindow(parent),
       state(hagieState),
       stm32Worker(stm32Worker),
+      heightTargetController(heightTargetController),
       centralStack(nullptr)
 {
     setWindowTitle(
@@ -136,7 +139,8 @@ MainWindow::MainWindow(
                                  */
                                 testAutoEnabled[body] =
                                     false;
-
+                                testVisionAutoEnabled[body] =
+                                    false;    
 
                                 /*
                                  * Estado visual MANUAL.
@@ -233,6 +237,9 @@ MainWindow::MainWindow(
                         )
                         {
                             testAutoEnabled[body] =
+                                false;
+
+                            testVisionAutoEnabled[body] =
                                 false;
 
 
@@ -552,12 +559,95 @@ void MainWindow::updateTestPage()
         testHeightLabels[body]
             ->setText(
                 QString(
-                    "Altura: %1 mm"
+                    "Altura encoder: %1 mm"
                 )
                     .arg(
                         bodyState.height_mm
                     )
             );
+
+
+        if (bodyState.vision_valid)
+        {
+            testVisionHeightLabels[body]
+                ->setText(
+                    QString(
+                        "Visión 3D: %1 mm"
+                    )
+                        .arg(
+                            bodyState.vision_height_mm
+                        )
+                );
+
+
+            if (heightTargetController != nullptr)
+                {
+                    HeightTargetController::BodyConfiguration
+                        configuration =
+                            heightTargetController
+                                ->getBodyConfiguration(
+                                    body
+                                );
+
+                    configuration.offset_mm =
+                        configVisionOffsetSpin[body]
+                            ->value();
+
+                    heightTargetController
+                        ->setBodyConfiguration(
+                            body,
+                            configuration
+                        );
+
+                    HeightTargetController::TargetResult
+                        targetResult =
+                            heightTargetController
+                                ->calculateTarget(
+                                    body,
+                                    bodyState.vision_height_mm,
+                                    bodyState.vision_valid
+                                );
+
+                if (targetResult.valid)
+                {
+                    testVisionTargetLabels[body]
+                        ->setText(
+                            QString(
+                                "Objetivo 3D: %1 mm"
+                            )
+                                .arg(
+                                    targetResult.target_mm
+                                )
+                        );
+                }
+                else
+                {
+                    testVisionTargetLabels[body]
+                        ->setText(
+                            "Objetivo 3D: NO VÁLIDO"
+                        );
+                }
+            }
+            else
+            {
+                testVisionTargetLabels[body]
+                    ->setText(
+                        "Objetivo 3D: ---"
+                    );
+            }
+        }
+        else
+        {
+            testVisionHeightLabels[body]
+                ->setText(
+                    "Visión 3D: NO VÁLIDA"
+                );
+
+            testVisionTargetLabels[body]
+                ->setText(
+                    "Objetivo 3D: NO VÁLIDO"
+                );
+        }
 
 
         testValveLabels[body]
@@ -606,7 +696,8 @@ void MainWindow::updateTestPage()
              */
             bool manualEnabled =
                 stm32Connected &&
-                !testAutoEnabled[body];
+                !testAutoEnabled[body] &&
+                !testVisionAutoEnabled[body];
 
 
             testUpButtons[body]
@@ -757,6 +848,9 @@ void MainWindow::updateTestPage()
 
 
             testAutoEnabled[body] =
+                false;
+
+            testVisionAutoEnabled[body] =
                 false;
 
 
@@ -1553,6 +1647,47 @@ QWidget *MainWindow::createTestsPage()
             );
 
 
+        /*
+         * Altura detectada por visión 3D.
+         */
+        testVisionHeightLabels[body] =
+            new QLabel(
+                "Visión 3D: --- mm"
+            );
+
+        testVisionHeightLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+        testVisionHeightLabels[body]
+            ->setStyleSheet(
+                "font-weight: bold;"
+                "color: #2b6cff;"
+            );
+
+
+        /*
+         * Objetivo calculado a partir de visión.
+         * Todavía NO se envía a la STM32.
+         */
+        testVisionTargetLabels[body] =
+            new QLabel(
+                "Objetivo 3D: --- mm"
+            );
+
+        testVisionTargetLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+        testVisionTargetLabels[body]
+            ->setStyleSheet(
+                "font-weight: bold;"
+                "color: #7a2cff;"
+            );
+
+
         testEncoderStatusLabels[body] =
             new QLabel(
                 "Encoder: ---"
@@ -1730,7 +1865,12 @@ QWidget *MainWindow::createTestsPage()
 
         testAutoButtons[body] =
             new QPushButton(
-                "AUTO"
+                "AUTO TEST"
+            );
+
+        testVisionAutoButtons[body] =
+            new QPushButton(
+                "AUTO VISIÓN"
             );
 
 
@@ -1739,6 +1879,9 @@ QWidget *MainWindow::createTestsPage()
          */
         testAutoEnabled[body] =
             false;
+
+        testVisionAutoEnabled[body] =
+            false;    
 
 
         /*
@@ -1755,6 +1898,25 @@ QWidget *MainWindow::createTestsPage()
             {
                 testAutoEnabled[body] =
                     false;
+
+                testVisionAutoEnabled[body] =
+                    false;
+
+                testAutoButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testVisionAutoButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testManualButtons[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "background-color: lightgreen;"
+                    );
 
                 testModeLabels[body]
                     ->setText(
@@ -1816,11 +1978,31 @@ QWidget *MainWindow::createTestsPage()
                 testAutoEnabled[body] =
                     true;
 
+                testVisionAutoEnabled[body] =
+                    false;
+
+                testManualButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testVisionAutoButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testAutoButtons[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "background-color: lightgreen;"
+                    );
+
 
                 testModeLabels[body]
                     ->setText(
-                        "Modo: AUTO"
+                        "Modo: AUTO TEST"
                     );
+                    
 
                 testModeLabels[body]
                     ->setStyleSheet(
@@ -1847,13 +2029,134 @@ QWidget *MainWindow::createTestsPage()
             }
         );
 
+       
+        connect(
+            testVisionAutoButtons[body],
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr ||
+                    state == nullptr ||
+                    heightTargetController == nullptr)
+                {
+                    return;
+                }
 
+                HagieState::SystemState system =
+                    state->getSystemState();
+
+                HagieState::BodyState bodyState =
+                    state->getBodyState(body);
+
+
+                /*
+                * Condiciones mínimas para permitir AUTO VISIÓN.
+                */
+                if (!system.stm32_connected ||
+                    !system.vision_running ||
+                    !bodyState.vision_valid ||
+                    bodyState.faults != 0)
+                {
+                    return;
+                }
+
+
+                /*
+                * AUTO TEST y AUTO VISIÓN son excluyentes.
+                */
+                testAutoEnabled[body] =
+                    false;
+
+                testVisionAutoEnabled[body] =
+                    true;
+
+
+                /*
+                * Estado visual de botones.
+                */
+                testManualButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testAutoButtons[body]
+                    ->setStyleSheet(
+                        ""
+                    );
+
+                testVisionAutoButtons[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "background-color: lightgreen;"
+                    );
+
+
+                testModeLabels[body]
+                    ->setText(
+                        "Modo: AUTO VISIÓN"
+                    );
+
+                testModeLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "color: green;"
+                    );
+
+
+                /*
+                * En AUTO VISIÓN no permitimos
+                * movimiento manual.
+                */
+                testDownButtons[body]
+                    ->setEnabled(false);
+
+                testUpButtons[body]
+                    ->setEnabled(false);
+
+
+                /*
+                * Calcular objetivo usando visión + offset.
+                */
+                HeightTargetController::TargetResult
+                    targetResult =
+                        heightTargetController
+                            ->calculateTarget(
+                                body,
+                                bodyState.vision_height_mm,
+                                bodyState.vision_valid
+                            );
+
+
+                if (!targetResult.valid)
+                {
+                    testVisionAutoEnabled[body] =
+                        false;
+
+                    return;
+                }
+
+
+                /*
+                * Primera consigna hacia STM32.
+                */
+                stm32Worker->setTargetHeight(
+                    static_cast<uint8_t>(body),
+                    targetResult.target_mm
+                );
+            }
+        );
+        
         modeButtonLayout->addWidget(
             testManualButtons[body]
         );
 
         modeButtonLayout->addWidget(
             testAutoButtons[body]
+        );
+
+        modeButtonLayout->addWidget(
+            testVisionAutoButtons[body]
         );
 
 
@@ -1987,6 +2290,9 @@ QWidget *MainWindow::createTestsPage()
                 testAutoEnabled[body] =
                     false;
 
+                testVisionAutoEnabled[body] =
+                    false;
+
 
                 testModeLabels[body]
                     ->setText(
@@ -2075,6 +2381,14 @@ QWidget *MainWindow::createTestsPage()
         );
 
         bodyLayout->addWidget(
+            testVisionHeightLabels[body]
+        );
+
+        bodyLayout->addWidget(
+            testVisionTargetLabels[body]
+        );
+
+        bodyLayout->addWidget(
             testEncoderStatusLabels[body]
         );
 
@@ -2147,26 +2461,128 @@ QWidget *MainWindow::createTestsPage()
 
 
             for (std::size_t body = 0;
-                 body < HagieState::BODY_COUNT;
-                 ++body)
+                body < HagieState::BODY_COUNT;
+                ++body)
             {
-                if (!testAutoEnabled[body])
+                /*
+                * ====================================================
+                * AUTO TEST
+                * ====================================================
+                */
+                if (testAutoEnabled[body])
                 {
+                    uint16_t target =
+                        static_cast<uint16_t>(
+                            testTargetHeightSpin[body]
+                                ->value()
+                        );
+
+                    stm32Worker->setTargetHeight(
+                        static_cast<uint8_t>(body),
+                        target
+                    );
+
                     continue;
                 }
 
 
-                uint16_t target =
-                    static_cast<uint16_t>(
-                        testTargetHeightSpin[body]
-                            ->value()
+                /*
+                * ====================================================
+                * AUTO VISIÓN
+                * ====================================================
+                */
+                if (testVisionAutoEnabled[body])
+                {
+                    if (state == nullptr ||
+                        heightTargetController == nullptr)
+                    {
+                        continue;
+                    }
+
+                    HagieState::SystemState system =
+                        state->getSystemState();
+
+                    HagieState::BodyState bodyState =
+                        state->getBodyState(body);
+
+
+                    /*
+                    * Si se pierde alguna condición necesaria,
+                    * salir de AUTO VISIÓN.
+                    */
+                    if (!system.stm32_connected ||
+                        !system.vision_running ||
+                        !bodyState.vision_valid ||
+                        bodyState.faults != 0)
+                    {
+                        testVisionAutoEnabled[body] =
+                            false;
+
+                        testModeLabels[body]
+                            ->setText(
+                                "Modo: MANUAL"
+                            );
+
+                        testModeLabels[body]
+                            ->setStyleSheet(
+                                "font-weight: bold;"
+                            );
+
+                        testVisionAutoButtons[body]
+                            ->setStyleSheet(
+                                ""
+                            );
+
+                        testManualButtons[body]
+                            ->setStyleSheet(
+                                "font-weight: bold;"
+                                "background-color: lightgreen;"
+                            );
+
+                        stm32Worker->setValveCommand(
+                            static_cast<uint8_t>(body),
+                            0
+                        );
+
+                        continue;
+                    }
+
+
+                    /*
+                    * Calcular el objetivo 3D actual.
+                    */
+                    HeightTargetController::TargetResult
+                        targetResult =
+                            heightTargetController
+                                ->calculateTarget(
+                                    body,
+                                    bodyState.vision_height_mm,
+                                    bodyState.vision_valid
+                                );
+
+
+                    if (!targetResult.valid)
+                    {
+                        testVisionAutoEnabled[body] =
+                            false;
+
+                        stm32Worker->setValveCommand(
+                            static_cast<uint8_t>(body),
+                            0
+                        );
+
+                        continue;
+                    }
+
+
+                    /*
+                    * Renovar consigna hacia STM32.
+                    */
+                    stm32Worker->setTargetHeight(
+                        static_cast<uint8_t>(body),
+                        targetResult.target_mm
                     );
-
-
-                stm32Worker->setTargetHeight(
-                    static_cast<uint8_t>(body),
-                    target
-                );
+                }
             }
         }
     );
@@ -2218,6 +2634,9 @@ QWidget *MainWindow::createTestsPage()
                  ++body)
             {
                 testAutoEnabled[body] =
+                    false;
+
+                testVisionAutoEnabled[body] =
                     false;
 
 
@@ -2505,8 +2924,41 @@ QWidget *MainWindow::createConfigurationPage()
             directionLabel
         );
 
+
+        QLabel *visionOffsetLabel =
+            new QLabel(
+                "Offset visión 3D (mm)"
+            );
+
+        configVisionOffsetSpin[body] =
+            new QSpinBox();
+
+        configVisionOffsetSpin[body]
+            ->setRange(
+                -1000,
+                1000
+            );
+
+        configVisionOffsetSpin[body]
+            ->setSingleStep(
+                10
+            );
+
+        configVisionOffsetSpin[body]
+            ->setValue(
+                0
+            );
+
         bodyLayout->addWidget(
             configEncoderDirectionCombo[body]
+        );
+
+        bodyLayout->addWidget(
+            visionOffsetLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionOffsetSpin[body]
         );
 
 
@@ -2924,6 +3376,11 @@ void MainWindow::updateSystemStatus()
             ? "IMU: OK"
             : "IMU: NO VÁLIDA";
 
+    QString visionText =
+        system.vision_running
+            ? "VISIÓN: ACTIVA"
+            : "VISIÓN: DETENIDA";
+
     QString aiText =
         system.ai_running
             ? "IA: ACTIVA"
@@ -2935,6 +3392,8 @@ void MainWindow::updateSystemStatus()
         + canText
         + " | "
         + imuText
+        + " | "
+        + visionText
         + " | "
         + aiText
     );
@@ -3176,6 +3635,12 @@ void MainWindow::saveConfiguration()
                 .toInt()
         );
 
+        settings.setValue(
+            "vision_offset_mm",
+            configVisionOffsetSpin[body]
+                ->value()
+        );
+
         settings.endGroup();
     }
 
@@ -3266,6 +3731,14 @@ void MainWindow::loadConfiguration()
                 "encoder_direction",
                 1
             ).toInt();
+
+
+        configVisionOffsetSpin[body]->setValue(
+                settings.value(
+                    "vision_offset_mm",
+                    0
+                ).toInt()
+            );
 
         int index =
             configEncoderDirectionCombo[body]

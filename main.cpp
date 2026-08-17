@@ -1,62 +1,172 @@
 #include <QApplication>
 
+
 #include "gui/mainwindow.h"
 #include "core/hagie_state.h"
+#include "core/height_target_controller.h"
 #include "stm32/stm32_worker.h"
+#include "vision/vision_height_source.h"
 
 
-int main(int argc, char *argv[])
+int main(
+    int argc,
+    char *argv[])
 {
-    QApplication app(argc, argv);
+    QApplication app(
+        argc,
+        argv
+    );
+
 
     /*
-     * Estado central de toda la aplicación Hagie.
+     * ========================================================
+     * ESTADO CENTRAL
+     * ========================================================
      *
-     * Este objeto será compartido por:
+     * Estado compartido por:
+     *
      * - GUI
-     * - UART / STM32
-     * - Visión
+     * - STM32
+     * - Visión 3D
      * - IA
      */
     HagieState hagieState;
 
+
     /*
-    * Comunicación STM32.
-    */
+     * ========================================================
+     * CÁLCULO DE OBJETIVOS DE ALTURA
+     * ========================================================
+     *
+     * Este módulo convierte:
+     *
+     * altura detectada por visión
+     *
+     *          ↓
+     *
+     * altura objetivo del cuerpo
+     *
+     * Por ahora:
+     *
+     * offset = 0 mm
+     *
+     * por lo tanto:
+     *
+     * objetivo 3D = altura visión
+     *
+     * IMPORTANTE:
+     *
+     * Este objeto NO mueve válvulas.
+     * Tampoco transmite todavía a STM32.
+     */
+    HeightTargetController
+        heightTargetController;
+
+
+    /*
+     * ========================================================
+     * COMUNICACIÓN STM32
+     * ========================================================
+     */
     STM32Worker stm32Worker(
         &hagieState,
         "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0670FF525649898367224551-if02",
         115200
     );
 
+
     if (!stm32Worker.start())
     {
-        qWarning("No se pudo iniciar la comunicación con STM32");
+        qWarning(
+            "No se pudo iniciar la comunicación con STM32"
+        );
     }
 
 
-  
+    /*
+     * ========================================================
+     * VISIÓN 3D
+     * ========================================================
+     *
+     * Actualmente VisionHeightSource utiliza
+     * datos simulados.
+     *
+     * Después será reemplazado internamente por:
+     *
+     * cámaras ZED
+     *      ↓
+     * nube de puntos
+     *      ↓
+     * cálculo geométrico
+     *      ↓
+     * altura de cultivo
+     *
+     * VisionHeightSource publica sus resultados
+     * en HagieState.
+     */
+    VisionHeightSource visionHeightSource(
+        &hagieState
+    );
+
+
+    if (!visionHeightSource.start())
+    {
+        qWarning(
+            "No se pudo iniciar VisionHeightSource"
+        );
+    }
+
 
     /*
-     * Crear ventana principal.
+     * ========================================================
+     * VENTANA PRINCIPAL
+     * ========================================================
      *
-     * Le entregamos una referencia al estado central.
+     * La GUI recibe:
+     *
+     * - estado central;
+     * - comunicación STM32;
+     * - controlador de objetivos 3D.
      */
     MainWindow window(
         &hagieState,
-        &stm32Worker
+        &stm32Worker,
+        &heightTargetController
     );
-    
+
 
     window.show();
 
-    int result = app.exec();
 
     /*
-    * Detener correctamente el hilo STM32
-    * al cerrar la aplicación.
-    */
+     * ========================================================
+     * LOOP PRINCIPAL Qt
+     * ========================================================
+     */
+    int result =
+        app.exec();
+
+
+    /*
+     * ========================================================
+     * CIERRE ORDENADO
+     * ========================================================
+     */
+
+    /*
+     * Primero detener visión.
+     */
+    visionHeightSource.stop();
+
+
+    /*
+     * Después detener STM32.
+     *
+     * STM32Worker intenta dejar las válvulas
+     * detenidas antes de cerrar.
+     */
     stm32Worker.stop();
+
 
     return result;
 }

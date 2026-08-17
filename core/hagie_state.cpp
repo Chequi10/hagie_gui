@@ -19,9 +19,14 @@ void HagieState::setBodyHeight(
         return;
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
 
-    bodies[body].height_mm = height_mm;
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].height_mm =
+        height_mm;
 }
 
 
@@ -34,9 +39,14 @@ void HagieState::setBodyTarget(
         return;
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
 
-    bodies[body].target_mm = target_mm;
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].target_mm =
+        target_mm;
 }
 
 
@@ -49,9 +59,14 @@ void HagieState::setBodyValveCommand(
         return;
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
 
-    bodies[body].valve_command = command;
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].valve_command =
+        command;
 }
 
 
@@ -64,9 +79,14 @@ void HagieState::setBodyAutoMode(
         return;
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
 
-    bodies[body].auto_mode = auto_mode;
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].auto_mode =
+        auto_mode;
 }
 
 
@@ -79,21 +99,84 @@ void HagieState::setBodyFaults(
         return;
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
 
-    bodies[body].faults = faults;
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].faults =
+        faults;
 }
 
 
-HagieState::BodyState HagieState::getBodyState(
+// ============================================================
+// VISIÓN 3D
+// ============================================================
+
+void HagieState::setBodyVisionHeight(
+    std::size_t body,
+    uint16_t height_mm,
+    bool valid)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].vision_height_mm =
+        height_mm;
+
+
+    bodies[body].vision_valid =
+        valid;
+}
+
+
+void HagieState::setBodyVisionValid(
+    std::size_t body,
+    bool valid)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].vision_valid =
+        valid;
+}
+
+
+// ============================================================
+// OBTENER ESTADO DE CUERPO
+// ============================================================
+
+HagieState::BodyState
+HagieState::getBodyState(
     std::size_t body) const
 {
     if (body >= BODY_COUNT)
     {
-        return BodyState{};
+        return BodyState {};
     }
 
-    std::lock_guard<std::mutex> lock(stateMutex);
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
 
     return bodies[body];
 }
@@ -106,15 +189,23 @@ HagieState::BodyState HagieState::getBodyState(
 void HagieState::setSystemState(
     const SystemState& state)
 {
-    std::lock_guard<std::mutex> lock(stateMutex);
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
 
-    systemState = state;
+
+    systemState =
+        state;
 }
 
 
-HagieState::SystemState HagieState::getSystemState() const
+HagieState::SystemState
+HagieState::getSystemState() const
 {
-    std::lock_guard<std::mutex> lock(stateMutex);
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
 
     return systemState;
 }
@@ -127,15 +218,23 @@ HagieState::SystemState HagieState::getSystemState() const
 void HagieState::setImuState(
     const ImuState& state)
 {
-    std::lock_guard<std::mutex> lock(stateMutex);
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
 
-    imuState = state;
+
+    imuState =
+        state;
 }
 
 
-HagieState::ImuState HagieState::getImuState() const
+HagieState::ImuState
+HagieState::getImuState() const
 {
-    std::lock_guard<std::mutex> lock(stateMutex);
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
 
     return imuState;
 }

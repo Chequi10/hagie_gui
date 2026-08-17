@@ -19,6 +19,7 @@ add_executable(hagie_gui
 
     core/hagie_state.cpp
     core/hagie_state.h
+    core/height_target_controller.cpp
 
     stm32/protocol.cpp
     stm32/protocol.h
@@ -28,6 +29,9 @@ add_executable(hagie_gui
 
     stm32/stm32_worker.cpp
     stm32/stm32_worker.h
+
+    vision/vision_height_source.cpp
+    
 )
 
 target_include_directories(hagie_gui

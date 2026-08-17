@@ -1,19 +1,22 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+
 #include <QMainWindow>
+#include <QLabel>
+
 #include <array>
 #include <chrono>
-#include <QLabel>
+#include <cstdint>
 
 
 #include "core/hagie_state.h"
 
 
 class QStackedWidget;
-class QLabel;
 class QTimer;
 class STM32Worker;
+class HeightTargetController;
 class QFrame;
 class QPushButton;
 class QSpinBox;
@@ -25,164 +28,378 @@ class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
+
 public:
+
     explicit MainWindow(
         HagieState *hagieState,
         STM32Worker *stm32Worker,
+        HeightTargetController *heightTargetController,
         QWidget *parent = nullptr
     );
 
+
     ~MainWindow();
 
+
 private:
+
+    // ========================================================
+    // ESTADO CENTRAL
+    // ========================================================
+
     HagieState *state;
 
     STM32Worker *stm32Worker;
 
-    QStackedWidget *centralStack;
+    HeightTargetController *heightTargetController;
 
-    QTimer *dashboardTimer;
 
-    QLabel *systemStatusLabel;
+    // ========================================================
+    // GUI GENERAL
+    // ========================================================
+
+    QStackedWidget *centralStack = nullptr;
+
+    QTimer *dashboardTimer = nullptr;
+
+
+    QLabel *systemStatusLabel = nullptr;
 
     QLabel *systemFaultsLabel = nullptr;
 
     QLabel *configSyncLabel = nullptr;
 
+
+    // ========================================================
+    // DASHBOARD
+    // ========================================================
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > heightLabels {};
+
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > targetLabels {};
+
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > modeLabels {};
+
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > valveLabels {};
+
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > faultLabels {};
+
+
+    // ========================================================
+    // FALLAS
+    // ========================================================
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > bodyFaultDetailLabels {};
+
+
+    // ========================================================
+    // PANEL DE TEST
+    // ========================================================
+
     int testValveCommand = 300;
 
-    std::array<QFrame *, HagieState::BODY_COUNT>
-    testBodyFrames {};
 
-    std::array<QLabel *, HagieState::BODY_COUNT>
-    testFaultLabels {};
+    std::array<
+        QFrame *,
+        HagieState::BODY_COUNT
+    > testBodyFrames {};
 
-    
-    std::array<QLabel *, HagieState::BODY_COUNT>
-        bodyFaultDetailLabels {};
 
-    std::array<QLabel *, HagieState::BODY_COUNT>
-    testHeightLabels {};
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testFaultLabels {};
 
-    std::array<QLabel *, HagieState::BODY_COUNT>
-    testValveLabels {};
-
-    std::array<QPushButton *, HagieState::BODY_COUNT>
-    testUpButtons {};
-
-    std::array<QPushButton *, HagieState::BODY_COUNT>
-    testDownButtons {};
 
     /*
-    * ========================================================
-    * Diagnóstico de encoders en Panel de Test
-    * ========================================================
-    */
+     * Altura REAL del cuerpo.
+     *
+     * Proviene del encoder STM32.
+     */
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testHeightLabels {};
 
-    std::array<QLabel *, HagieState::BODY_COUNT>
-        testEncoderStatusLabels {};
-
-    std::array<QLabel *, HagieState::BODY_COUNT>
-        testEncoderDeltaLabels {};
 
     /*
-    * Última altura observada de cada encoder.
-    */
-    std::array<uint16_t, HagieState::BODY_COUNT>
-        testPreviousHeight {};
+     * ========================================================
+     * VISIÓN 3D
+     * ========================================================
+     *
+     * Altura detectada por cámaras / nube de puntos.
+     */
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testVisionHeightLabels {};
+
 
     /*
-    * Indica si ya tenemos una primera muestra válida.
-    */
-    std::array<bool, HagieState::BODY_COUNT>
-        testEncoderInitialized {};
+     * ========================================================
+     * OBJETIVO CALCULADO DESDE VISIÓN 3D
+     * ========================================================
+     *
+     * Resultado de:
+     *
+     * VisionHeightSource
+     *          ↓
+     * HeightTargetController
+     *
+     * Por ahora SOLO se muestra.
+     *
+     * NO se transmite automáticamente a STM32.
+     */
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testVisionTargetLabels {};
 
-        /*para que no quede siemrpe quieto*/
 
-    std::array<std::chrono::steady_clock::time_point, HagieState::BODY_COUNT>
-        testLastEncoderMovementTime {};
-
-    std::array<int8_t, HagieState::BODY_COUNT>
-        testEncoderDirection {};
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testValveLabels {};
 
 
-     /*Para configuracion*/  
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > testUpButtons {};
 
-    std::array<QSpinBox *, HagieState::BODY_COUNT>
-        configMinHeightSpin {};
 
-    std::array<QSpinBox *, HagieState::BODY_COUNT>
-        configMaxHeightSpin {};
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > testDownButtons {};
 
-    std::array<QDoubleSpinBox *, HagieState::BODY_COUNT>
-        configEncoderScaleSpin {};
 
-    std::array<QComboBox *, HagieState::BODY_COUNT>
-        configEncoderDirectionCombo {};  
-        
-    QSpinBox *configMoveThresholdSpin = nullptr;
+    // ========================================================
+    // DIAGNÓSTICO DE ENCODERS
+    // ========================================================
 
-    QDoubleSpinBox *configMinMovementSpin = nullptr;
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testEncoderStatusLabels {};
 
-    QSpinBox *configNoMovementTimeoutSpin = nullptr;
 
-    QSpinBox *configTargetTimeoutSpin = nullptr;
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testEncoderDeltaLabels {};
+
 
     /*
-    * ========================================================
-    * Control AUTO de prueba
-    * ========================================================
-    */
-
-    QTimer *testAutoTimer = nullptr;
-
-    QSpinBox *testTargetHeightSpin[
+     * Última altura observada de cada encoder.
+     */
+    std::array<
+        uint16_t,
         HagieState::BODY_COUNT
-    ] {};
+    > testPreviousHeight {};
 
-    QLabel *testModeLabels[
+
+    /*
+     * Indica si ya tenemos una primera muestra válida.
+     */
+    std::array<
+        bool,
         HagieState::BODY_COUNT
-    ] {};
+    > testEncoderInitialized {};
 
-    QPushButton *testManualButtons[
+
+    /*
+     * Momento del último movimiento observado.
+     */
+    std::array<
+        std::chrono::steady_clock::time_point,
         HagieState::BODY_COUNT
-    ] {};
+    > testLastEncoderMovementTime {};
 
-    QPushButton *testAutoButtons[
+
+    /*
+     * -1 = bajando
+     *  0 = quieto
+     * +1 = subiendo
+     */
+    std::array<
+        int8_t,
         HagieState::BODY_COUNT
-    ] {};
+    > testEncoderDirection {};
 
-    std::array<bool, HagieState::BODY_COUNT>
-        testAutoEnabled {};
 
-       
+    // ========================================================
+    // CONFIGURACIÓN POR CUERPO
+    // ========================================================
 
-    void updateTestPage();
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configMinHeightSpin {};
 
-    void updateFaultPage();
 
-    std::array<QLabel *, HagieState::BODY_COUNT> heightLabels {};
-    std::array<QLabel *, HagieState::BODY_COUNT> targetLabels {};
-    std::array<QLabel *, HagieState::BODY_COUNT> modeLabels {};
-    std::array<QLabel *, HagieState::BODY_COUNT> valveLabels {};
-    std::array<QLabel *, HagieState::BODY_COUNT> faultLabels {};
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configMaxHeightSpin {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configEncoderScaleSpin {};
+
+
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionOffsetSpin {};
+
+
+    std::array<
+        QComboBox *,
+        HagieState::BODY_COUNT
+    > configEncoderDirectionCombo {};
+
+
+    // ========================================================
+    // CONFIGURACIÓN GLOBAL
+    // ========================================================
+
+    QSpinBox *configMoveThresholdSpin =
+        nullptr;
+
+
+    QDoubleSpinBox *configMinMovementSpin =
+        nullptr;
+
+
+    QSpinBox *configNoMovementTimeoutSpin =
+        nullptr;
+
+
+    QSpinBox *configTargetTimeoutSpin =
+        nullptr;
+
+
+    // ========================================================
+    // CONTROL AUTO DE PRUEBA
+    // ========================================================
+
+    QTimer *testAutoTimer =
+        nullptr;
+
+
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > testTargetHeightSpin {};
+
+
+    std::array<
+        QLabel *,
+        HagieState::BODY_COUNT
+    > testModeLabels {};
+
+
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > testManualButtons {};
+
+
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > testAutoButtons {};
+
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > testVisionAutoButtons {};
+
+
+    std::array<
+        bool,
+        HagieState::BODY_COUNT
+    > testAutoEnabled {};
+
+    std::array<
+        bool,
+        HagieState::BODY_COUNT
+    > testVisionAutoEnabled {};
+
+
+    // ========================================================
+    // ACTUALIZACIÓN GUI
+    // ========================================================
 
     void updateDashboard();
 
     void updateSystemStatus();
 
+    void updateFaultPage();
+
+    void updateTestPage();
+
+
+    // ========================================================
+    // CREACIÓN DE PÁGINAS
+    // ========================================================
+
     QWidget *createDashboardPage();
+
     QWidget *createCamerasPage();
+
     QWidget *createFaultsPage();
+
     QWidget *createTestsPage();
+
     QWidget *createConfigurationPage();
 
+
+    // ========================================================
+    // MENÚS / STATUS
+    // ========================================================
+
     void createMenus();
+
     void createStatusBar();
 
+
+    // ========================================================
+    // CONFIGURACIÓN
+    // ========================================================
+
     void saveConfiguration();
+
     void loadConfiguration();
+
     void syncConfigurationToWorker();
 };
+
 
 #endif
