@@ -32,6 +32,16 @@ public:
         std::array<uint16_t, BODY_COUNT> height_mm {};
     };
 
+    struct config_ack
+    {
+        uint8_t subcommand = 0;
+        uint8_t body = 0xFF;
+        uint8_t status = 0;
+
+        uint32_t value1 = 0;
+        uint32_t value2 = 0;
+    };
+
     struct imu_state
     {
         bool valid = false;
@@ -109,6 +119,9 @@ public:
     using imu_callback =
         std::function<void(const imu_state&)>;
 
+    using config_ack_callback =
+        std::function<void(const config_ack&)>;
+
 
     // ============================================================
     // Constructor / destructor
@@ -155,6 +168,10 @@ public:
 
     void set_imu_callback(
         imu_callback callback
+    );
+
+    void set_config_ack_callback(
+        config_ack_callback callback
     );
 
 
@@ -269,6 +286,8 @@ private:
     std::thread comm_thread;
 
     std::atomic<bool> running {false};
+
+    config_ack_callback on_config_ack;
 
   
 

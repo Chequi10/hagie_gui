@@ -140,6 +140,13 @@ void stm32canbus_serialif::set_imu_callback(
     on_imu = std::move(callback);
 }
 
+void stm32canbus_serialif::set_config_ack_callback(
+    config_ack_callback callback)
+{
+    on_config_ack =
+        std::move(callback);
+}
+
 
 // ============================================================
 // Recepción serie
@@ -494,6 +501,51 @@ void stm32canbus_serialif::handle_packet(
 
             break;
         }
+
+        // ----------------------------------------------------
+        // 'L' - ACK de configuración STM32
+        // ----------------------------------------------------
+
+        case 'L':
+        {
+            if (n != 12)
+            {
+                return;
+            }
+
+            config_ack ack;
+
+            ack.subcommand =
+                payload[1];
+
+            ack.body =
+                payload[2];
+
+            ack.status =
+                payload[3];
+
+            ack.value1 =
+                (static_cast<uint32_t>(payload[4]) << 24) |
+                (static_cast<uint32_t>(payload[5]) << 16) |
+                (static_cast<uint32_t>(payload[6]) << 8)  |
+                static_cast<uint32_t>(payload[7]);
+
+            ack.value2 =
+                (static_cast<uint32_t>(payload[8]) << 24) |
+                (static_cast<uint32_t>(payload[9]) << 16) |
+                (static_cast<uint32_t>(payload[10]) << 8) |
+                static_cast<uint32_t>(payload[11]);
+
+            if (on_config_ack)
+            {
+                on_config_ack(
+                    ack
+                );
+            }
+
+            break;
+        }
+
         default:
         {
             set_error(

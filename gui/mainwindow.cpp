@@ -20,6 +20,7 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QSettings>
+#include <QScrollArea>
 
 
 MainWindow::MainWindow(
@@ -496,7 +497,7 @@ QWidget *MainWindow::createCamerasPage()
         Qt::AlignCenter
     );
 
-    mainCamera->setMinimumHeight(450);
+    mainCamera->setMinimumHeight(250);
 
     mainCamera->setStyleSheet(
         "background-color: black;"
@@ -1577,152 +1578,66 @@ QWidget *MainWindow::createConfigurationPage()
 
             syncConfigurationToWorker();
 
-            /*
-            * ====================================================
-            * K 0x01
-            * Límites mínimo / máximo de cada cuerpo
-            * ====================================================
-            */
-            for (std::size_t body = 0;
-                body < HagieState::BODY_COUNT;
-                ++body)
-            {
-                uint16_t minHeight =
-                    static_cast<uint16_t>(
-                        configMinHeightSpin[body]->value()
-                    );
-
-                uint16_t maxHeight =
-                    static_cast<uint16_t>(
-                        configMaxHeightSpin[body]->value()
-                    );
-
-                /*
-                * Validación antes de enviar.
-                */
-                if (minHeight >= maxHeight)
-                {
-                    return;
-                }
-
-                stm32Worker->setBodyLimits(
-                    static_cast<uint8_t>(body),
-                    minHeight,
-                    maxHeight
-                );
-            }
-
-
-            /*
-            * ====================================================
-            * K 0x02
-            * Umbral de comando para considerar movimiento
-            * ====================================================
-            */
-            stm32Worker->setMoveCommandThreshold(
-                static_cast<uint16_t>(
-                    configMoveThresholdSpin->value()
-                )
-            );
-
-
-            /*
-            * ====================================================
-            * K 0x03
-            * Movimiento mínimo esperado
-            * ====================================================
-            */
-            stm32Worker->setMinBodyMovement(
-                static_cast<float>(
-                    configMinMovementSpin->value()
-                )
-            );
-
-
-            /*
-            * ====================================================
-            * K 0x04
-            * Timeout NO_MOVEMENT
-            * ====================================================
-            */
-            stm32Worker->setNoMovementTimeout(
-                static_cast<uint32_t>(
-                    configNoMovementTimeoutSpin->value()
-                )
-            );
-
-
-            /*
-            * ====================================================
-            * K 0x05
-            * Timeout de consigna AUTO
-            * ====================================================
-            */
-            stm32Worker->setTargetTimeout(
-                static_cast<uint32_t>(
-                    configTargetTimeoutSpin->value()
-                )
-            );
-
-            /*
-            * ====================================================
-            * K 0x06
-            * Sentido de cada encoder
-            * ====================================================
-            */
-            for (std::size_t body = 0;
-                body < HagieState::BODY_COUNT;
-                ++body)
-            {
-                int directionData =
-                    configEncoderDirectionCombo[body]
-                        ->currentData()
-                        .toInt();
-
-                uint8_t protocolDirection =
-                    (directionData == 1)
-                        ? 0       // Normal
-                        : 1;      // Invertido
-
-                stm32Worker->setEncoderDirection(
-                    static_cast<uint8_t>(body),
-                    protocolDirection
-                );
-            }
-
-
-            /*
-            * ====================================================
-            * K 0x07
-            * Escala de cada encoder
-            * ====================================================
-            */
-            for (std::size_t body = 0;
-                body < HagieState::BODY_COUNT;
-                ++body)
-            {
-                float scale =
-                    static_cast<float>(
-                        configEncoderScaleSpin[body]
-                            ->value()
-                    );
-
-                stm32Worker->setEncoderScale(
-                    static_cast<uint8_t>(body),
-                    scale
-                );
-            }
+            
         }
     );
 
     
-    mainLayout->addWidget(
-        saveButton
+    
+
+
+    /*
+    * Contenedor exterior:
+    * - contenido desplazable arriba
+    * - botón GUARDAR fijo abajo
+    */
+    QWidget *container =
+        new QWidget();
+
+    QVBoxLayout *containerLayout =
+        new QVBoxLayout(container);
+
+    containerLayout->setContentsMargins(
+        0,
+        0,
+        0,
+        0
     );
 
 
-    return page;
-}
+    /*
+    * Solo la configuración entra en el scroll.
+    */
+    QScrollArea *scrollArea =
+        new QScrollArea();
+
+    scrollArea->setWidgetResizable(
+        true
+    );
+
+    scrollArea->setWidget(
+        page
+    );
+
+    scrollArea->setFrameShape(
+        QFrame::NoFrame
+    );
+
+    containerLayout->addWidget(
+        scrollArea,
+        1
+    );
+
+
+    /*
+    * El botón queda siempre visible.
+    */
+    containerLayout->addWidget(
+        saveButton
+    );
+
+    return container;
+}    
 
 /*
  * ============================================================
@@ -1738,6 +1653,13 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget(
         systemStatusLabel,
         1
+    );
+
+    configSyncLabel =
+        new QLabel(this);
+
+    statusBar()->addPermanentWidget(
+        configSyncLabel
     );
 
     updateSystemStatus();
@@ -1841,6 +1763,59 @@ void MainWindow::updateSystemStatus()
         + " | "
         + aiText
     );
+
+
+    if (stm32Worker != nullptr &&
+        configSyncLabel != nullptr)
+    {
+        STM32Worker::ConfigSyncStatus configStatus =
+            stm32Worker->getConfigSyncStatus();
+
+        switch (configStatus)
+        {
+            case STM32Worker::ConfigSyncStatus::PENDING:
+            {
+                configSyncLabel->setText(
+                    "CONFIG STM32: PENDIENTE"
+                );
+
+                configSyncLabel->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: orange;"
+                );
+
+                break;
+            }
+
+            case STM32Worker::ConfigSyncStatus::SYNCHRONIZED:
+            {
+                configSyncLabel->setText(
+                    "CONFIG STM32: SINCRONIZADA"
+                );
+
+                configSyncLabel->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: green;"
+                );
+
+                break;
+            }
+
+            case STM32Worker::ConfigSyncStatus::ERROR:
+            {
+                configSyncLabel->setText(
+                    "CONFIG STM32: ERROR"
+                );
+
+                configSyncLabel->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: red;"
+                );
+
+                break;
+            }
+        }
+    }
 }
 
 void MainWindow::updateFaultPage()
@@ -2418,6 +2393,8 @@ void MainWindow::syncConfigurationToWorker()
         return;
     }
 
+    
+
     /*
      * K01 - Límites por cuerpo
      */
@@ -2512,4 +2489,9 @@ void MainWindow::syncConfigurationToWorker()
             )
         );
     }
+    /*
+    * Ya cargamos toda la configuración en runtimeConfig.
+    * Ahora comenzar el envío secuencial K -> ACK -> K.
+    */
+    stm32Worker->beginConfigurationSync();
 }

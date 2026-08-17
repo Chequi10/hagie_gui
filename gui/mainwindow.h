@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <array>
 #include <chrono>
+#include <QLabel>
 
 
 #include "core/hagie_state.h"
@@ -18,6 +19,7 @@ class QPushButton;
 class QSpinBox;
 class QDoubleSpinBox;
 class QComboBox;
+
 
 class MainWindow : public QMainWindow
 {
@@ -44,6 +46,8 @@ private:
     QLabel *systemStatusLabel;
 
     QLabel *systemFaultsLabel = nullptr;
+
+    QLabel *configSyncLabel = nullptr;
 
     int testValveCommand = 300;
 

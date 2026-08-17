@@ -413,161 +413,72 @@ void STM32Worker::setBodyLimits(
         return;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.min_height_mm[body] =
-            min_height_mm;
-
-        runtimeConfig.max_height_mm[body] =
-            max_height_mm;
-
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_BODY_LIMITS;
-
-    command.body =
-        body;
-
-    command.value_u16_1 =
+    runtimeConfig.min_height_mm[body] =
         min_height_mm;
 
-    command.value_u16_2 =
+    runtimeConfig.max_height_mm[body] =
         max_height_mm;
 
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
 
 
 void STM32Worker::setMoveCommandThreshold(
     uint16_t threshold)
 {
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.move_command_threshold =
-            threshold;
-
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_MOVE_COMMAND_THRESHOLD;
-
-    command.value_u16_1 =
+    runtimeConfig.move_command_threshold =
         threshold;
 
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
 
 
 void STM32Worker::setMinBodyMovement(
     float movement_mm)
 {
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.min_body_movement_mm =
-            movement_mm;
-
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_MIN_BODY_MOVEMENT;
-
-    command.value_float =
+    runtimeConfig.min_body_movement_mm =
         movement_mm;
 
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
 
 void STM32Worker::setNoMovementTimeout(
     uint32_t timeout_ms)
 {
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.no_movement_timeout_ms =
-            timeout_ms;
-
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_NO_MOVEMENT_TIMEOUT;
-
-    command.value_u32 =
+    runtimeConfig.no_movement_timeout_ms =
         timeout_ms;
 
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
+
+
 void STM32Worker::setTargetTimeout(
     uint32_t timeout_ms)
 {
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.target_timeout_ms =
-            timeout_ms;
-
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_TARGET_TIMEOUT;
-
-    command.value_u32 =
+    runtimeConfig.target_timeout_ms =
         timeout_ms;
 
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
 
 
@@ -580,38 +491,15 @@ void STM32Worker::setEncoderDirection(
         return;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(
-            configMutex
-        );
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
 
-        runtimeConfig.encoder_direction[body] =
-            direction;
+    runtimeConfig.encoder_direction[body] =
+        direction;
 
-        runtimeConfig.valid = true;
-    }
-
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_ENCODER_DIRECTION;
-
-    command.body =
-        body;
-
-    command.value =
-        static_cast<int16_t>(
-            direction
-        );
-
-    enqueueCommand(command);
+    runtimeConfig.valid = true;
 }
-
 
 void STM32Worker::setEncoderScale(
     uint8_t body,
@@ -622,37 +510,70 @@ void STM32Worker::setEncoderScale(
         return;
     }
 
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.encoder_scale[body] =
+        mm_per_pulse;
+
+    runtimeConfig.valid = true;
+}
+void STM32Worker::enqueueRuntimeConfiguration()
+{
     {
         std::lock_guard<std::mutex> lock(
             configMutex
         );
 
-        runtimeConfig.encoder_scale[body] =
-            mm_per_pulse;
-
-        runtimeConfig.valid = true;
+        if (!runtimeConfig.valid)
+        {
+            return;
+        }
     }
 
-    if (!running)
-    {
-        return;
-    }
-
-    Command command;
-
-    command.type =
-        CommandType::SET_ENCODER_SCALE;
-
-    command.body =
-        body;
-
-    command.value_float =
-        mm_per_pulse;
-
-    enqueueCommand(command);
+    beginConfigurationSync();
 }
 
-void STM32Worker::enqueueRuntimeConfiguration()
+void STM32Worker::beginConfigurationSync()
+{
+    {
+        std::lock_guard<std::mutex> lock(
+            configAckMutex
+        );
+
+        configAckLimits.fill(false);
+        configAckDirection.fill(false);
+        configAckScale.fill(false);
+
+        configAckMoveThreshold = false;
+        configAckMinMovement = false;
+        configAckNoMovementTimeout = false;
+        configAckTargetTimeout = false;
+
+        configSyncStatus =
+            ConfigSyncStatus::PENDING;
+    }
+
+    configSyncStep = 0;
+    configCommandPending = false;
+    configRetryCount = 0;
+
+    sendCurrentConfigurationCommand();
+}
+
+STM32Worker::ConfigSyncStatus
+STM32Worker::getConfigSyncStatus() const
+{
+    std::lock_guard<std::mutex> lock(
+        configAckMutex
+    );
+
+    return configSyncStatus;
+}
+
+
+void STM32Worker::sendCurrentConfigurationCommand()
 {
     RuntimeConfiguration configCopy;
 
@@ -663,6 +584,9 @@ void STM32Worker::enqueueRuntimeConfiguration()
 
         if (!runtimeConfig.valid)
         {
+            configSyncStatus =
+                ConfigSyncStatus::ERROR;
+
             return;
         }
 
@@ -670,145 +594,159 @@ void STM32Worker::enqueueRuntimeConfiguration()
             runtimeConfig;
     }
 
-
-    /*
-     * K 0x01
-     * Límites por cuerpo.
-     */
-    for (std::size_t body = 0;
-         body < HagieState::BODY_COUNT;
-         ++body)
+    if (configSyncStep >= CONFIG_SYNC_COMMAND_COUNT)
     {
-        Command command;
+        std::lock_guard<std::mutex> lock(
+            configAckMutex
+        );
 
-        command.type =
-            CommandType::SET_BODY_LIMITS;
+        configSyncStatus =
+            ConfigSyncStatus::SYNCHRONIZED;
 
-        command.body =
-            static_cast<uint8_t>(body);
+        configCommandPending = false;
 
-        command.value_u16_1 =
-            configCopy.min_height_mm[body];
-
-        command.value_u16_2 =
-            configCopy.max_height_mm[body];
-
-        enqueueCommand(command);
+        return;
     }
 
-
     /*
-     * K 0x02
+     * 0..5 -> K01
      */
+    if (configSyncStep <= 5)
     {
-        Command command;
+        uint8_t body =
+            configSyncStep;
 
-        command.type =
-            CommandType::SET_MOVE_COMMAND_THRESHOLD;
-
-        command.value_u16_1 =
-            configCopy.move_command_threshold;
-
-        enqueueCommand(command);
+        stm32->set_body_limits(
+            body,
+            configCopy.min_height_mm[body],
+            configCopy.max_height_mm[body]
+        );
     }
 
-
     /*
-     * K 0x03
+     * 6 -> K02
      */
+    else if (configSyncStep == 6)
     {
-        Command command;
-
-        command.type =
-            CommandType::SET_MIN_BODY_MOVEMENT;
-
-        command.value_float =
-            configCopy.min_body_movement_mm;
-
-        enqueueCommand(command);
+        stm32->set_move_command_threshold(
+            configCopy.move_command_threshold
+        );
     }
 
-
     /*
-     * K 0x04
+     * 7 -> K03
      */
+    else if (configSyncStep == 7)
     {
-        Command command;
-
-        command.type =
-            CommandType::SET_NO_MOVEMENT_TIMEOUT;
-
-        command.value_u32 =
-            configCopy.no_movement_timeout_ms;
-
-        enqueueCommand(command);
+        stm32->set_min_body_movement(
+            configCopy.min_body_movement_mm
+        );
     }
 
-
     /*
-     * K 0x05
+     * 8 -> K04
      */
+    else if (configSyncStep == 8)
     {
-        Command command;
-
-        command.type =
-            CommandType::SET_TARGET_TIMEOUT;
-
-        command.value_u32 =
-            configCopy.target_timeout_ms;
-
-        enqueueCommand(command);
+        stm32->set_no_movement_timeout(
+            configCopy.no_movement_timeout_ms
+        );
     }
 
-
     /*
-     * K 0x06
-     * Sentido encoder.
+     * 9 -> K05
      */
-    for (std::size_t body = 0;
-         body < HagieState::BODY_COUNT;
-         ++body)
+    else if (configSyncStep == 9)
     {
-        Command command;
-
-        command.type =
-            CommandType::SET_ENCODER_DIRECTION;
-
-        command.body =
-            static_cast<uint8_t>(body);
-
-        command.value =
-            static_cast<int16_t>(
-                configCopy.encoder_direction[body]
-            );
-
-        enqueueCommand(command);
+        stm32->set_target_timeout(
+            configCopy.target_timeout_ms
+        );
     }
 
+    /*
+     * 10..15 -> K06
+     */
+    else if (configSyncStep <= 15)
+    {
+        uint8_t body =
+            configSyncStep - 10;
+
+        stm32->set_encoder_direction(
+            body,
+            configCopy.encoder_direction[body]
+        );
+    }
 
     /*
-     * K 0x07
-     * Escala encoder.
+     * 16..21 -> K07
      */
-    for (std::size_t body = 0;
-         body < HagieState::BODY_COUNT;
-         ++body)
+    else
     {
-        Command command;
+        uint8_t body =
+            configSyncStep - 16;
 
-        command.type =
-            CommandType::SET_ENCODER_SCALE;
-
-        command.body =
-            static_cast<uint8_t>(body);
-
-        command.value_float =
-            configCopy.encoder_scale[body];
-
-        enqueueCommand(command);
+        stm32->set_encoder_scale(
+            body,
+            configCopy.encoder_scale[body]
+        );
     }
+
+    configCommandPending = true;
+
+    configCommandSentTime =
+        std::chrono::steady_clock::now();
 }
 
+
+void STM32Worker::processConfigurationSync()
+{
+    if (!configCommandPending)
+    {
+        return;
+    }
+
+    auto now =
+        std::chrono::steady_clock::now();
+
+    auto elapsed =
+        std::chrono::duration_cast<
+            std::chrono::milliseconds>(
+                now - configCommandSentTime
+            ).count();
+
+    if (elapsed < 250)
+    {
+        return;
+    }
+
+    /*
+     * Timeout esperando ACK.
+     */
+    if (configRetryCount < 3)
+    {
+        configRetryCount++;
+
+        configCommandPending = false;
+
+        sendCurrentConfigurationCommand();
+
+        return;
+    }
+
+    /*
+     * Demasiados intentos.
+     */
+    {
+        std::lock_guard<std::mutex> lock(
+            configAckMutex
+        );
+
+        configSyncStatus =
+            ConfigSyncStatus::ERROR;
+    }
+
+    configCommandPending = false;
+}
 // ============================================================
 // CALLBACKS RX
 // ============================================================
@@ -1008,7 +946,282 @@ void STM32Worker::configureCallbacks()
             );
         }
     );
+
+    stm32->set_config_ack_callback(
+        [this](
+            const stm32canbus_serialif::config_ack& ack)
+        {
+            std::cout
+            << "CONFIG ACK"
+            << " K=" << static_cast<int>(ack.subcommand)
+            << " body=" << static_cast<int>(ack.body)
+            << " status=" << static_cast<int>(ack.status)
+            << " value1=" << ack.value1
+            << " value2=" << ack.value2
+            << std::endl;
+            
+            
+            RuntimeConfiguration expected;
+
+            {
+                std::lock_guard<std::mutex> lock(
+                    configMutex
+                );
+
+                expected = runtimeConfig;
+            }
+
+            bool validAck = false;
+
+
+            /*
+            * Si STM32 rechazó el parámetro,
+            * terminar inmediatamente con ERROR.
+            */
+            if (ack.status != 0)
+            {
+                std::lock_guard<std::mutex> lock(
+                    configAckMutex
+                );
+
+                configSyncStatus =
+                    ConfigSyncStatus::ERROR;
+
+                configCommandPending = false;
+
+                return;
+            }
+
+
+            /*
+            * Validar que el ACK corresponda exactamente
+            * al paso que estamos esperando.
+            */
+            switch (configSyncStep)
+            {
+                /*
+                * 0..5 -> K01 límites
+                */
+                case 0:
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                {
+                    uint8_t body =
+                        configSyncStep;
+
+                    if (ack.subcommand == 0x01 &&
+                        ack.body == body &&
+                        ack.value1 ==
+                            expected.min_height_mm[body] &&
+                        ack.value2 ==
+                            expected.max_height_mm[body])
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 6 -> K02
+                */
+                case 6:
+                {
+                    if (ack.subcommand == 0x02 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected.move_command_threshold)
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 7 -> K03
+                */
+                case 7:
+                {
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected.min_body_movement_mm
+                            * 100.0f
+                            + 0.5f
+                        );
+
+                    if (ack.subcommand == 0x03 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expectedValue)
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 8 -> K04
+                */
+                case 8:
+                {
+                    if (ack.subcommand == 0x04 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected.no_movement_timeout_ms)
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 9 -> K05
+                */
+                case 9:
+                {
+                    if (ack.subcommand == 0x05 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected.target_timeout_ms)
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 10..15 -> K06 dirección
+                */
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                {
+                    uint8_t body =
+                        configSyncStep - 10;
+
+                    if (ack.subcommand == 0x06 &&
+                        ack.body == body &&
+                        ack.value1 ==
+                            expected.encoder_direction[body])
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                * 16..21 -> K07 escala
+                */
+                case 16:
+                case 17:
+                case 18:
+                case 19:
+                case 20:
+                case 21:
+                {
+                    uint8_t body =
+                        configSyncStep - 16;
+
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected.encoder_scale[body]
+                            * 100000.0f
+                            + 0.5f
+                        );
+
+                    if (ack.subcommand == 0x07 &&
+                        ack.body == body &&
+                        ack.value1 ==
+                            expectedValue)
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                default:
+                {
+                    return;
+                }
+            }
+
+
+            /*
+            * Llegó un ACK que no corresponde
+            * al comando que estamos esperando.
+            */
+            if (!validAck)
+            {
+                std::lock_guard<std::mutex> lock(
+                    configAckMutex
+                );
+
+                configSyncStatus =
+                    ConfigSyncStatus::ERROR;
+
+                configCommandPending = false;
+
+                return;
+            }
+
+
+            /*
+            * ACK correcto.
+            */
+            configCommandPending = false;
+            configRetryCount = 0;
+
+            configSyncStep++;
+
+
+            /*
+            * Si terminamos los 22 comandos,
+            * la STM32 quedó completamente sincronizada.
+            */
+            if (configSyncStep >=
+                CONFIG_SYNC_COMMAND_COUNT)
+            {
+                std::lock_guard<std::mutex> lock(
+                    configAckMutex
+                );
+
+                configSyncStatus =
+                    ConfigSyncStatus::SYNCHRONIZED;
+
+                return;
+            }
+
+
+            /*
+            * Enviar siguiente K.
+            */
+            sendCurrentConfigurationCommand();
+        }
+    );
 }
+
+
+
+
 
 
 // ============================================================
@@ -1175,6 +1388,7 @@ void STM32Worker::workerLoop()
         try
         {
             processTxQueue();
+            processConfigurationSync();
         }
         catch (const std::exception& e)
         {

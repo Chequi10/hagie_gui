@@ -14,6 +14,7 @@
 #include <deque>
 #include <mutex>
 #include <array>
+#include <chrono>
 
 
 class STM32Worker
@@ -104,6 +105,19 @@ public:
         float mm_per_pulse
     );
 
+    enum class ConfigSyncStatus
+    {
+        PENDING,
+        SYNCHRONIZED,
+        ERROR
+    };
+
+    ConfigSyncStatus getConfigSyncStatus() const;
+
+    void beginConfigurationSync();
+
+   
+
 
 private:
      // ========================================================
@@ -145,7 +159,57 @@ private:
     */
     void enqueueRuntimeConfiguration();   
     
+    struct ConfigAckState
+    {
+        bool received = false;
 
+        uint8_t subcommand = 0;
+        uint8_t body = 0xFF;
+        uint8_t status = 0;
+
+        uint32_t value1 = 0;
+        uint32_t value2 = 0;
+    };
+
+    ConfigAckState lastConfigAck;
+
+    mutable std::mutex configAckMutex;
+
+    /*
+    * ========================================================
+    * Seguimiento de ACK de configuración
+    * ========================================================
+    *
+    * Para considerar la configuración sincronizada deben
+    * confirmarse:
+    *
+    * K01 x 6
+    * K02
+    * K03
+    * K04
+    * K05
+    * K06 x 6
+    * K07 x 6
+    *
+    * Total: 22 ACK únicos.
+    */
+
+    std::array<bool, HagieState::BODY_COUNT>
+        configAckLimits {};
+
+    std::array<bool, HagieState::BODY_COUNT>
+        configAckDirection {};
+
+    std::array<bool, HagieState::BODY_COUNT>
+        configAckScale {};
+
+    bool configAckMoveThreshold = false;
+    bool configAckMinMovement = false;
+    bool configAckNoMovementTimeout = false;
+    bool configAckTargetTimeout = false;
+
+    ConfigSyncStatus configSyncStatus =
+        ConfigSyncStatus::PENDING;
   
 
     // ========================================================
@@ -253,6 +317,56 @@ private:
     std::deque<Command> txQueue;
 
     std::mutex configMutex;
+
+    /*
+    * ========================================================
+    * Sincronización secuencial de configuración
+    * ========================================================
+    *
+    * Se envía un solo K por vez.
+    * El siguiente se envía únicamente cuando llega
+    * el ACK correspondiente.
+    *
+    * Secuencia:
+    *
+    *  0..5   -> K01 cuerpos 0..5
+    *  6      -> K02
+    *  7      -> K03
+    *  8      -> K04
+    *  9      -> K05
+    * 10..15  -> K06 cuerpos 0..5
+    * 16..21  -> K07 cuerpos 0..5
+    *
+    * 22      -> terminada
+    */
+
+    static constexpr uint8_t CONFIG_SYNC_COMMAND_COUNT = 22;
+
+    uint8_t configSyncStep = 0;
+
+    bool configCommandPending = false;
+
+    uint8_t configRetryCount = 0;
+
+    std::chrono::steady_clock::time_point
+        configCommandSentTime;
+
+
+    /*
+    * Enviar únicamente el comando correspondiente
+    * al paso actual de sincronización.
+    */
+    void sendCurrentConfigurationCommand();
+
+
+    /*
+    * Procesar timeout / reintento de la
+    * sincronización de configuración.
+    */
+    void processConfigurationSync();
+
+
+    
 };
 
 
