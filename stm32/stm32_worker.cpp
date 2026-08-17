@@ -3,6 +3,7 @@
 #include <chrono>
 #include <exception>
 #include <iostream>
+#include <utility>
 
 
 STM32Worker::STM32Worker(
@@ -35,25 +36,44 @@ bool STM32Worker::start()
         return true;
     }
 
+
     try
     {
         stm32 =
-            std::make_unique<stm32canbus_serialif>(
+            std::make_unique<
+                stm32canbus_serialif
+            >(
                 port,
                 baudrate
             );
 
+
         configureCallbacks();
+
 
         stm32->start();
 
+
         running = true;
+
 
         workerThread =
             std::thread(
                 &STM32Worker::workerLoop,
                 this
             );
+
+
+        /*
+         * La interfaz fue creada correctamente.
+         *
+         * El estado real de comunicación seguirá
+         * siendo actualizado por STM32.
+         */
+        notifyConnectionState(
+            true
+        );
+
 
         return true;
     }
@@ -64,169 +84,38 @@ bool STM32Worker::start()
             << e.what()
             << std::endl;
 
+
         stm32.reset();
 
+
         running = false;
+
 
         if (state != nullptr)
         {
             HagieState::SystemState system =
                 state->getSystemState();
 
-            system.stm32_connected = false;
 
-            state->setSystemState(system);
+            system.stm32_connected =
+                false;
+
+
+            state->setSystemState(
+                system
+            );
         }
+
+
+        notifyConnectionState(
+            false
+        );
+
 
         return false;
     }
 }
 
-
-void STM32Worker::enqueueCommand(
-    const Command& command)
-{
-    std::lock_guard<std::mutex> lock(txMutex);
-
-    txQueue.push_back(command);
-}
-
-
-void STM32Worker::processTxQueue()
-{
-    if (!stm32)
-    {
-        return;
-    }
-
-    while (true)
-    {
-        Command command;
-
-        {
-            std::lock_guard<std::mutex> lock(txMutex);
-
-            if (txQueue.empty())
-            {
-                break;
-            }
-
-            command = txQueue.front();
-            txQueue.pop_front();
-        }
-
-        switch (command.type)
-        {
-            case CommandType::SET_TARGET_HEIGHT:
-            {
-                stm32->set_target_height(
-                    command.body,
-                    static_cast<uint16_t>(
-                        command.value
-                    )
-                );
-
-                break;
-            }
-
-            case CommandType::SET_VALVE_COMMAND:
-            {
-                stm32->set_valve_command(
-                    command.body,
-                    command.value
-                );
-
-                break;
-            }
-
-            case CommandType::STOP_ALL_VALVES:
-            {
-                stm32->stop_all_valves();
-
-                break;
-            }
-
-            case CommandType::CLEAR_BODY_FAULT:
-            {
-                stm32->clear_body_fault(
-                    command.body
-                );
-
-                break;
-            }
-
-            case CommandType::SET_BODY_LIMITS:
-            {
-                stm32->set_body_limits(
-                    command.body,
-                    command.value_u16_1,
-                    command.value_u16_2
-                );
-
-                break;
-            }
-
-            case CommandType::SET_MOVE_COMMAND_THRESHOLD:
-            {
-                stm32->set_move_command_threshold(
-                    command.value_u16_1
-                );
-
-                break;
-            }
-
-            case CommandType::SET_MIN_BODY_MOVEMENT:
-            {
-                stm32->set_min_body_movement(
-                    command.value_float
-                );
-
-                break;
-            }
-
-            case CommandType::SET_NO_MOVEMENT_TIMEOUT:
-            {
-                stm32->set_no_movement_timeout(
-                    command.value_u32
-                );
-
-                break;
-            }
-
-            case CommandType::SET_TARGET_TIMEOUT:
-            {
-                stm32->set_target_timeout(
-                    command.value_u32
-                );
-
-                break;
-            }
-
-            case CommandType::SET_ENCODER_DIRECTION:
-            {
-                stm32->set_encoder_direction(
-                    command.body,
-                    static_cast<uint8_t>(
-                        command.value
-                    )
-                );
-
-                break;
-            }
-
-            case CommandType::SET_ENCODER_SCALE:
-            {
-                stm32->set_encoder_scale(
-                    command.body,
-                    command.value_float
-                );
-
-                break;
-            }
-
-        }
-    }
-}
 
 void STM32Worker::stop()
 {
@@ -235,13 +124,22 @@ void STM32Worker::stop()
         if (stm32)
         {
             stm32->stop();
+
             stm32.reset();
         }
+
+
+        notifyConnectionState(
+            false
+        );
+
 
         return;
     }
 
+
     running = false;
+
 
     /*
      * Primero intentar dejar el sistema seguro.
@@ -257,32 +155,302 @@ void STM32Worker::stop()
         }
     }
 
+
     if (workerThread.joinable())
     {
         workerThread.join();
     }
 
+
     if (stm32)
     {
         stm32->stop();
+
         stm32.reset();
     }
+
 
     if (state != nullptr)
     {
         HagieState::SystemState system =
             state->getSystemState();
 
-        system.stm32_connected = false;
 
-        state->setSystemState(system);
+        system.stm32_connected =
+            false;
+
+
+        state->setSystemState(
+            system
+        );
     }
+
+
+    notifyConnectionState(
+        false
+    );
 }
 
 
 bool STM32Worker::isRunning() const
 {
     return running;
+}
+
+
+// ============================================================
+// CALLBACK DE CONEXIÓN
+// ============================================================
+
+void STM32Worker::setConnectionCallback(
+    connection_callback callback)
+{
+    onConnection =
+        std::move(callback);
+}
+
+
+void STM32Worker::notifyConnectionState(
+    bool connected)
+{
+    /*
+     * ========================================================
+     * PÉRDIDA DE STM32
+     * ========================================================
+     *
+     * Nunca conservar órdenes de movimiento pendientes.
+     */
+    if (!connected)
+    {
+        {
+            std::lock_guard<std::mutex> lock(
+                txMutex
+            );
+
+            txQueue.clear();
+        }
+
+        /*
+         * La representación local también queda
+         * inmediatamente en MANUAL.
+         */
+        if (state != nullptr)
+        {
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                state->setBodyAutoMode(
+                    body,
+                    false
+                );
+
+                state->setBodyValveCommand(
+                    body,
+                    0
+                );
+            }
+        }
+    }
+
+
+    /*
+     * Avisar a MainWindow.
+     *
+     * Este callback puede ejecutarse desde el
+     * hilo STM32. MainWindow lo pasará al hilo Qt.
+     */
+    if (onConnection)
+    {
+        onConnection(
+            connected
+        );
+    }
+}
+
+
+// ============================================================
+// COLA TX
+// ============================================================
+
+void STM32Worker::enqueueCommand(
+    const Command& command)
+{
+    std::lock_guard<std::mutex> lock(
+        txMutex
+    );
+
+
+    txQueue.push_back(
+        command
+    );
+}
+
+
+void STM32Worker::processTxQueue()
+{
+    if (!stm32)
+    {
+        return;
+    }
+
+
+    while (true)
+    {
+        Command command;
+
+
+        {
+            std::lock_guard<std::mutex> lock(
+                txMutex
+            );
+
+
+            if (txQueue.empty())
+            {
+                break;
+            }
+
+
+            command =
+                txQueue.front();
+
+
+            txQueue.pop_front();
+        }
+
+
+        switch (command.type)
+        {
+            case CommandType::SET_TARGET_HEIGHT:
+            {
+                stm32->set_target_height(
+                    command.body,
+                    static_cast<uint16_t>(
+                        command.value
+                    )
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_VALVE_COMMAND:
+            {
+                stm32->set_valve_command(
+                    command.body,
+                    command.value
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::STOP_ALL_VALVES:
+            {
+                stm32->stop_all_valves();
+
+
+                break;
+            }
+
+
+            case CommandType::CLEAR_BODY_FAULT:
+            {
+                stm32->clear_body_fault(
+                    command.body
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_BODY_LIMITS:
+            {
+                stm32->set_body_limits(
+                    command.body,
+                    command.value_u16_1,
+                    command.value_u16_2
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_MOVE_COMMAND_THRESHOLD:
+            {
+                stm32->set_move_command_threshold(
+                    command.value_u16_1
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_MIN_BODY_MOVEMENT:
+            {
+                stm32->set_min_body_movement(
+                    command.value_float
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_NO_MOVEMENT_TIMEOUT:
+            {
+                stm32->set_no_movement_timeout(
+                    command.value_u32
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_TARGET_TIMEOUT:
+            {
+                stm32->set_target_timeout(
+                    command.value_u32
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_ENCODER_DIRECTION:
+            {
+                stm32->set_encoder_direction(
+                    command.body,
+                    static_cast<uint8_t>(
+                        command.value
+                    )
+                );
+
+
+                break;
+            }
+
+
+            case CommandType::SET_ENCODER_SCALE:
+            {
+                stm32->set_encoder_scale(
+                    command.body,
+                    command.value_float
+                );
+
+
+                break;
+            }
+        }
+    }
 }
 
 
@@ -299,6 +467,7 @@ void STM32Worker::setTargetHeight(
         return;
     }
 
+
     enqueueCommand(
         {
             CommandType::SET_TARGET_HEIGHT,
@@ -309,6 +478,7 @@ void STM32Worker::setTargetHeight(
         }
     );
 
+
     if (state != nullptr &&
         body < HagieState::BODY_COUNT)
     {
@@ -316,6 +486,7 @@ void STM32Worker::setTargetHeight(
             body,
             height_mm
         );
+
 
         state->setBodyAutoMode(
             body,
@@ -334,6 +505,7 @@ void STM32Worker::setValveCommand(
         return;
     }
 
+
     enqueueCommand(
         {
             CommandType::SET_VALVE_COMMAND,
@@ -341,6 +513,7 @@ void STM32Worker::setValveCommand(
             command
         }
     );
+
 
     if (state != nullptr &&
         body < HagieState::BODY_COUNT)
@@ -360,6 +533,7 @@ void STM32Worker::stopAllValves()
         return;
     }
 
+
     enqueueCommand(
         {
             CommandType::STOP_ALL_VALVES,
@@ -367,6 +541,7 @@ void STM32Worker::stopAllValves()
             0
         }
     );
+
 
     if (state != nullptr)
     {
@@ -391,6 +566,7 @@ void STM32Worker::clearBodyFault(
         return;
     }
 
+
     enqueueCommand(
         {
             CommandType::CLEAR_BODY_FAULT,
@@ -401,29 +577,37 @@ void STM32Worker::clearBodyFault(
 }
 
 
-
+// ============================================================
+// CONFIGURACIÓN RUNTIME
+// ============================================================
 
 void STM32Worker::setBodyLimits(
     uint8_t body,
     uint16_t min_height_mm,
     uint16_t max_height_mm)
 {
-    if (body >= HagieState::BODY_COUNT)
+    if (body >=
+        HagieState::BODY_COUNT)
     {
         return;
     }
+
 
     std::lock_guard<std::mutex> lock(
         configMutex
     );
 
+
     runtimeConfig.min_height_mm[body] =
         min_height_mm;
+
 
     runtimeConfig.max_height_mm[body] =
         max_height_mm;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
 
 
@@ -434,10 +618,13 @@ void STM32Worker::setMoveCommandThreshold(
         configMutex
     );
 
+
     runtimeConfig.move_command_threshold =
         threshold;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
 
 
@@ -448,11 +635,15 @@ void STM32Worker::setMinBodyMovement(
         configMutex
     );
 
+
     runtimeConfig.min_body_movement_mm =
         movement_mm;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
+
 
 void STM32Worker::setNoMovementTimeout(
     uint32_t timeout_ms)
@@ -461,10 +652,13 @@ void STM32Worker::setNoMovementTimeout(
         configMutex
     );
 
+
     runtimeConfig.no_movement_timeout_ms =
         timeout_ms;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
 
 
@@ -475,10 +669,13 @@ void STM32Worker::setTargetTimeout(
         configMutex
     );
 
+
     runtimeConfig.target_timeout_ms =
         timeout_ms;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
 
 
@@ -486,39 +683,56 @@ void STM32Worker::setEncoderDirection(
     uint8_t body,
     uint8_t direction)
 {
-    if (body >= HagieState::BODY_COUNT)
+    if (body >=
+        HagieState::BODY_COUNT)
     {
         return;
     }
+
 
     std::lock_guard<std::mutex> lock(
         configMutex
     );
 
+
     runtimeConfig.encoder_direction[body] =
         direction;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
+
 
 void STM32Worker::setEncoderScale(
     uint8_t body,
     float mm_per_pulse)
 {
-    if (body >= HagieState::BODY_COUNT)
+    if (body >=
+        HagieState::BODY_COUNT)
     {
         return;
     }
+
 
     std::lock_guard<std::mutex> lock(
         configMutex
     );
 
+
     runtimeConfig.encoder_scale[body] =
         mm_per_pulse;
 
-    runtimeConfig.valid = true;
+
+    runtimeConfig.valid =
+        true;
 }
+
+
+// ============================================================
+// SINCRONIZACIÓN CONFIGURACIÓN
+// ============================================================
+
 void STM32Worker::enqueueRuntimeConfiguration()
 {
     {
@@ -526,14 +740,17 @@ void STM32Worker::enqueueRuntimeConfiguration()
             configMutex
         );
 
+
         if (!runtimeConfig.valid)
         {
             return;
         }
     }
 
+
     beginConfigurationSync();
 }
+
 
 void STM32Worker::beginConfigurationSync()
 {
@@ -542,25 +759,58 @@ void STM32Worker::beginConfigurationSync()
             configAckMutex
         );
 
-        configAckLimits.fill(false);
-        configAckDirection.fill(false);
-        configAckScale.fill(false);
 
-        configAckMoveThreshold = false;
-        configAckMinMovement = false;
-        configAckNoMovementTimeout = false;
-        configAckTargetTimeout = false;
+        configAckLimits.fill(
+            false
+        );
+
+
+        configAckDirection.fill(
+            false
+        );
+
+
+        configAckScale.fill(
+            false
+        );
+
+
+        configAckMoveThreshold =
+            false;
+
+
+        configAckMinMovement =
+            false;
+
+
+        configAckNoMovementTimeout =
+            false;
+
+
+        configAckTargetTimeout =
+            false;
+
 
         configSyncStatus =
             ConfigSyncStatus::PENDING;
     }
 
-    configSyncStep = 0;
-    configCommandPending = false;
-    configRetryCount = 0;
+
+    configSyncStep =
+        0;
+
+
+    configCommandPending =
+        false;
+
+
+    configRetryCount =
+        0;
+
 
     sendCurrentConfigurationCommand();
 }
+
 
 STM32Worker::ConfigSyncStatus
 STM32Worker::getConfigSyncStatus() const
@@ -568,6 +818,7 @@ STM32Worker::getConfigSyncStatus() const
     std::lock_guard<std::mutex> lock(
         configAckMutex
     );
+
 
     return configSyncStatus;
 }
@@ -577,36 +828,58 @@ void STM32Worker::sendCurrentConfigurationCommand()
 {
     RuntimeConfiguration configCopy;
 
+
     {
         std::lock_guard<std::mutex> lock(
             configMutex
         );
 
+
         if (!runtimeConfig.valid)
         {
+            std::lock_guard<std::mutex> ackLock(
+                configAckMutex
+            );
+
+
             configSyncStatus =
                 ConfigSyncStatus::ERROR;
 
+
             return;
         }
+
 
         configCopy =
             runtimeConfig;
     }
 
-    if (configSyncStep >= CONFIG_SYNC_COMMAND_COUNT)
+
+    if (!stm32)
+    {
+        return;
+    }
+
+
+    if (configSyncStep >=
+        CONFIG_SYNC_COMMAND_COUNT)
     {
         std::lock_guard<std::mutex> lock(
             configAckMutex
         );
 
+
         configSyncStatus =
             ConfigSyncStatus::SYNCHRONIZED;
 
-        configCommandPending = false;
+
+        configCommandPending =
+            false;
+
 
         return;
     }
+
 
     /*
      * 0..5 -> K01
@@ -616,12 +889,14 @@ void STM32Worker::sendCurrentConfigurationCommand()
         uint8_t body =
             configSyncStep;
 
+
         stm32->set_body_limits(
             body,
             configCopy.min_height_mm[body],
             configCopy.max_height_mm[body]
         );
     }
+
 
     /*
      * 6 -> K02
@@ -633,6 +908,7 @@ void STM32Worker::sendCurrentConfigurationCommand()
         );
     }
 
+
     /*
      * 7 -> K03
      */
@@ -642,6 +918,7 @@ void STM32Worker::sendCurrentConfigurationCommand()
             configCopy.min_body_movement_mm
         );
     }
+
 
     /*
      * 8 -> K04
@@ -653,6 +930,7 @@ void STM32Worker::sendCurrentConfigurationCommand()
         );
     }
 
+
     /*
      * 9 -> K05
      */
@@ -663,6 +941,7 @@ void STM32Worker::sendCurrentConfigurationCommand()
         );
     }
 
+
     /*
      * 10..15 -> K06
      */
@@ -671,11 +950,13 @@ void STM32Worker::sendCurrentConfigurationCommand()
         uint8_t body =
             configSyncStep - 10;
 
+
         stm32->set_encoder_direction(
             body,
             configCopy.encoder_direction[body]
         );
     }
+
 
     /*
      * 16..21 -> K07
@@ -685,13 +966,17 @@ void STM32Worker::sendCurrentConfigurationCommand()
         uint8_t body =
             configSyncStep - 16;
 
+
         stm32->set_encoder_scale(
             body,
             configCopy.encoder_scale[body]
         );
     }
 
-    configCommandPending = true;
+
+    configCommandPending =
+        true;
+
 
     configCommandSentTime =
         std::chrono::steady_clock::now();
@@ -705,19 +990,25 @@ void STM32Worker::processConfigurationSync()
         return;
     }
 
+
     auto now =
         std::chrono::steady_clock::now();
 
+
     auto elapsed =
         std::chrono::duration_cast<
-            std::chrono::milliseconds>(
-                now - configCommandSentTime
-            ).count();
+            std::chrono::milliseconds
+        >(
+            now -
+            configCommandSentTime
+        ).count();
+
 
     if (elapsed < 250)
     {
         return;
     }
+
 
     /*
      * Timeout esperando ACK.
@@ -726,12 +1017,17 @@ void STM32Worker::processConfigurationSync()
     {
         configRetryCount++;
 
-        configCommandPending = false;
+
+        configCommandPending =
+            false;
+
 
         sendCurrentConfigurationCommand();
 
+
         return;
     }
+
 
     /*
      * Demasiados intentos.
@@ -741,12 +1037,17 @@ void STM32Worker::processConfigurationSync()
             configAckMutex
         );
 
+
         configSyncStatus =
             ConfigSyncStatus::ERROR;
     }
 
-    configCommandPending = false;
+
+    configCommandPending =
+        false;
 }
+
+
 // ============================================================
 // CALLBACKS RX
 // ============================================================
@@ -765,12 +1066,14 @@ void STM32Worker::configureCallbacks()
 
     stm32->set_encoder_callback(
         [this](
-            const stm32canbus_serialif::encoder_state& encoderState)
+            const stm32canbus_serialif::encoder_state&
+                encoderState)
         {
             if (state == nullptr)
             {
                 return;
             }
+
 
             for (std::size_t body = 0;
                  body < HagieState::BODY_COUNT;
@@ -791,12 +1094,14 @@ void STM32Worker::configureCallbacks()
 
     stm32->set_valve_callback(
         [this](
-            const stm32canbus_serialif::valve_state& valveState)
+            const stm32canbus_serialif::valve_state&
+                valveState)
         {
             if (state == nullptr)
             {
                 return;
             }
+
 
             for (std::size_t body = 0;
                  body < HagieState::BODY_COUNT;
@@ -817,29 +1122,43 @@ void STM32Worker::configureCallbacks()
 
     stm32->set_diagnostic_callback(
         [this](
-            const stm32canbus_serialif::diagnostic_state& diagnostic)
+            const stm32canbus_serialif::diagnostic_state&
+                diagnostic)
         {
             if (state == nullptr)
             {
                 return;
             }
 
+
             HagieState::SystemState system =
                 state->getSystemState();
+
 
             system.stm32_connected =
                 diagnostic.jetson_connection_ok;
 
+
             system.can_ok =
-                ((diagnostic.system_faults & 0x10U) == 0);
+                (
+                    (
+                        diagnostic.system_faults
+                        & 0x10U
+                    ) == 0
+                );
+
 
             system.system_faults =
                 diagnostic.system_faults;
 
+
             system.axiomatic_modules =
                 diagnostic.axiomatic_modules;
 
-            state->setSystemState(system);
+
+            state->setSystemState(
+                system
+            );
 
 
             for (std::size_t body = 0;
@@ -861,26 +1180,34 @@ void STM32Worker::configureCallbacks()
 
     stm32->set_stm32_state_callback(
         [this](
-            const stm32canbus_serialif::stm32_state& stm32State)
+            const stm32canbus_serialif::stm32_state&
+                stm32State)
         {
             if (state == nullptr)
             {
                 return;
             }
 
+
             HagieState::SystemState system =
                 state->getSystemState();
+
 
             system.stm32_connected =
                 stm32State.jetson_connection_ok;
 
+
             system.stm32_uptime_ticks =
                 stm32State.uptime_ticks;
+
 
             system.axiomatic_modules =
                 stm32State.axiomatic_modules;
 
-            state->setSystemState(system);
+
+            state->setSystemState(
+                system
+            );
         }
     );
 
@@ -898,37 +1225,49 @@ void STM32Worker::configureCallbacks()
                 return;
             }
 
+
             HagieState::ImuState imuState;
+
 
             imuState.valid =
                 imu.valid;
 
+
             imuState.roll_deg =
                 imu.roll_deg;
+
 
             imuState.pitch_deg =
                 imu.pitch_deg;
 
+
             imuState.gravity_deg =
                 imu.gravity_deg;
+
 
             imuState.gyro_roll_dps =
                 imu.gyro_roll_dps;
 
+
             imuState.gyro_pitch_dps =
                 imu.gyro_pitch_dps;
+
 
             imuState.gyro_yaw_dps =
                 imu.gyro_yaw_dps;
 
+
             imuState.accel_x_mps2 =
                 imu.accel_x_mps2;
+
 
             imuState.accel_y_mps2 =
                 imu.accel_y_mps2;
 
+
             imuState.accel_z_mps2 =
                 imu.accel_z_mps2;
+
 
             state->setImuState(
                 imuState
@@ -938,8 +1277,10 @@ void STM32Worker::configureCallbacks()
             HagieState::SystemState system =
                 state->getSystemState();
 
+
             system.imu_valid =
                 imu.valid;
+
 
             state->setSystemState(
                 system
@@ -947,61 +1288,78 @@ void STM32Worker::configureCallbacks()
         }
     );
 
+
+    // --------------------------------------------------------
+    // ACK CONFIGURACIÓN
+    // --------------------------------------------------------
+
     stm32->set_config_ack_callback(
         [this](
             const stm32canbus_serialif::config_ack& ack)
         {
             std::cout
-            << "CONFIG ACK"
-            << " K=" << static_cast<int>(ack.subcommand)
-            << " body=" << static_cast<int>(ack.body)
-            << " status=" << static_cast<int>(ack.status)
-            << " value1=" << ack.value1
-            << " value2=" << ack.value2
-            << std::endl;
-            
-            
+                << "CONFIG ACK"
+                << " K="
+                << static_cast<int>(
+                    ack.subcommand
+                )
+                << " body="
+                << static_cast<int>(
+                    ack.body
+                )
+                << " status="
+                << static_cast<int>(
+                    ack.status
+                )
+                << " value1="
+                << ack.value1
+                << " value2="
+                << ack.value2
+                << std::endl;
+
+
             RuntimeConfiguration expected;
+
 
             {
                 std::lock_guard<std::mutex> lock(
                     configMutex
                 );
 
-                expected = runtimeConfig;
+
+                expected =
+                    runtimeConfig;
             }
 
-            bool validAck = false;
+
+            bool validAck =
+                false;
 
 
             /*
-            * Si STM32 rechazó el parámetro,
-            * terminar inmediatamente con ERROR.
-            */
+             * STM32 rechazó el parámetro.
+             */
             if (ack.status != 0)
             {
                 std::lock_guard<std::mutex> lock(
                     configAckMutex
                 );
 
+
                 configSyncStatus =
                     ConfigSyncStatus::ERROR;
 
-                configCommandPending = false;
+
+                configCommandPending =
+                    false;
+
 
                 return;
             }
 
 
-            /*
-            * Validar que el ACK corresponda exactamente
-            * al paso que estamos esperando.
-            */
             switch (configSyncStep)
             {
-                /*
-                * 0..5 -> K01 límites
-                */
                 case 0:
                 case 1:
                 case 2:
@@ -1012,98 +1370,111 @@ void STM32Worker::configureCallbacks()
                     uint8_t body =
                         configSyncStep;
 
-                    if (ack.subcommand == 0x01 &&
+
+                    if (
+                        ack.subcommand == 0x01 &&
                         ack.body == body &&
                         ack.value1 ==
-                            expected.min_height_mm[body] &&
+                            expected
+                                .min_height_mm[body] &&
                         ack.value2 ==
-                            expected.max_height_mm[body])
+                            expected
+                                .max_height_mm[body]
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 6 -> K02
-                */
                 case 6:
                 {
-                    if (ack.subcommand == 0x02 &&
+                    if (
+                        ack.subcommand == 0x02 &&
                         ack.body == 0xFF &&
                         ack.value1 ==
-                            expected.move_command_threshold)
+                            expected
+                                .move_command_threshold
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 7 -> K03
-                */
                 case 7:
                 {
                     uint32_t expectedValue =
                         static_cast<uint32_t>(
-                            expected.min_body_movement_mm
+                            expected
+                                .min_body_movement_mm
                             * 100.0f
                             + 0.5f
                         );
 
-                    if (ack.subcommand == 0x03 &&
+
+                    if (
+                        ack.subcommand == 0x03 &&
                         ack.body == 0xFF &&
                         ack.value1 ==
-                            expectedValue)
+                            expectedValue
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 8 -> K04
-                */
                 case 8:
                 {
-                    if (ack.subcommand == 0x04 &&
+                    if (
+                        ack.subcommand == 0x04 &&
                         ack.body == 0xFF &&
                         ack.value1 ==
-                            expected.no_movement_timeout_ms)
+                            expected
+                                .no_movement_timeout_ms
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 9 -> K05
-                */
                 case 9:
                 {
-                    if (ack.subcommand == 0x05 &&
+                    if (
+                        ack.subcommand == 0x05 &&
                         ack.body == 0xFF &&
                         ack.value1 ==
-                            expected.target_timeout_ms)
+                            expected
+                                .target_timeout_ms
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 10..15 -> K06 dirección
-                */
                 case 10:
                 case 11:
                 case 12:
@@ -1114,21 +1485,24 @@ void STM32Worker::configureCallbacks()
                     uint8_t body =
                         configSyncStep - 10;
 
-                    if (ack.subcommand == 0x06 &&
+
+                    if (
+                        ack.subcommand == 0x06 &&
                         ack.body == body &&
                         ack.value1 ==
-                            expected.encoder_direction[body])
+                            expected
+                                .encoder_direction[body]
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
 
 
-                /*
-                * 16..21 -> K07 escala
-                */
                 case 16:
                 case 17:
                 case 18:
@@ -1139,20 +1513,27 @@ void STM32Worker::configureCallbacks()
                     uint8_t body =
                         configSyncStep - 16;
 
+
                     uint32_t expectedValue =
                         static_cast<uint32_t>(
-                            expected.encoder_scale[body]
+                            expected
+                                .encoder_scale[body]
                             * 100000.0f
                             + 0.5f
                         );
 
-                    if (ack.subcommand == 0x07 &&
+
+                    if (
+                        ack.subcommand == 0x07 &&
                         ack.body == body &&
                         ack.value1 ==
-                            expectedValue)
+                            expectedValue
+                    )
                     {
-                        validAck = true;
+                        validAck =
+                            true;
                     }
+
 
                     break;
                 }
@@ -1166,62 +1547,69 @@ void STM32Worker::configureCallbacks()
 
 
             /*
-            * Llegó un ACK que no corresponde
-            * al comando que estamos esperando.
-            */
+             * ACK incorrecto.
+             */
             if (!validAck)
             {
                 std::lock_guard<std::mutex> lock(
                     configAckMutex
                 );
 
+
                 configSyncStatus =
                     ConfigSyncStatus::ERROR;
 
-                configCommandPending = false;
+
+                configCommandPending =
+                    false;
+
 
                 return;
             }
 
 
             /*
-            * ACK correcto.
-            */
-            configCommandPending = false;
-            configRetryCount = 0;
+             * ACK correcto.
+             */
+            configCommandPending =
+                false;
+
+
+            configRetryCount =
+                0;
+
 
             configSyncStep++;
 
 
             /*
-            * Si terminamos los 22 comandos,
-            * la STM32 quedó completamente sincronizada.
-            */
-            if (configSyncStep >=
-                CONFIG_SYNC_COMMAND_COUNT)
+             * Fin de los 22 comandos.
+             */
+            if (
+                configSyncStep >=
+                CONFIG_SYNC_COMMAND_COUNT
+            )
             {
                 std::lock_guard<std::mutex> lock(
                     configAckMutex
                 );
 
+
                 configSyncStatus =
                     ConfigSyncStatus::SYNCHRONIZED;
+
 
                 return;
             }
 
 
             /*
-            * Enviar siguiente K.
-            */
+             * Siguiente comando.
+             */
             sendCurrentConfigurationCommand();
         }
     );
 }
-
-
-
-
 
 
 // ============================================================
@@ -1232,8 +1620,10 @@ void STM32Worker::workerLoop()
 {
     using namespace std::chrono;
 
+
     auto lastHeartbeat =
         steady_clock::now();
+
 
     while (running)
     {
@@ -1250,24 +1640,80 @@ void STM32Worker::workerLoop()
                     << "Intentando reconectar STM32..."
                     << std::endl;
 
+
                 stm32 =
-                    std::make_unique<stm32canbus_serialif>(
+                    std::make_unique<
+                        stm32canbus_serialif
+                    >(
                         port,
                         baudrate
                     );
 
+
                 configureCallbacks();
 
+
                 stm32->start();
+
 
                 lastHeartbeat =
                     steady_clock::now();
 
+
                 /*
-                * Reenviar configuración runtime
-                * después de reconectar.
-                */
+                 * =================================================
+                 * SEGURIDAD DE RECONEXIÓN
+                 * =================================================
+                 *
+                 * Antes de:
+                 *
+                 * - avisar a GUI
+                 * - sincronizar configuración
+                 * - aceptar nuevas consignas
+                 *
+                 * mandar PARADA TOTAL directamente.
+                 *
+                 * De esta manera una STM32 que vuelve
+                 * a aparecer nunca retoma un AUTO anterior.
+                 */
+                stm32->stop_all_valves();
+
+
+                /*
+                 * También reflejar localmente MANUAL.
+                 */
+                if (state != nullptr)
+                {
+                    for (std::size_t body = 0;
+                         body < HagieState::BODY_COUNT;
+                         ++body)
+                    {
+                        state->setBodyAutoMode(
+                            body,
+                            false
+                        );
+
+                        state->setBodyValveCommand(
+                            body,
+                            0
+                        );
+                    }
+                }
+
+
+                /*
+                 * Ahora sí informar que volvió.
+                 */
+                notifyConnectionState(
+                    true
+                );
+
+
+                /*
+                 * Reenviar configuración runtime.
+                 */
                 enqueueRuntimeConfiguration();
+
 
                 std::cout
                     << "STM32 reconectada."
@@ -1280,11 +1726,35 @@ void STM32Worker::workerLoop()
                     << e.what()
                     << std::endl;
 
+
+                /*
+                 * Si la interfaz llegó a crearse,
+                 * cerrarla antes de destruirla.
+                 */
+                if (stm32)
+                {
+                    try
+                    {
+                        stm32->stop();
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+
+
                 stm32.reset();
+
+
+                notifyConnectionState(
+                    false
+                );
+
 
                 std::this_thread::sleep_for(
                     seconds(1)
                 );
+
 
                 continue;
             }
@@ -1300,18 +1770,20 @@ void STM32Worker::workerLoop()
         auto now =
             steady_clock::now();
 
+
         auto elapsed =
-            duration_cast<milliseconds>(
-                now - lastHeartbeat
+            duration_cast<
+                milliseconds
+            >(
+                now -
+                lastHeartbeat
             );
 
 
         /*
          * ----------------------------------------------------
-         * Heartbeat
+         * HEARTBEAT
          * ----------------------------------------------------
-         *
-         * Se transmite desde ESTE MISMO HILO.
          */
         if (elapsed.count() >= 100)
         {
@@ -1319,7 +1791,9 @@ void STM32Worker::workerLoop()
             {
                 stm32->send_heartbeat();
 
-                lastHeartbeat = now;
+
+                lastHeartbeat =
+                    now;
             }
             catch (const std::exception& e)
             {
@@ -1328,23 +1802,45 @@ void STM32Worker::workerLoop()
                     << e.what()
                     << std::endl;
 
+
                 /*
-                 * Actualizar estado visible por GUI.
+                 * Estado global.
                  */
                 if (state != nullptr)
                 {
                     HagieState::SystemState system =
                         state->getSystemState();
 
-                    system.stm32_connected = false;
-                    system.can_ok = false;
-                    system.imu_valid = false;
 
-                    state->setSystemState(system);
+                    system.stm32_connected =
+                        false;
+
+
+                    system.can_ok =
+                        false;
+
+
+                    system.imu_valid =
+                        false;
+
+
+                    state->setSystemState(
+                        system
+                    );
                 }
 
+
                 /*
-                 * Cerrar la interfaz dañada.
+                 * Cancela AUTO y elimina órdenes
+                 * pendientes antes de reconectar.
+                 */
+                notifyConnectionState(
+                    false
+                );
+
+
+                /*
+                 * Cerrar interfaz dañada.
                  */
                 try
                 {
@@ -1354,14 +1850,14 @@ void STM32Worker::workerLoop()
                 {
                 }
 
+
                 stm32.reset();
 
-                /*
-                 * Esperar antes de volver a intentar.
-                 */
+
                 std::this_thread::sleep_for(
                     seconds(1)
                 );
+
 
                 continue;
             }
@@ -1370,24 +1866,14 @@ void STM32Worker::workerLoop()
 
         /*
          * ----------------------------------------------------
-         * Cola de comandos TX
+         * COLA TX
          * ----------------------------------------------------
-         *
-         * Todos los comandos provenientes de:
-         *
-         * - GUI
-         * - IA
-         * - control
-         * - tests
-         *
-         * terminan en txQueue.
-         *
-         * ESTE es el único hilo autorizado a transmitir
-         * hacia la STM32.
          */
         try
         {
             processTxQueue();
+
+
             processConfigurationSync();
         }
         catch (const std::exception& e)
@@ -1397,23 +1883,44 @@ void STM32Worker::workerLoop()
                 << e.what()
                 << std::endl;
 
+
             /*
-             * Marcar comunicación caída.
+             * Estado global.
              */
             if (state != nullptr)
             {
                 HagieState::SystemState system =
                     state->getSystemState();
 
-                system.stm32_connected = false;
-                system.can_ok = false;
-                system.imu_valid = false;
 
-                state->setSystemState(system);
+                system.stm32_connected =
+                    false;
+
+
+                system.can_ok =
+                    false;
+
+
+                system.imu_valid =
+                    false;
+
+
+                state->setSystemState(
+                    system
+                );
             }
 
+
             /*
-             * Cerrar la interfaz actual.
+             * Cancela AUTO y vacía la cola.
+             */
+            notifyConnectionState(
+                false
+            );
+
+
+            /*
+             * Cerrar interfaz.
              */
             try
             {
@@ -1423,22 +1930,21 @@ void STM32Worker::workerLoop()
             {
             }
 
+
             stm32.reset();
 
-            /*
-             * Esperar antes de intentar reconectar.
-             */
+
             std::this_thread::sleep_for(
                 seconds(1)
             );
+
 
             continue;
         }
 
 
         /*
-         * Ciclo del worker:
-         * aproximadamente 100 Hz.
+         * Ciclo aproximadamente 100 Hz.
          */
         std::this_thread::sleep_for(
             milliseconds(10)

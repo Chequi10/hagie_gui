@@ -128,6 +128,33 @@ private:
 
     QSpinBox *configTargetTimeoutSpin = nullptr;
 
+    /*
+    * ========================================================
+    * Control AUTO de prueba
+    * ========================================================
+    */
+
+    QTimer *testAutoTimer = nullptr;
+
+    QSpinBox *testTargetHeightSpin[
+        HagieState::BODY_COUNT
+    ] {};
+
+    QLabel *testModeLabels[
+        HagieState::BODY_COUNT
+    ] {};
+
+    QPushButton *testManualButtons[
+        HagieState::BODY_COUNT
+    ] {};
+
+    QPushButton *testAutoButtons[
+        HagieState::BODY_COUNT
+    ] {};
+
+    std::array<bool, HagieState::BODY_COUNT>
+        testAutoEnabled {};
+
        
 
     void updateTestPage();

@@ -23,6 +23,7 @@
 #include <QScrollArea>
 
 
+
 MainWindow::MainWindow(
     HagieState *hagieState,
     STM32Worker *stm32Worker,
@@ -32,18 +33,24 @@ MainWindow::MainWindow(
       stm32Worker(stm32Worker),
       centralStack(nullptr)
 {
-    setWindowTitle("Hagie Control");
+    setWindowTitle(
+        "Hagie Control"
+    );
 
     resize(
         1280,
         720
     );
 
+
     /*
-     * Widget central con múltiples páginas.
+     * ========================================================
+     * Widget central con múltiples páginas
+     * ========================================================
      */
     centralStack =
         new QStackedWidget(this);
+
 
     /*
      * Página 0
@@ -52,12 +59,14 @@ MainWindow::MainWindow(
         createDashboardPage()
     );
 
+
     /*
      * Página 1
      */
     centralStack->addWidget(
         createCamerasPage()
     );
+
 
     /*
      * Página 2
@@ -66,12 +75,14 @@ MainWindow::MainWindow(
         createFaultsPage()
     );
 
+
     /*
      * Página 3
      */
     centralStack->addWidget(
         createTestsPage()
     );
+
 
     /*
      * Página 4
@@ -80,28 +91,225 @@ MainWindow::MainWindow(
         createConfigurationPage()
     );
 
+
     setCentralWidget(
         centralStack
     );
 
+
+    /*
+     * ========================================================
+     * Callback de conexión STM32
+     * ========================================================
+     */
+    if (this->stm32Worker != nullptr)
+    {
+        this->stm32Worker->setConnectionCallback(
+            [this](bool connected)
+            {
+                /*
+                 * El callback viene desde el hilo STM32.
+                 *
+                 * Pasamos la modificación de widgets
+                 * al hilo principal de Qt.
+                 */
+                QTimer::singleShot(
+                    0,
+                    this,
+                    [this, connected]()
+                    {
+                        /*
+                         * ========================================
+                         * STM32 DESCONECTADA
+                         * ========================================
+                         */
+                        if (!connected)
+                        {
+                            for (
+                                std::size_t body = 0;
+                                body < HagieState::BODY_COUNT;
+                                ++body
+                            )
+                            {
+                                /*
+                                 * Cancelar AUTO local.
+                                 */
+                                testAutoEnabled[body] =
+                                    false;
+
+
+                                /*
+                                 * Estado visual MANUAL.
+                                 */
+                                if (testModeLabels[body] != nullptr)
+                                {
+                                    testModeLabels[body]->setText(
+                                        "Modo: MANUAL"
+                                    );
+
+                                    testModeLabels[body]->setStyleSheet(
+                                        "font-weight: bold;"
+                                    );
+                                }
+
+
+                                /*
+                                 * Sin STM32 no permitimos
+                                 * órdenes de movimiento.
+                                 */
+                                if (testDownButtons[body] != nullptr)
+                                {
+                                    testDownButtons[body]->setEnabled(
+                                        false
+                                    );
+                                }
+
+
+                                if (testUpButtons[body] != nullptr)
+                                {
+                                    testUpButtons[body]->setEnabled(
+                                        false
+                                    );
+                                }
+
+
+                                if (testAutoButtons[body] != nullptr)
+                                {
+                                    testAutoButtons[body]->setEnabled(
+                                        false
+                                    );
+                                }
+
+
+                                if (testManualButtons[body] != nullptr)
+                                {
+                                    testManualButtons[body]->setEnabled(
+                                        false
+                                    );
+                                }
+                            }
+
+
+                            /*
+                             * Estado compartido también seguro.
+                             */
+                            if (state != nullptr)
+                            {
+                                for (
+                                    std::size_t body = 0;
+                                    body < HagieState::BODY_COUNT;
+                                    ++body
+                                )
+                                {
+                                    state->setBodyAutoMode(
+                                        body,
+                                        false
+                                    );
+
+                                    state->setBodyValveCommand(
+                                        body,
+                                        0
+                                    );
+                                }
+                            }
+
+
+                            return;
+                        }
+
+
+                        /*
+                         * ========================================
+                         * STM32 RECONECTADA
+                         * ========================================
+                         *
+                         * Nunca recuperar automáticamente
+                         * el AUTO anterior.
+                         */
+                        for (
+                            std::size_t body = 0;
+                            body < HagieState::BODY_COUNT;
+                            ++body
+                        )
+                        {
+                            testAutoEnabled[body] =
+                                false;
+
+
+                            if (testModeLabels[body] != nullptr)
+                            {
+                                testModeLabels[body]->setText(
+                                    "Modo: MANUAL"
+                                );
+
+                                testModeLabels[body]->setStyleSheet(
+                                    "font-weight: bold;"
+                                );
+                            }
+
+
+                            if (testAutoButtons[body] != nullptr)
+                            {
+                                testAutoButtons[body]->setEnabled(
+                                    true
+                                );
+                            }
+
+
+                            if (testManualButtons[body] != nullptr)
+                            {
+                                testManualButtons[body]->setEnabled(
+                                    true
+                                );
+                            }
+                        }
+
+
+                        /*
+                         * No reenviamos objetivos viejos.
+                         *
+                         * El STM32Worker ya envía STOP ALL
+                         * inmediatamente al reconectar.
+                         */
+                    }
+                );
+            }
+        );
+    }
+
+
+    /*
+     * ========================================================
+     * Configuración
+     * ========================================================
+     */
     loadConfiguration();
+
     syncConfigurationToWorker();
 
+
+    /*
+     * ========================================================
+     * Menús / barra de estado
+     * ========================================================
+     */
     createMenus();
+
     createStatusBar();
+
     updateDashboard();
+
     updateFaultPage();
 
 
     /*
-    * Actualización periódica de la interfaz.
-    *
-    * La GUI consulta HagieState cada 100 ms.
-    * Los hilos UART, visión e IA nunca modifican
-    * directamente los widgets Qt.
-    */
+     * ========================================================
+     * Timer de actualización GUI
+     * ========================================================
+     */
     dashboardTimer =
         new QTimer(this);
+
 
     connect(
         dashboardTimer,
@@ -110,7 +318,473 @@ MainWindow::MainWindow(
         &MainWindow::updateDashboard
     );
 
-    dashboardTimer->start(100);
+
+    dashboardTimer->start(
+        100
+    );
+}
+
+void MainWindow::updateTestPage()
+{
+    if (state == nullptr)
+    {
+        return;
+    }
+
+
+    constexpr int32_t
+        ENCODER_MOVEMENT_THRESHOLD_MM =
+            2;
+
+
+    constexpr int64_t
+        ENCODER_STILL_TIMEOUT_MS =
+            300;
+
+
+    auto now =
+        std::chrono::steady_clock::now();
+
+
+    /*
+     * Estado de conexión real.
+     */
+    HagieState::SystemState system =
+        state->getSystemState();
+
+
+    bool stm32Connected =
+        system.stm32_connected;
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        HagieState::BodyState bodyState =
+            state->getBodyState(
+                body
+            );
+
+
+        /*
+         * ====================================================
+         * DIAGNÓSTICO DEL ENCODER
+         * ====================================================
+         */
+
+        if (!testEncoderInitialized[body])
+        {
+            testPreviousHeight[body] =
+                bodyState.height_mm;
+
+
+            testEncoderInitialized[body] =
+                true;
+
+
+            testEncoderDirection[body] =
+                0;
+
+
+            testLastEncoderMovementTime[body] =
+                now;
+
+
+            testEncoderStatusLabels[body]
+                ->setText(
+                    "Encoder: QUIETO"
+                );
+
+
+            testEncoderStatusLabels[body]
+                ->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: gray;"
+                );
+
+
+            testEncoderDeltaLabels[body]
+                ->setText(
+                    "Cambio: 0 mm"
+                );
+        }
+        else
+        {
+            int32_t delta =
+                static_cast<int32_t>(
+                    bodyState.height_mm
+                )
+                -
+                static_cast<int32_t>(
+                    testPreviousHeight[body]
+                );
+
+
+            if (
+                delta >=
+                ENCODER_MOVEMENT_THRESHOLD_MM
+            )
+            {
+                testEncoderDirection[body] =
+                    1;
+
+
+                testLastEncoderMovementTime[body] =
+                    now;
+
+
+                testEncoderStatusLabels[body]
+                    ->setText(
+                        "Encoder: SUBIENDO"
+                    );
+
+
+                testEncoderStatusLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "color: green;"
+                    );
+
+
+                testEncoderDeltaLabels[body]
+                    ->setText(
+                        QString(
+                            "Cambio: +%1 mm"
+                        )
+                            .arg(delta)
+                    );
+
+
+                testPreviousHeight[body] =
+                    bodyState.height_mm;
+            }
+            else if (
+                delta <=
+                -ENCODER_MOVEMENT_THRESHOLD_MM
+            )
+            {
+                testEncoderDirection[body] =
+                    -1;
+
+
+                testLastEncoderMovementTime[body] =
+                    now;
+
+
+                testEncoderStatusLabels[body]
+                    ->setText(
+                        "Encoder: BAJANDO"
+                    );
+
+
+                testEncoderStatusLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "color: green;"
+                    );
+
+
+                testEncoderDeltaLabels[body]
+                    ->setText(
+                        QString(
+                            "Cambio: %1 mm"
+                        )
+                            .arg(delta)
+                    );
+
+
+                testPreviousHeight[body] =
+                    bodyState.height_mm;
+            }
+            else
+            {
+                auto elapsed =
+                    std::chrono::
+                        duration_cast<
+                            std::chrono::
+                                milliseconds
+                        >(
+                            now -
+                            testLastEncoderMovementTime[
+                                body
+                            ]
+                        ).count();
+
+
+                if (
+                    elapsed >=
+                    ENCODER_STILL_TIMEOUT_MS
+                )
+                {
+                    testEncoderDirection[body] =
+                        0;
+
+
+                    testEncoderStatusLabels[body]
+                        ->setText(
+                            "Encoder: QUIETO"
+                        );
+
+
+                    testEncoderStatusLabels[body]
+                        ->setStyleSheet(
+                            "font-weight: bold;"
+                            "color: gray;"
+                        );
+
+
+                    testEncoderDeltaLabels[body]
+                        ->setText(
+                            "Cambio: 0 mm"
+                        );
+                }
+            }
+        }
+
+
+        /*
+         * ====================================================
+         * TELEMETRÍA
+         * ====================================================
+         */
+
+        testHeightLabels[body]
+            ->setText(
+                QString(
+                    "Altura: %1 mm"
+                )
+                    .arg(
+                        bodyState.height_mm
+                    )
+            );
+
+
+        testValveLabels[body]
+            ->setText(
+                QString(
+                    "Válvula: %1"
+                )
+                    .arg(
+                        bodyState.valve_command
+                    )
+            );
+
+
+        /*
+         * ====================================================
+         * FALLAS
+         * ====================================================
+         */
+
+        if (bodyState.faults == 0)
+        {
+            testFaultLabels[body]
+                ->setText(
+                    "Estado: OK"
+                );
+
+
+            testFaultLabels[body]
+                ->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: green;"
+                );
+
+
+            testBodyFrames[body]
+                ->setStyleSheet(
+                    ""
+                );
+
+
+            /*
+             * Movimiento manual solamente si:
+             *
+             * - STM32 conectada
+             * - cuerpo NO está AUTO
+             */
+            bool manualEnabled =
+                stm32Connected &&
+                !testAutoEnabled[body];
+
+
+            testUpButtons[body]
+                ->setEnabled(
+                    manualEnabled
+                );
+
+
+            testDownButtons[body]
+                ->setEnabled(
+                    manualEnabled
+                );
+        }
+        else
+        {
+            QStringList faults;
+
+
+            if (
+                (bodyState.faults & 0x01U)
+                != 0
+            )
+            {
+                faults
+                    << "ENCODER_TIMEOUT";
+            }
+
+
+            if (
+                (bodyState.faults & 0x02U)
+                != 0
+            )
+            {
+                faults
+                    << "ENCODER_RANGE";
+            }
+
+
+            if (
+                (bodyState.faults & 0x04U)
+                != 0
+            )
+            {
+                faults
+                    << "NO_MOVEMENT";
+            }
+
+
+            if (
+                (bodyState.faults & 0x08U)
+                != 0
+            )
+            {
+                faults
+                    << "MIN_LIMIT";
+            }
+
+
+            if (
+                (bodyState.faults & 0x10U)
+                != 0
+            )
+            {
+                faults
+                    << "MAX_LIMIT";
+            }
+
+
+            if (
+                (bodyState.faults & 0x20U)
+                != 0
+            )
+            {
+                faults
+                    << "TARGET_TIMEOUT";
+            }
+
+
+            if (
+                (bodyState.faults & 0x40U)
+                != 0
+            )
+            {
+                faults
+                    << "VALVE_ERROR";
+            }
+
+
+            testFaultLabels[body]
+                ->setText(
+                    "FALLA: "
+                    + faults.join(
+                        " | "
+                    )
+                );
+
+
+            testFaultLabels[body]
+                ->setStyleSheet(
+                    "font-weight: bold;"
+                    "color: red;"
+                );
+
+
+            testBodyFrames[body]
+                ->setStyleSheet(
+                    "QFrame {"
+                    "border: 2px solid red;"
+                    "}"
+                );
+
+
+            testUpButtons[body]
+                ->setEnabled(
+                    false
+                );
+
+
+            testDownButtons[body]
+                ->setEnabled(
+                    false
+                );
+        }
+
+
+        /*
+         * ====================================================
+         * AUTO / MANUAL SEGÚN CONEXIÓN
+         * ====================================================
+         */
+
+        if (!stm32Connected)
+        {
+            /*
+             * Sin comunicación:
+             * ninguna orden nueva.
+             */
+            testAutoButtons[body]
+                ->setEnabled(
+                    false
+                );
+
+
+            testManualButtons[body]
+                ->setEnabled(
+                    false
+                );
+
+
+            testAutoEnabled[body] =
+                false;
+
+
+            testModeLabels[body]
+                ->setText(
+                    "Modo: MANUAL"
+                );
+
+
+            testModeLabels[body]
+                ->setStyleSheet(
+                    "font-weight: bold;"
+                );
+        }
+        else
+        {
+            testAutoButtons[body]
+                ->setEnabled(
+                    true
+                );
+
+
+            testManualButtons[body]
+                ->setEnabled(
+                    true
+                );
+        }
+    }
 }
 
 
@@ -715,6 +1389,10 @@ QWidget *MainWindow::createTestsPage()
     QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
+    mainLayout->setSizeConstraint(
+        QLayout::SetMinimumSize
+    );
+
 
     QLabel *title =
         new QLabel(
@@ -732,10 +1410,12 @@ QWidget *MainWindow::createTestsPage()
 
     mainLayout->addWidget(title);
 
+
     /*
-    * Selector de intensidad del comando
-    * para las pruebas manuales.
-    */
+     * ========================================================
+     * Selector de intensidad para modo MANUAL
+     * ========================================================
+     */
     QHBoxLayout *commandLayout =
         new QHBoxLayout();
 
@@ -756,9 +1436,12 @@ QWidget *MainWindow::createTestsPage()
     commandCombo->addItem("1000", 1000);
 
     /*
-    * Valor inicial = 300.
-    */
+     * Valor inicial = 300.
+     */
     commandCombo->setCurrentIndex(2);
+
+    testValveCommand = 300;
+
 
     connect(
         commandCombo,
@@ -775,6 +1458,7 @@ QWidget *MainWindow::createTestsPage()
         }
     );
 
+
     commandLayout->addStretch();
 
     commandLayout->addWidget(
@@ -787,13 +1471,16 @@ QWidget *MainWindow::createTestsPage()
 
     commandLayout->addStretch();
 
+
     mainLayout->addLayout(
         commandLayout
     );
 
 
     /*
-     * Grid de los 6 cuerpos.
+     * ========================================================
+     * Grid de los seis cuerpos
+     * ========================================================
      */
     QGridLayout *bodyGrid =
         new QGridLayout();
@@ -813,11 +1500,29 @@ QWidget *MainWindow::createTestsPage()
             QFrame::StyledPanel
         );
 
+        frame->setMinimumHeight(
+            280
+        );
+
 
         QVBoxLayout *bodyLayout =
             new QVBoxLayout(frame);
 
+        bodyLayout->setContentsMargins(
+            8,
+            5,
+            8,
+            5
+        );
 
+        bodyLayout->setSpacing(
+            3
+        );    
+
+
+        /*
+         * Título.
+         */
         QLabel *bodyTitle =
             new QLabel(
                 QString("CUERPO %1")
@@ -834,41 +1539,57 @@ QWidget *MainWindow::createTestsPage()
         );
 
 
+        /*
+         * Estado actual.
+         */
         testHeightLabels[body] =
             new QLabel(
                 "Altura: --- mm"
             );
+
+        testHeightLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+
+        testEncoderStatusLabels[body] =
+            new QLabel(
+                "Encoder: ---"
+            );
+
+        testEncoderStatusLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
+
+        testEncoderDeltaLabels[body] =
+            new QLabel(
+                "Cambio: 0 mm"
+            );
+
+        testEncoderDeltaLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
+
 
         testValveLabels[body] =
             new QLabel(
                 "Válvula: 0"
             );
 
+        testValveLabels[body]
+            ->setAlignment(
+                Qt::AlignCenter
+            );
 
-            testFaultLabels[body] =
+
+        testFaultLabels[body] =
             new QLabel(
                 "Estado: OK"
             );
-
-            testEncoderStatusLabels[body] =
-                new QLabel(
-                    "Encoder: ---"
-                );
-
-            testEncoderDeltaLabels[body] =
-                new QLabel(
-                    "Cambio: 0 mm"
-                );
-
-            testEncoderStatusLabels[body]
-                ->setAlignment(
-                    Qt::AlignCenter
-                );
-
-            testEncoderDeltaLabels[body]
-                ->setAlignment(
-                    Qt::AlignCenter
-                );
 
         testFaultLabels[body]
             ->setAlignment(
@@ -881,22 +1602,288 @@ QWidget *MainWindow::createTestsPage()
             );
 
 
-        testHeightLabels[body]
+        /*
+         * ====================================================
+         * Altura objetivo AUTO
+         * ====================================================
+         */
+        QHBoxLayout *targetLayout =
+            new QHBoxLayout();
+
+        QLabel *targetLabel =
+            new QLabel(
+                "Objetivo:"
+            );
+
+
+        testTargetHeightSpin[body] =
+            new QSpinBox();
+
+        testTargetHeightSpin[body]
+            ->setRange(
+                0,
+                2000
+            );
+
+        testTargetHeightSpin[body]
+            ->setSuffix(
+                " mm"
+            );
+
+        /*
+        * Recuperar el último objetivo utilizado
+        * solamente como valor de interfaz.
+        *
+        * Esto NO activa AUTO.
+        */
+        QSettings testSettings(
+            "hagie_config.ini",
+            QSettings::IniFormat
+        );
+
+        QString targetKey =
+            QString("Test/target_body_%1")
+                .arg(body);
+
+        int savedTarget =
+            testSettings.value(
+                targetKey,
+                500
+            ).toInt();
+
+        testTargetHeightSpin[body]
+            ->setValue(
+                savedTarget
+            );
+
+        connect(
+            testTargetHeightSpin[body],
+            QOverload<int>::of(
+                &QSpinBox::valueChanged
+            ),
+            this,
+            [body](int value)
+            {
+                QSettings settings(
+                    "hagie_config.ini",
+                    QSettings::IniFormat
+                );
+
+                QString key =
+                    QString("Test/target_body_%1")
+                        .arg(body);
+
+                settings.setValue(
+                    key,
+                    value
+                );
+
+                settings.sync();
+            }
+        );    
+
+
+
+        targetLayout->addWidget(
+            targetLabel
+        );
+
+        targetLayout->addWidget(
+            testTargetHeightSpin[body]
+        );
+
+
+        /*
+         * ====================================================
+         * Estado MANUAL / AUTO
+         * ====================================================
+         */
+        testModeLabels[body] =
+            new QLabel(
+                "Modo: MANUAL"
+            );
+
+        testModeLabels[body]
             ->setAlignment(
                 Qt::AlignCenter
             );
 
-        testValveLabels[body]
-            ->setAlignment(
-                Qt::AlignCenter
+        testModeLabels[body]
+            ->setStyleSheet(
+                "font-weight: bold;"
             );
 
 
         /*
-         * Botones de movimiento.
+         * ====================================================
+         * Botones MANUAL / AUTO
+         * ====================================================
          */
-        QHBoxLayout *buttonLayout =
+        QHBoxLayout *modeButtonLayout =
             new QHBoxLayout();
+
+
+        testManualButtons[body] =
+            new QPushButton(
+                "MANUAL"
+            );
+
+        testAutoButtons[body] =
+            new QPushButton(
+                "AUTO"
+            );
+
+
+        /*
+         * Estado inicial.
+         */
+        testAutoEnabled[body] =
+            false;
+
+
+        /*
+         * MANUAL.
+         *
+         * El opcode B con comando cero hace que
+         * la STM32 vuelva a modo MANUAL.
+         */
+        connect(
+            testManualButtons[body],
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                testAutoEnabled[body] =
+                    false;
+
+                testModeLabels[body]
+                    ->setText(
+                        "Modo: MANUAL"
+                    );
+
+                testModeLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                    );
+
+
+                testDownButtons[body]
+                    ->setEnabled(true);
+
+                testUpButtons[body]
+                    ->setEnabled(true);
+
+
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        /*
+         * AUTO.
+         *
+         * Enviar inmediatamente la primera
+         * consigna D.
+         */
+        connect(
+            testAutoButtons[body],
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                uint16_t target =
+                    static_cast<uint16_t>(
+                        testTargetHeightSpin[body]
+                            ->value()
+                    );
+
+
+                testAutoEnabled[body] =
+                    true;
+
+
+                testModeLabels[body]
+                    ->setText(
+                        "Modo: AUTO"
+                    );
+
+                testModeLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                        "color: green;"
+                    );
+
+
+                /*
+                 * Mientras estamos en AUTO no
+                 * permitimos SUBIR / BAJAR manual.
+                 */
+                testDownButtons[body]
+                    ->setEnabled(false);
+
+                testUpButtons[body]
+                    ->setEnabled(false);
+
+
+                stm32Worker->setTargetHeight(
+                    static_cast<uint8_t>(body),
+                    target
+                );
+            }
+        );
+
+
+        modeButtonLayout->addWidget(
+            testManualButtons[body]
+        );
+
+        modeButtonLayout->addWidget(
+            testAutoButtons[body]
+        );
+
+
+        /*
+         * ====================================================
+         * Botones de movimiento manual
+         * ====================================================
+         */
+        QWidget *manualControlWidget =
+            new QWidget();
+
+        manualControlWidget->setMinimumHeight(
+            40
+        );
+
+        QHBoxLayout *buttonLayout =
+            new QHBoxLayout(
+                manualControlWidget
+            );
+
+        buttonLayout->setContentsMargins(
+            0,
+            3,
+            0,
+            3
+        );
+
+        buttonLayout->setSpacing(
+            5
+        );
 
 
         testDownButtons[body] =
@@ -914,123 +1901,17 @@ QWidget *MainWindow::createTestsPage()
                 "SUBIR"
             );
 
-        /*
-        * Alias locales para no tener que modificar
-        * el resto de los connect().
-        */
+
+        testDownButtons[body]->setMinimumHeight(30);
+        stopButton->setMinimumHeight(30);
+        testUpButtons[body]->setMinimumHeight(30);
+
+
         QPushButton *downButton =
             testDownButtons[body];
 
         QPushButton *upButton =
             testUpButtons[body];
-
-
-        /*
-        * BAJAR mientras se mantiene presionado.
-        */
-        connect(
-            downButton,
-            &QPushButton::pressed,
-            this,
-            [this, body]()
-            {
-                if (stm32Worker == nullptr)
-                {
-                    return;
-                }
-
-                stm32Worker->setValveCommand(
-                    static_cast<uint8_t>(body),
-                    static_cast<int16_t>(
-                        -testValveCommand
-                    )
-                );
-            }
-        );
-
-        connect(
-            downButton,
-            &QPushButton::released,
-            this,
-            [this, body]()
-            {
-                if (stm32Worker == nullptr)
-                {
-                    return;
-                }
-
-                stm32Worker->setValveCommand(
-                    static_cast<uint8_t>(body),
-                    0
-                );
-            }
-        );
-
-
-        /*
-         * STOP
-         */
-        connect(
-            stopButton,
-            &QPushButton::clicked,
-            this,
-            [this, body]()
-            {
-                if (stm32Worker == nullptr)
-                {
-                    return;
-                }
-
-                stm32Worker->setValveCommand(
-                    static_cast<uint8_t>(body),
-                    0
-                );
-            }
-        );
-
-
-        
-        /*
-        * SUBIR mientras se mantiene presionado.
-        */
-        connect(
-            upButton,
-            &QPushButton::pressed,
-            this,
-            [this, body]()
-            {
-                if (stm32Worker == nullptr)
-                {
-                    return;
-                }
-
-                stm32Worker->setValveCommand(
-                static_cast<uint8_t>(body),
-                static_cast<int16_t>(
-                    testValveCommand
-                )
-            );
-            }
-        );
-
-        connect(
-            upButton,
-            &QPushButton::released,
-            this,
-            [this, body]()
-            {
-                if (stm32Worker == nullptr)
-                {
-                    return;
-                }
-
-                stm32Worker->setValveCommand(
-                    static_cast<uint8_t>(body),
-                    0
-                );
-            }
-        );
-
 
         buttonLayout->addWidget(
             downButton
@@ -1045,6 +1926,146 @@ QWidget *MainWindow::createTestsPage()
         );
 
 
+
+
+        /*
+         * BAJAR.
+         */
+        connect(
+            downButton,
+            &QPushButton::pressed,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    static_cast<int16_t>(
+                        -testValveCommand
+                    )
+                );
+            }
+        );
+
+
+        connect(
+            downButton,
+            &QPushButton::released,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        /*
+         * STOP.
+         *
+         * STOP también cancela AUTO.
+         */
+        connect(
+            stopButton,
+            &QPushButton::clicked,
+            this,
+            [this, body]()
+            {
+                testAutoEnabled[body] =
+                    false;
+
+
+                testModeLabels[body]
+                    ->setText(
+                        "Modo: MANUAL"
+                    );
+
+                testModeLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                    );
+
+
+                
+
+
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        /*
+         * SUBIR.
+         */
+        connect(
+            upButton,
+            &QPushButton::pressed,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    static_cast<int16_t>(
+                        testValveCommand
+                    )
+                );
+            }
+        );
+
+
+        connect(
+            upButton,
+            &QPushButton::released,
+            this,
+            [this, body]()
+            {
+                if (stm32Worker == nullptr)
+                {
+                    return;
+                }
+
+
+                stm32Worker->setValveCommand(
+                    static_cast<uint8_t>(body),
+                    0
+                );
+            }
+        );
+
+
+        /*
+         * ====================================================
+         * Construcción visual del cuerpo
+         * ====================================================
+         */
         bodyLayout->addWidget(
             bodyTitle
         );
@@ -1069,9 +2090,23 @@ QWidget *MainWindow::createTestsPage()
             testFaultLabels[body]
         );
 
+
         bodyLayout->addLayout(
-            buttonLayout
+            targetLayout
         );
+
+        bodyLayout->addWidget(
+            testModeLabels[body]
+        );
+
+        bodyLayout->addLayout(
+            modeButtonLayout
+        );
+
+        bodyLayout->addWidget(
+            manualControlWidget
+        );
+
 
         bodyGrid->addWidget(
             frame,
@@ -1087,16 +2122,79 @@ QWidget *MainWindow::createTestsPage()
 
 
     /*
-     * Botón global de seguridad.
+     * ========================================================
+     * Renovación periódica de consignas AUTO
+     * ========================================================
+     *
+     * La STM32 tiene watchdog individual de consigna.
+     * Mientras un cuerpo esté en AUTO, reenviamos D
+     * periódicamente.
+     */
+    testAutoTimer =
+        new QTimer(this);
+
+
+    connect(
+        testAutoTimer,
+        &QTimer::timeout,
+        this,
+        [this]()
+        {
+            if (stm32Worker == nullptr)
+            {
+                return;
+            }
+
+
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                if (!testAutoEnabled[body])
+                {
+                    continue;
+                }
+
+
+                uint16_t target =
+                    static_cast<uint16_t>(
+                        testTargetHeightSpin[body]
+                            ->value()
+                    );
+
+
+                stm32Worker->setTargetHeight(
+                    static_cast<uint8_t>(body),
+                    target
+                );
+            }
+        }
+    );
+
+
+    /*
+     * Reenviar consigna AUTO cada 500 ms.
+     */
+    testAutoTimer->start(
+        500
+    );
+
+
+    /*
+     * ========================================================
+     * Botón global de seguridad
+     * ========================================================
      */
     QPushButton *stopAllButton =
         new QPushButton(
             "DETENER TODAS LAS VÁLVULAS"
         );
 
+
     stopAllButton->setMinimumHeight(
         60
     );
+
 
     stopAllButton->setStyleSheet(
         "font-size: 18px;"
@@ -1112,22 +2210,99 @@ QWidget *MainWindow::createTestsPage()
         this,
         [this]()
         {
+            /*
+             * Cancelar AUTO de los seis cuerpos.
+             */
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                testAutoEnabled[body] =
+                    false;
+
+
+                testModeLabels[body]
+                    ->setText(
+                        "Modo: MANUAL"
+                    );
+
+                testModeLabels[body]
+                    ->setStyleSheet(
+                        "font-weight: bold;"
+                    );
+
+
+                testDownButtons[body]
+                    ->setEnabled(true);
+
+                testUpButtons[body]
+                    ->setEnabled(true);
+            }
+
+
             if (stm32Worker == nullptr)
             {
                 return;
             }
+
 
             stm32Worker->stopAllValves();
         }
     );
 
 
-    mainLayout->addWidget(
-        stopAllButton
+    /*
+    * Contenedor exterior:
+    * - panel de test desplazable
+    * - parada total siempre visible abajo
+    */
+    QWidget *container =
+        new QWidget();
+
+    QVBoxLayout *containerLayout =
+        new QVBoxLayout(container);
+
+    containerLayout->setContentsMargins(
+        0,
+        0,
+        0,
+        0
     );
 
 
-    return page;
+    /*
+    * Todo el panel de test queda dentro
+    * del área desplazable.
+    */
+    QScrollArea *scrollArea =
+        new QScrollArea();
+
+    scrollArea->setWidgetResizable(
+        true
+    );
+
+    scrollArea->setWidget(
+        page
+    );
+
+    scrollArea->setFrameShape(
+        QFrame::NoFrame
+    );
+
+    containerLayout->addWidget(
+        scrollArea,
+        1
+    );
+
+
+    /*
+    * Parada de emergencia siempre visible.
+    */
+    containerLayout->addWidget(
+        stopAllButton
+    );
+
+    return container;
 }
 
 /*
@@ -1952,247 +3127,6 @@ void MainWindow::updateFaultPage()
                 ->setText(
                     faults.join("\n")
                 );
-        }
-    }
-}
-void MainWindow::updateTestPage()
-{
-    if (state == nullptr)
-    {
-        return;
-    }
-
-    constexpr int32_t ENCODER_MOVEMENT_THRESHOLD_MM = 2;
-    constexpr int64_t ENCODER_STILL_TIMEOUT_MS = 300;
-
-    auto now =
-        std::chrono::steady_clock::now();
-
-    for (std::size_t body = 0;
-         body < HagieState::BODY_COUNT;
-         ++body)
-    {
-        HagieState::BodyState bodyState =
-            state->getBodyState(body);
-
-
-        /*
-         * ========================================================
-         * DIAGNÓSTICO DEL ENCODER
-         * ========================================================
-         */
-
-        if (!testEncoderInitialized[body])
-        {
-            testPreviousHeight[body] =
-                bodyState.height_mm;
-
-            testEncoderInitialized[body] =
-                true;
-
-            testEncoderDirection[body] =
-                0;
-
-            testLastEncoderMovementTime[body] =
-                now;
-
-            testEncoderStatusLabels[body]->setText(
-                "Encoder: QUIETO"
-            );
-
-            testEncoderStatusLabels[body]->setStyleSheet(
-                "font-weight: bold;"
-                "color: gray;"
-            );
-
-            testEncoderDeltaLabels[body]->setText(
-                "Cambio: 0 mm"
-            );
-        }
-        else
-        {
-            int32_t delta =
-                static_cast<int32_t>(
-                    bodyState.height_mm
-                )
-                -
-                static_cast<int32_t>(
-                    testPreviousHeight[body]
-                );
-
-            if (delta >= ENCODER_MOVEMENT_THRESHOLD_MM)
-            {
-                testEncoderDirection[body] = 1;
-
-                testLastEncoderMovementTime[body] =
-                    now;
-
-                testEncoderStatusLabels[body]->setText(
-                    "Encoder: SUBIENDO"
-                );
-
-                testEncoderStatusLabels[body]->setStyleSheet(
-                    "font-weight: bold;"
-                    "color: green;"
-                );
-
-                testEncoderDeltaLabels[body]->setText(
-                    QString("Cambio: +%1 mm")
-                        .arg(delta)
-                );
-
-                testPreviousHeight[body] =
-                    bodyState.height_mm;
-            }
-            else if (delta <= -ENCODER_MOVEMENT_THRESHOLD_MM)
-            {
-                testEncoderDirection[body] = -1;
-
-                testLastEncoderMovementTime[body] =
-                    now;
-
-                testEncoderStatusLabels[body]->setText(
-                    "Encoder: BAJANDO"
-                );
-
-                testEncoderStatusLabels[body]->setStyleSheet(
-                    "font-weight: bold;"
-                    "color: green;"
-                );
-
-                testEncoderDeltaLabels[body]->setText(
-                    QString("Cambio: %1 mm")
-                        .arg(delta)
-                );
-
-                testPreviousHeight[body] =
-                    bodyState.height_mm;
-            }
-            else
-            {
-                auto elapsed =
-                    std::chrono::duration_cast<
-                        std::chrono::milliseconds>(
-                            now -
-                            testLastEncoderMovementTime[body]
-                        ).count();
-
-                if (elapsed >= ENCODER_STILL_TIMEOUT_MS)
-                {
-                    testEncoderDirection[body] = 0;
-
-                    testEncoderStatusLabels[body]->setText(
-                        "Encoder: QUIETO"
-                    );
-
-                    testEncoderStatusLabels[body]->setStyleSheet(
-                        "font-weight: bold;"
-                        "color: gray;"
-                    );
-
-                    testEncoderDeltaLabels[body]->setText(
-                        "Cambio: 0 mm"
-                    );
-                }
-            }
-        }
-
-
-        /*
-         * ========================================================
-         * TODO ESTO ES LA LÓGICA QUE YA FUNCIONABA
-         * ========================================================
-         */
-
-        testHeightLabels[body]->setText(
-            QString("Altura: %1 mm")
-                .arg(bodyState.height_mm)
-        );
-
-        testValveLabels[body]->setText(
-            QString("Válvula: %1")
-                .arg(bodyState.valve_command)
-        );
-
-        if (bodyState.faults == 0)
-        {
-            testFaultLabels[body]->setText(
-                "Estado: OK"
-            );
-
-            testFaultLabels[body]->setStyleSheet(
-                "font-weight: bold;"
-                "color: green;"
-            );
-
-            testBodyFrames[body]->setStyleSheet(
-                ""
-            );
-
-            /*
-             * Sin fallas:
-             * permitir movimiento manual.
-             */
-            testUpButtons[body]->setEnabled(true);
-            testDownButtons[body]->setEnabled(true);
-        }
-        else
-        {
-            QStringList faults;
-
-            if ((bodyState.faults & 0x01U) != 0)
-            {
-                faults << "ENCODER_TIMEOUT";
-            }
-
-            if ((bodyState.faults & 0x02U) != 0)
-            {
-                faults << "ENCODER_RANGE";
-            }
-
-            if ((bodyState.faults & 0x04U) != 0)
-            {
-                faults << "NO_MOVEMENT";
-            }
-
-            if ((bodyState.faults & 0x08U) != 0)
-            {
-                faults << "MIN_LIMIT";
-            }
-
-            if ((bodyState.faults & 0x10U) != 0)
-            {
-                faults << "MAX_LIMIT";
-            }
-
-            if ((bodyState.faults & 0x20U) != 0)
-            {
-                faults << "TARGET_TIMEOUT";
-            }
-
-            if ((bodyState.faults & 0x40U) != 0)
-            {
-                faults << "VALVE_ERROR";
-            }
-
-            testFaultLabels[body]->setText(
-                "FALLA: "
-                + faults.join(" | ")
-            );
-
-            testFaultLabels[body]->setStyleSheet(
-                "font-weight: bold;"
-                "color: red;"
-            );
-
-            testBodyFrames[body]->setStyleSheet(
-                "QFrame {"
-                "border: 2px solid red;"
-                "}"
-            );
-
-            testUpButtons[body]->setEnabled(false);
-            testDownButtons[body]->setEnabled(false);
         }
     }
 }

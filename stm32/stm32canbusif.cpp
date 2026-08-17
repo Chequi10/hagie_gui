@@ -145,6 +145,7 @@ void stm32canbus_serialif::set_config_ack_callback(
 {
     on_config_ack =
         std::move(callback);
+        
 }
 
 
