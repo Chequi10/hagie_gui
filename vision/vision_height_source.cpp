@@ -121,6 +121,47 @@ bool VisionHeightSource::isRunning() const
 
 
 // ============================================================
+// SELECCIÓN DE FUENTE DE VISIÓN
+// ============================================================
+
+void VisionHeightSource::setSourceMode(
+    SourceMode mode)
+{
+    sourceMode.store(
+        mode
+    );
+
+
+    /*
+     * Al cambiar de fuente invalidamos inmediatamente
+     * las mediciones anteriores.
+     *
+     * Esto evita que AUTO VISIÓN pueda utilizar
+     * accidentalmente un dato perteneciente a
+     * la fuente anterior.
+     */
+    if (state != nullptr)
+    {
+        for (std::size_t body = 0;
+             body < BODY_COUNT;
+             ++body)
+        {
+            state->setBodyVisionValid(
+                body,
+                false
+            );
+        }
+    }
+}
+
+
+VisionHeightSource::SourceMode
+VisionHeightSource::getSourceMode() const
+{
+    return sourceMode.load();
+}
+
+// ============================================================
 // OBTENER ÚLTIMO RESULTADO
 // ============================================================
 
@@ -189,27 +230,32 @@ void VisionHeightSource::workerLoop()
 
     while (running)
     {
-        /*
-         * Actualmente genera datos simulados.
-         *
-         * Después esto será reemplazado por:
-         *
-         * ZED
-         *  ↓
-         * nube de puntos
-         *  ↓
-         * zona correspondiente a cada cuerpo
-         *  ↓
-         * cálculo de altura
-         *  ↓
-         * submitResult()
-         */
-        generateSimulatedResult();
+        SourceMode mode =
+            sourceMode.load();
 
 
-        /*
-         * Simulación a 10 Hz.
-         */
+        if (mode == SourceMode::SIMULATION)
+        {
+            /*
+            * Fuente simulada.
+            */
+            generateSimulatedResult();
+        }
+        else
+        {
+            /*
+            * Fuente EXTERNAL.
+            *
+            * No generamos ningún dato aquí.
+            *
+            * Las cámaras 3D reales entregarán
+            * los resultados mediante:
+            *
+            * submitResult(...)
+            */
+        }
+
+
         std::this_thread::sleep_for(
             milliseconds(100)
         );

@@ -22,7 +22,7 @@ class QPushButton;
 class QSpinBox;
 class QDoubleSpinBox;
 class QComboBox;
-
+class VisionHeightSource;
 
 class MainWindow : public QMainWindow
 {
@@ -35,6 +35,7 @@ public:
         HagieState *hagieState,
         STM32Worker *stm32Worker,
         HeightTargetController *heightTargetController,
+        VisionHeightSource *visionHeightSource,
         QWidget *parent = nullptr
     );
 
@@ -51,6 +52,8 @@ private:
     HagieState *state;
 
     STM32Worker *stm32Worker;
+
+    VisionHeightSource *visionHeightSource;
 
     HeightTargetController *heightTargetController;
 
@@ -303,6 +306,14 @@ private:
 
     QSpinBox *configTargetTimeoutSpin =
         nullptr;
+
+    /*
+    * Fuente utilizada para obtener
+    * las mediciones de visión 3D.
+    *
+    * SIMULACIÓN / CÁMARAS 3D
+    */
+    QComboBox *configVisionSourceCombo = nullptr;
 
 
     // ========================================================

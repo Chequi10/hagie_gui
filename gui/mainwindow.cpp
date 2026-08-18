@@ -22,6 +22,7 @@
 #include <QDoubleSpinBox>
 #include <QSettings>
 #include <QScrollArea>
+#include "vision/vision_height_source.h"
 
 
 
@@ -29,11 +30,13 @@ MainWindow::MainWindow(
     HagieState *hagieState,
     STM32Worker *stm32Worker,
     HeightTargetController *heightTargetController,
+    VisionHeightSource *visionHeightSource,
     QWidget *parent)
     : QMainWindow(parent),
       state(hagieState),
       stm32Worker(stm32Worker),
       heightTargetController(heightTargetController),
+      visionHeightSource(visionHeightSource),
       centralStack(nullptr)
 {
     setWindowTitle(
@@ -2810,6 +2813,86 @@ QWidget *MainWindow::createConfigurationPage()
     mainLayout->addWidget(title);
 
 
+    
+   
+
+    /*
+    * ========================================================
+    * FUENTE DE VISIÓN 3D
+    * ========================================================
+    */
+    QFrame *visionSourceFrame =
+        new QFrame();
+
+    visionSourceFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QHBoxLayout *visionSourceLayout =
+        new QHBoxLayout(
+            visionSourceFrame
+        );
+
+    QLabel *visionSourceLabel =
+        new QLabel(
+            "Fuente de visión 3D:"
+        );
+
+    configVisionSourceCombo =
+        new QComboBox();
+
+    configVisionSourceCombo->addItem(
+        "SIMULACIÓN",
+        0
+    );
+
+    configVisionSourceCombo->addItem(
+        "CÁMARAS 3D",
+        1
+    );
+
+    connect(
+            configVisionSourceCombo,
+            QOverload<int>::of(
+                &QComboBox::currentIndexChanged
+            ),
+            this,
+            [this](int index)
+            {
+                if (visionHeightSource == nullptr)
+                {
+                    return;
+                }
+
+                if (index == 0)
+                {
+                    visionHeightSource->setSourceMode(
+                        VisionHeightSource::SourceMode::SIMULATION
+                    );
+                }
+                else
+                {
+                    visionHeightSource->setSourceMode(
+                        VisionHeightSource::SourceMode::EXTERNAL
+                    );
+                }
+            }
+    );
+    visionSourceLayout->addWidget(
+        visionSourceLabel
+    );
+
+    visionSourceLayout->addWidget(
+        configVisionSourceCombo
+    );
+
+    visionSourceLayout->addStretch();
+
+    mainLayout->addWidget(
+        visionSourceFrame
+    );
+
+
     QGridLayout *bodyGrid =
         new QGridLayout();
 
@@ -3430,10 +3513,35 @@ void MainWindow::updateSystemStatus()
             ? "IMU: OK"
             : "IMU: NO VÁLIDA";
 
-    QString visionText =
-        system.vision_running
-            ? "VISIÓN: ACTIVA"
-            : "VISIÓN: DETENIDA";
+    QString visionText;
+
+    if (!system.vision_running)
+    {
+        visionText =
+            "VISIÓN: DETENIDA";
+    }
+    else if (visionHeightSource == nullptr)
+    {
+        visionText =
+            "VISIÓN: ACTIVA";
+    }
+    else
+    {
+        VisionHeightSource::SourceMode mode =
+            visionHeightSource->getSourceMode();
+
+        if (mode ==
+            VisionHeightSource::SourceMode::SIMULATION)
+        {
+            visionText =
+                "VISIÓN: ACTIVA (SIMULACIÓN)";
+        }
+        else
+        {
+            visionText =
+                "VISIÓN: ACTIVA (CÁMARAS 3D)";
+        }
+    }
 
     QString aiText =
         system.ai_running
@@ -3731,6 +3839,26 @@ void MainWindow::saveConfiguration()
 
     settings.endGroup();
 
+    
+
+    /*
+    * ========================================================
+    * Fuente de visión 3D
+    * ========================================================
+    */
+    settings.beginGroup(
+        "Vision"
+    );
+
+    settings.setValue(
+        "source_mode",
+        configVisionSourceCombo
+            ->currentData()
+            .toInt()
+    );
+
+    settings.endGroup();
+
     /*
      * Forzar escritura en disco.
      */
@@ -3846,6 +3974,38 @@ void MainWindow::loadConfiguration()
     );
 
     settings.endGroup();
+
+    /*
+    * ========================================================
+    * Fuente de visión 3D
+    * ========================================================
+    */
+    settings.beginGroup(
+        "Vision"
+    );
+
+    int visionSourceMode =
+        settings.value(
+            "source_mode",
+            0
+        ).toInt();
+
+    settings.endGroup();
+
+
+    int visionSourceIndex =
+        configVisionSourceCombo
+            ->findData(
+                visionSourceMode
+            );
+
+    if (visionSourceIndex >= 0)
+    {
+        configVisionSourceCombo
+            ->setCurrentIndex(
+                visionSourceIndex
+            );
+    }
 }
 void MainWindow::syncConfigurationToWorker()
 {

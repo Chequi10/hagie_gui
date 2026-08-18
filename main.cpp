@@ -131,7 +131,8 @@ int main(
     MainWindow window(
         &hagieState,
         &stm32Worker,
-        &heightTargetController
+        &heightTargetController,
+        &visionHeightSource
     );
 
 

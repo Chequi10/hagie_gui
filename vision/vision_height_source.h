@@ -19,6 +19,16 @@ public:
 
     static constexpr std::size_t BODY_COUNT = 6;
 
+    // ========================================================
+    // FUENTE DE VISIÓN
+    // ========================================================
+
+    enum class SourceMode
+    {
+        SIMULATION,
+        EXTERNAL
+    };
+
 
     /*
      * Resultado de visión para un cuerpo.
@@ -99,6 +109,16 @@ public:
 
 
     bool isRunning() const;
+
+    // ========================================================
+    // SELECCIÓN DE FUENTE
+    // ========================================================
+
+    void setSourceMode(
+        SourceMode mode
+    );
+
+    SourceMode getSourceMode() const;
 
 
     // ========================================================
@@ -193,6 +213,13 @@ private:
 
     std::thread workerThread;
 
+    // ========================================================
+    // MODO DE FUENTE
+    // ========================================================
+
+    std::atomic<SourceMode> sourceMode {
+        SourceMode::SIMULATION
+    };
 
     // ========================================================
     // ÚLTIMO RESULTADO
