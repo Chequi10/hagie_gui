@@ -31,6 +31,7 @@ add_executable(hagie_gui
     stm32/stm32_worker.h
 
     vision/vision_height_source.cpp
+    vision/vision_3d_processor.cpp
     
 )
 
@@ -42,4 +43,16 @@ target_include_directories(hagie_gui
 target_link_libraries(hagie_gui
     PRIVATE
     Qt6::Widgets
+)
+
+add_executable(
+    vision_3d_processor_test
+    tests/vision_3d_processor_test.cpp
+    vision/vision_3d_processor.cpp
+)
+
+target_include_directories(
+    vision_3d_processor_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )

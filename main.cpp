@@ -118,16 +118,17 @@ int main(
 
 
     /*
-     * ========================================================
-     * VENTANA PRINCIPAL
-     * ========================================================
-     *
-     * La GUI recibe:
-     *
-     * - estado central;
-     * - comunicación STM32;
-     * - controlador de objetivos 3D.
-     */
+    * ========================================================
+    * VENTANA PRINCIPAL
+    * ========================================================
+    *
+    * La GUI recibe:
+    *
+    * - estado central;
+    * - comunicación STM32;
+    * - controlador de objetivos 3D;
+    * - fuente de visión 3D.
+    */
     MainWindow window(
         &hagieState,
         &stm32Worker,
