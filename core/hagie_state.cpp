@@ -117,25 +117,26 @@ void HagieState::setBodyFaults(
 void HagieState::setBodyVisionHeight(
     std::size_t body,
     uint16_t height_mm,
-    bool valid)
+    bool valid,
+    uint64_t timestamp_ms)
 {
     if (body >= BODY_COUNT)
     {
         return;
     }
 
-
     std::lock_guard<std::mutex> lock(
         stateMutex
     );
 
-
     bodies[body].vision_height_mm =
         height_mm;
 
-
     bodies[body].vision_valid =
         valid;
+
+    bodies[body].vision_timestamp_ms =
+        timestamp_ms;
 }
 
 

@@ -373,6 +373,24 @@ void MainWindow::updateTestPage()
                 body
             );
 
+        uint64_t nowMs =
+            static_cast<uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now()
+                            .time_since_epoch()
+                    ).count()
+            );
+
+        constexpr uint64_t VISION_STALE_TIMEOUT_MS =
+            500;
+
+        bool visionFresh =
+            bodyState.vision_valid &&
+            bodyState.vision_timestamp_ms != 0 &&
+            (nowMs - bodyState.vision_timestamp_ms) <=
+                VISION_STALE_TIMEOUT_MS;    
+
 
         /*
          * ====================================================
@@ -567,7 +585,7 @@ void MainWindow::updateTestPage()
             );
 
 
-        if (bodyState.vision_valid)
+        if (visionFresh)
         {
             testVisionHeightLabels[body]
                 ->setText(
@@ -2049,13 +2067,31 @@ QWidget *MainWindow::createTestsPage()
                 HagieState::BodyState bodyState =
                     state->getBodyState(body);
 
+                uint64_t nowMs =
+                    static_cast<uint64_t>(
+                        std::chrono::duration_cast<
+                            std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now()
+                                    .time_since_epoch()
+                            ).count()
+                    );
+
+                constexpr uint64_t VISION_STALE_TIMEOUT_MS =
+                    500;
+
+                bool visionFresh =
+                    bodyState.vision_valid &&
+                    bodyState.vision_timestamp_ms != 0 &&
+                    (nowMs - bodyState.vision_timestamp_ms) <=
+                        VISION_STALE_TIMEOUT_MS;    
+
 
                 /*
                 * Condiciones mínimas para permitir AUTO VISIÓN.
                 */
                 if (!system.stm32_connected ||
                     !system.vision_running ||
-                    !bodyState.vision_valid ||
+                    !visionFresh ||
                     bodyState.faults != 0)
                 {
                     return;
@@ -2510,9 +2546,27 @@ QWidget *MainWindow::createTestsPage()
                     * Si se pierde alguna condición necesaria,
                     * salir de AUTO VISIÓN.
                     */
+                   uint64_t nowMs =
+                        static_cast<uint64_t>(
+                            std::chrono::duration_cast<
+                                std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now()
+                                        .time_since_epoch()
+                                ).count()
+                        );
+
+                    constexpr uint64_t VISION_STALE_TIMEOUT_MS =
+                        500;
+
+                    bool visionFresh =
+                        bodyState.vision_valid &&
+                        bodyState.vision_timestamp_ms != 0 &&
+                        (nowMs - bodyState.vision_timestamp_ms) <=
+                            VISION_STALE_TIMEOUT_MS;
+
                     if (!system.stm32_connected ||
                         !system.vision_running ||
-                        !bodyState.vision_valid ||
+                        !visionFresh ||
                         bodyState.faults != 0)
                     {
                         testVisionAutoEnabled[body] =
@@ -2557,7 +2611,7 @@ QWidget *MainWindow::createTestsPage()
                                 ->calculateTarget(
                                     body,
                                     bodyState.vision_height_mm,
-                                    bodyState.vision_valid
+                                    visionFresh
                                 );
 
 

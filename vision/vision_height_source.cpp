@@ -137,6 +137,48 @@ VisionHeightSource::getResult() const
 
 
 // ============================================================
+// RECIBIR RESULTADO DE VISIÓN REAL
+// ============================================================
+
+void VisionHeightSource::submitResult(
+    const VisionResult& newResult)
+{
+    VisionResult resultCopy =
+        newResult;
+
+
+    /*
+     * Actualizar secuencia y almacenar
+     * el último resultado recibido.
+     */
+    {
+        std::lock_guard<std::mutex> lock(
+            resultMutex
+        );
+
+
+        resultCopy.sequence =
+            result.sequence + 1;
+
+
+        result =
+            resultCopy;
+    }
+
+
+    /*
+     * Publicar en HagieState.
+     *
+     * Este es el mismo camino que después
+     * utilizarán las cámaras reales.
+     */
+    publishResult(
+        resultCopy
+    );
+}
+
+
+// ============================================================
 // HILO PRINCIPAL
 // ============================================================
 
@@ -159,6 +201,8 @@ void VisionHeightSource::workerLoop()
          * zona correspondiente a cada cuerpo
          *  ↓
          * cálculo de altura
+         *  ↓
+         * submitResult()
          */
         generateSimulatedResult();
 
@@ -204,11 +248,27 @@ void VisionHeightSource::generateSimulatedResult()
 
 
     /*
-     * Variación 0..40 mm.
+     * Variación simulada 0..40 mm.
      */
     uint16_t variation =
         static_cast<uint16_t>(
             simulationStep % 41
+        );
+
+
+    /*
+     * Timestamp monotónico actual.
+     *
+     * Se utiliza steady_clock porque no depende
+     * de cambios en la hora del sistema.
+     */
+    uint64_t nowMs =
+        static_cast<uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
         );
 
 
@@ -219,6 +279,14 @@ void VisionHeightSource::generateSimulatedResult()
          body < BODY_COUNT;
          ++body)
     {
+        /*
+         * Cuerpos pares suben con la variación.
+         * Cuerpos impares bajan.
+         *
+         * Esto solamente sirve para reconocer
+         * visualmente que cada cuerpo recibe
+         * información independiente.
+         */
         if ((body % 2) == 0)
         {
             newResult
@@ -241,31 +309,29 @@ void VisionHeightSource::generateSimulatedResult()
             .bodies[body]
             .valid =
                 true;
+
+
+        newResult
+            .bodies[body]
+            .timestamp_ms =
+                nowMs;
     }
 
 
     /*
-     * Actualizar secuencia.
+     * IMPORTANTE:
+     *
+     * La simulación también utiliza submitResult().
+     *
+     * De esta forma existe un único camino para:
+     *
+     * - simulación;
+     * - cámaras reales.
+     *
+     * Más adelante solamente cambia quién genera
+     * VisionResult.
      */
-    {
-        std::lock_guard<std::mutex> lock(
-            resultMutex
-        );
-
-
-        newResult.sequence =
-            result.sequence + 1;
-
-
-        result =
-            newResult;
-    }
-
-
-    /*
-     * Publicar en estado central.
-     */
-    publishResult(
+    submitResult(
         newResult
     );
 
@@ -304,7 +370,10 @@ void VisionHeightSource::publishResult(
                 .height_mm,
             newResult
                 .bodies[body]
-                .valid
+                .valid,
+            newResult
+                .bodies[body]
+                .timestamp_ms
         );
     }
 }

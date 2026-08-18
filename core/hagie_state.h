@@ -77,6 +77,14 @@ public:
          * para este cuerpo es válida.
          */
         bool vision_valid = false;
+
+        /*
+        * Timestamp de la última medición válida
+        * entregada por visión 3D.
+        *
+        * Unidad: milisegundos de steady_clock.
+        */
+        uint64_t vision_timestamp_ms = 0;
     };
 
 
@@ -192,7 +200,8 @@ public:
     void setBodyVisionHeight(
         std::size_t body,
         uint16_t height_mm,
-        bool valid
+        bool valid,
+        uint64_t timestamp_ms
     );
 
 
