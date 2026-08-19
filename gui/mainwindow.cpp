@@ -31,13 +31,15 @@ MainWindow::MainWindow(
     STM32Worker *stm32Worker,
     HeightTargetController *heightTargetController,
     VisionHeightSource *visionHeightSource,
+    Vision3DProcessor *vision3DProcessor,
     QWidget *parent)
     : QMainWindow(parent),
-      state(hagieState),
-      stm32Worker(stm32Worker),
-      heightTargetController(heightTargetController),
-      visionHeightSource(visionHeightSource),
-      centralStack(nullptr)
+    state(hagieState),
+    stm32Worker(stm32Worker),
+    heightTargetController(heightTargetController),
+    visionHeightSource(visionHeightSource),
+    vision3DProcessor(vision3DProcessor),
+    centralStack(nullptr)
 {
     setWindowTitle(
         "Hagie Control"
@@ -2892,6 +2894,392 @@ QWidget *MainWindow::createConfigurationPage()
         visionSourceFrame
     );
 
+    /*
+    * ========================================================
+    * CONFIGURACIÓN DE CÁMARAS 3D
+    * ========================================================
+    */
+    QFrame *visionCameraFrame =
+        new QFrame();
+
+    visionCameraFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *visionCameraMainLayout =
+        new QVBoxLayout(
+            visionCameraFrame
+        );
+
+
+    QLabel *visionCameraTitle =
+        new QLabel(
+            "CONFIGURACIÓN DE CÁMARAS 3D"
+        );
+
+    visionCameraTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    visionCameraTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    visionCameraMainLayout->addWidget(
+        visionCameraTitle
+    );
+
+
+    /*
+    * Selector de cámara.
+    */
+    QHBoxLayout *cameraSelectorLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraSelectorLabel =
+        new QLabel(
+            "Cámara:"
+        );
+
+    configVisionCameraCombo =
+        new QComboBox();
+
+    configVisionCameraCombo->addItem(
+        "CÁMARA 1",
+        0
+    );
+
+    configVisionCameraCombo->addItem(
+        "CÁMARA 2",
+        1
+    );
+
+    configVisionCameraCombo->addItem(
+        "CÁMARA 3",
+        2
+    );
+
+
+    connect(
+        configVisionCameraCombo,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this](int index)
+        {
+            if (index < 0)
+            {
+                return;
+            }
+
+
+            std::size_t newCamera =
+                static_cast<std::size_t>(
+                    index
+                );
+
+
+            if (newCamera >=
+                Vision3DProcessor::CAMERA_COUNT)
+            {
+                return;
+            }
+
+
+            /*
+            * Guardar en memoria los valores
+            * de la cámara que estábamos editando.
+            */
+            saveVisionCameraFromWidgets(
+                currentVisionCamera
+            );
+
+
+            /*
+            * Cambiar de cámara.
+            */
+            currentVisionCamera =
+                newCamera;
+
+
+            /*
+            * Mostrar los valores propios
+            * de la nueva cámara.
+            */
+            loadVisionCameraIntoWidgets(
+                currentVisionCamera
+            );
+        }
+    );
+
+    cameraSelectorLayout->addWidget(
+        cameraSelectorLabel
+    );
+
+    cameraSelectorLayout->addWidget(
+        configVisionCameraCombo
+    );
+
+    cameraSelectorLayout->addStretch();
+
+    visionCameraMainLayout->addLayout(
+        cameraSelectorLayout
+    );
+
+
+    /*
+    * Cámara habilitada.
+    */
+    configVisionCameraEnabled =
+        new QCheckBox(
+            "Cámara habilitada"
+        );
+
+    visionCameraMainLayout->addWidget(
+        configVisionCameraEnabled
+    );
+
+
+    /*
+    * Cuerpos atendidos por la cámara.
+    */
+    QLabel *cameraBodiesLabel =
+        new QLabel(
+            "Cuerpos atendidos:"
+        );
+
+    visionCameraMainLayout->addWidget(
+        cameraBodiesLabel
+    );
+
+    QHBoxLayout *cameraBodiesLayout =
+        new QHBoxLayout();
+
+    for (std::size_t body = 0;
+        body < HagieState::BODY_COUNT;
+        ++body)
+    {
+        configVisionCameraBodyChecks[body] =
+            new QCheckBox(
+                QString("C%1")
+                    .arg(body + 1)
+            );
+
+        cameraBodiesLayout->addWidget(
+            configVisionCameraBodyChecks[body]
+        );
+    }
+
+    cameraBodiesLayout->addStretch();
+
+    visionCameraMainLayout->addLayout(
+        cameraBodiesLayout
+    );
+
+
+    /*
+    * Geometría física de cámara.
+    */
+    QGridLayout *cameraGeometryLayout =
+        new QGridLayout();
+
+
+    QLabel *cameraPositionXLabel =
+        new QLabel(
+            "Posición X (mm)"
+        );
+
+    configVisionCameraPositionX =
+        new QDoubleSpinBox();
+
+    configVisionCameraPositionX->setRange(
+        -20000.0,
+        20000.0
+    );
+
+    configVisionCameraPositionX->setDecimals(
+        1
+    );
+
+
+    QLabel *cameraPositionYLabel =
+        new QLabel(
+            "Posición Y (mm)"
+        );
+
+    configVisionCameraPositionY =
+        new QDoubleSpinBox();
+
+    configVisionCameraPositionY->setRange(
+        -20000.0,
+        20000.0
+    );
+
+    configVisionCameraPositionY->setDecimals(
+        1
+    );
+
+
+    QLabel *cameraPositionZLabel =
+        new QLabel(
+            "Posición Z (mm)"
+        );
+
+    configVisionCameraPositionZ =
+        new QDoubleSpinBox();
+
+    configVisionCameraPositionZ->setRange(
+        -5000.0,
+        10000.0
+    );
+
+    configVisionCameraPositionZ->setDecimals(
+        1
+    );
+
+
+    QLabel *cameraHeightLabel =
+        new QLabel(
+            "Altura cámara/piso (mm)"
+        );
+
+    configVisionCameraHeight =
+        new QDoubleSpinBox();
+
+    configVisionCameraHeight->setRange(
+        0.0,
+        10000.0
+    );
+
+    configVisionCameraHeight->setDecimals(
+        1
+    );
+
+
+    QLabel *cameraRollLabel =
+        new QLabel(
+            "Roll montaje (°)"
+        );
+
+    configVisionCameraRoll =
+        new QDoubleSpinBox();
+
+    configVisionCameraRoll->setRange(
+        -180.0,
+        180.0
+    );
+
+    configVisionCameraRoll->setDecimals(
+        2
+    );
+
+
+    QLabel *cameraPitchLabel =
+        new QLabel(
+            "Pitch montaje (°)"
+        );
+
+    configVisionCameraPitch =
+        new QDoubleSpinBox();
+
+    configVisionCameraPitch->setRange(
+        -180.0,
+        180.0
+    );
+
+    configVisionCameraPitch->setDecimals(
+        2
+    );
+
+
+    cameraGeometryLayout->addWidget(
+        cameraPositionXLabel,
+        0,
+        0
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraPositionX,
+        0,
+        1
+    );
+
+    cameraGeometryLayout->addWidget(
+        cameraPositionYLabel,
+        0,
+        2
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraPositionY,
+        0,
+        3
+    );
+
+
+    cameraGeometryLayout->addWidget(
+        cameraPositionZLabel,
+        1,
+        0
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraPositionZ,
+        1,
+        1
+    );
+
+    cameraGeometryLayout->addWidget(
+        cameraHeightLabel,
+        1,
+        2
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraHeight,
+        1,
+        3
+    );
+
+
+    cameraGeometryLayout->addWidget(
+        cameraRollLabel,
+        2,
+        0
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraRoll,
+        2,
+        1
+    );
+
+    cameraGeometryLayout->addWidget(
+        cameraPitchLabel,
+        2,
+        2
+    );
+
+    cameraGeometryLayout->addWidget(
+        configVisionCameraPitch,
+        2,
+        3
+    );
+
+
+    visionCameraMainLayout->addLayout(
+        cameraGeometryLayout
+    );
+
+
+    /*
+    * Agregar panel completo a Configuración.
+    */
+    mainLayout->addWidget(
+        visionCameraFrame
+    );
 
     QGridLayout *bodyGrid =
         new QGridLayout();
@@ -3752,6 +4140,153 @@ void MainWindow::updateFaultPage()
     }
 }
 
+void MainWindow::saveVisionCameraFromWidgets(
+    std::size_t camera)
+{
+    if (camera >= Vision3DProcessor::CAMERA_COUNT)
+    {
+        return;
+    }
+
+
+    Vision3DProcessor::CameraConfig& config =
+        visionCameraConfigs[camera];
+
+
+    /*
+     * Cámara habilitada.
+     */
+    config.enabled =
+        configVisionCameraEnabled->isChecked();
+
+
+    /*
+     * Cuerpos atendidos.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        config.body_enabled[body] =
+            configVisionCameraBodyChecks[body]
+                ->isChecked();
+    }
+
+
+    /*
+     * Geometría física.
+     */
+    config.geometry.position_x_mm =
+        static_cast<float>(
+            configVisionCameraPositionX->value()
+        );
+
+    config.geometry.position_y_mm =
+        static_cast<float>(
+            configVisionCameraPositionY->value()
+        );
+
+    config.geometry.position_z_mm =
+        static_cast<float>(
+            configVisionCameraPositionZ->value()
+        );
+
+
+    /*
+     * Altura respecto del piso.
+     */
+    config.geometry.camera_height_mm =
+        static_cast<float>(
+            configVisionCameraHeight->value()
+        );
+
+
+    /*
+     * Orientación fija de montaje.
+     */
+    config.geometry.roll_offset_deg =
+        static_cast<float>(
+            configVisionCameraRoll->value()
+        );
+
+    config.geometry.pitch_offset_deg =
+        static_cast<float>(
+            configVisionCameraPitch->value()
+        );
+}
+
+
+void MainWindow::loadVisionCameraIntoWidgets(
+    std::size_t camera)
+{
+    if (camera >= Vision3DProcessor::CAMERA_COUNT)
+    {
+        return;
+    }
+
+
+    const Vision3DProcessor::CameraConfig& config =
+        visionCameraConfigs[camera];
+
+
+    /*
+     * Cámara habilitada.
+     */
+    configVisionCameraEnabled->setChecked(
+        config.enabled
+    );
+
+
+    /*
+     * Cuerpos atendidos.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        configVisionCameraBodyChecks[body]
+            ->setChecked(
+                config.body_enabled[body]
+            );
+    }
+
+
+    /*
+     * Geometría física.
+     */
+    configVisionCameraPositionX->setValue(
+        config.geometry.position_x_mm
+    );
+
+    configVisionCameraPositionY->setValue(
+        config.geometry.position_y_mm
+    );
+
+    configVisionCameraPositionZ->setValue(
+        config.geometry.position_z_mm
+    );
+
+
+    /*
+     * Altura respecto del piso.
+     */
+    configVisionCameraHeight->setValue(
+        config.geometry.camera_height_mm
+    );
+
+
+    /*
+     * Orientación fija de montaje.
+     */
+    configVisionCameraRoll->setValue(
+        config.geometry.roll_offset_deg
+    );
+
+    configVisionCameraPitch->setValue(
+        config.geometry.pitch_offset_deg
+    );
+}
+
 void MainWindow::saveConfiguration()
 {
     QSettings settings(
@@ -3859,9 +4394,142 @@ void MainWindow::saveConfiguration()
 
     settings.endGroup();
 
+
+    /*
+    * ========================================================
+    * Configuración de cámaras 3D
+    * ========================================================
+    */
+
+    /*
+    * Guardar primero lo que actualmente está
+    * visible en los widgets.
+    */
+    if (configVisionCameraCombo != nullptr)
+    {
+        std::size_t currentCamera =
+            static_cast<std::size_t>(
+                configVisionCameraCombo->currentIndex()
+            );
+
+        if (currentCamera <
+            Vision3DProcessor::CAMERA_COUNT)
+        {
+            saveVisionCameraFromWidgets(
+                currentCamera
+            );
+        }
+    }
+
+
+    /*
+    * Guardar las tres configuraciones.
+    */
+    for (std::size_t camera = 0;
+        camera < Vision3DProcessor::CAMERA_COUNT;
+        ++camera)
+    {
+        QString group =
+            QString("Camera%1")
+                .arg(camera + 1);
+
+        settings.beginGroup(group);
+
+
+        const auto& config =
+            visionCameraConfigs[camera];
+
+
+        settings.setValue(
+            "enabled",
+            config.enabled
+        );
+
+
+        /*
+        * Cuerpos atendidos por esta cámara.
+        */
+        for (std::size_t body = 0;
+            body < HagieState::BODY_COUNT;
+            ++body)
+        {
+            settings.setValue(
+                QString("body_%1")
+                    .arg(body + 1),
+                config.body_enabled[body]
+            );
+        }
+
+
+        /*
+        * Posición física de la cámara.
+        */
+        settings.setValue(
+            "position_x_mm",
+            config.geometry.position_x_mm
+        );
+
+        settings.setValue(
+            "position_y_mm",
+            config.geometry.position_y_mm
+        );
+
+        settings.setValue(
+            "position_z_mm",
+            config.geometry.position_z_mm
+        );
+
+
+        /*
+        * Altura cámara / piso.
+        */
+        settings.setValue(
+            "camera_height_mm",
+            config.geometry.camera_height_mm
+        );
+
+
+        /*
+        * Correcciones de montaje.
+        */
+        settings.setValue(
+            "roll_offset_deg",
+            config.geometry.roll_offset_deg
+        );
+
+        settings.setValue(
+            "pitch_offset_deg",
+            config.geometry.pitch_offset_deg
+        );
+
+
+        settings.endGroup();
+    }
+
     /*
      * Forzar escritura en disco.
      */
+
+         /*
+     * ========================================================
+     * Aplicar configuración al procesador 3D
+     * ========================================================
+     */
+    if (vision3DProcessor != nullptr)
+    {
+        for (std::size_t camera = 0;
+             camera < Vision3DProcessor::CAMERA_COUNT;
+             ++camera)
+        {
+            vision3DProcessor->setCameraConfig(
+                camera,
+                visionCameraConfigs[camera]
+            );
+
+
+            
+        }
+    }
     settings.sync();
 }
 
@@ -4005,6 +4673,146 @@ void MainWindow::loadConfiguration()
             ->setCurrentIndex(
                 visionSourceIndex
             );
+    }
+
+    /*
+    * ========================================================
+    * Configuración de cámaras 3D
+    * ========================================================
+    */
+    for (std::size_t camera = 0;
+        camera < Vision3DProcessor::CAMERA_COUNT;
+        ++camera)
+    {
+        QString group =
+            QString("Camera%1")
+                .arg(camera + 1);
+
+        settings.beginGroup(group);
+
+
+        Vision3DProcessor::CameraConfig& config =
+            visionCameraConfigs[camera];
+
+
+        /*
+        * Cámara habilitada.
+        */
+        config.enabled =
+            settings.value(
+                "enabled",
+                false
+            ).toBool();
+
+
+        /*
+        * Cuerpos atendidos.
+        */
+        for (std::size_t body = 0;
+            body < HagieState::BODY_COUNT;
+            ++body)
+        {
+            config.body_enabled[body] =
+                settings.value(
+                    QString("body_%1")
+                        .arg(body + 1),
+                    false
+                ).toBool();
+        }
+
+
+        /*
+        * Posición física.
+        */
+        config.geometry.position_x_mm =
+            settings.value(
+                "position_x_mm",
+                0.0
+            ).toFloat();
+
+        config.geometry.position_y_mm =
+            settings.value(
+                "position_y_mm",
+                0.0
+            ).toFloat();
+
+        config.geometry.position_z_mm =
+            settings.value(
+                "position_z_mm",
+                0.0
+            ).toFloat();
+
+
+        /*
+        * Altura cámara / piso.
+        */
+        config.geometry.camera_height_mm =
+            settings.value(
+                "camera_height_mm",
+                0.0
+            ).toFloat();
+
+
+        /*
+        * Correcciones fijas de montaje.
+        */
+        config.geometry.roll_offset_deg =
+            settings.value(
+                "roll_offset_deg",
+                0.0
+            ).toFloat();
+
+        config.geometry.pitch_offset_deg =
+            settings.value(
+                "pitch_offset_deg",
+                0.0
+            ).toFloat();
+
+
+        settings.endGroup();
+    }
+
+
+    /*
+    * ========================================================
+    * Aplicar configuración al procesador 3D
+    * ========================================================
+    */
+    if (vision3DProcessor != nullptr)
+    {
+        for (std::size_t camera = 0;
+            camera < Vision3DProcessor::CAMERA_COUNT;
+            ++camera)
+        {
+            vision3DProcessor->setCameraConfig(
+                camera,
+                visionCameraConfigs[camera]
+            );
+        }
+    }
+
+    
+
+    /*
+    * Mostrar en la GUI la cámara
+    * actualmente seleccionada.
+    */
+    if (configVisionCameraCombo != nullptr)
+    {
+        int currentCamera =
+            configVisionCameraCombo
+                ->currentIndex();
+
+        if (currentCamera >= 0 &&
+            static_cast<std::size_t>(currentCamera) <
+                Vision3DProcessor::CAMERA_COUNT)
+        {
+            loadVisionCameraIntoWidgets(
+                static_cast<std::size_t>(
+                    currentCamera
+                )
+            );
+        }
     }
 }
 void MainWindow::syncConfigurationToWorker()

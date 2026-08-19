@@ -6,6 +6,8 @@
 #include "core/height_target_controller.h"
 #include "stm32/stm32_worker.h"
 #include "vision/vision_height_source.h"
+#include "vision/vision_3d_processor.h"
+
 
 
 int main(
@@ -84,6 +86,18 @@ int main(
 
 
     /*
+    * ========================================================
+    * PROCESADOR DE VISIÓN 3D
+    * ========================================================
+    *
+    * Procesa las nubes de puntos de las cámaras 3D
+    * y obtiene las alturas correspondientes a los cuerpos.
+    *
+    * Se crea una única instancia para toda la aplicación.
+    */
+    Vision3DProcessor vision3DProcessor;
+
+    /*
      * ========================================================
      * VISIÓN 3D
      * ========================================================
@@ -133,7 +147,8 @@ int main(
         &hagieState,
         &stm32Worker,
         &heightTargetController,
-        &visionHeightSource
+        &visionHeightSource,
+        &vision3DProcessor
     );
 
 

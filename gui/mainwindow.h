@@ -8,9 +8,12 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <QCheckBox>
 
 
 #include "core/hagie_state.h"
+
+#include "vision/vision_3d_processor.h"
 
 
 class QStackedWidget;
@@ -24,6 +27,7 @@ class QDoubleSpinBox;
 class QComboBox;
 class VisionHeightSource;
 
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -36,6 +40,7 @@ public:
         STM32Worker *stm32Worker,
         HeightTargetController *heightTargetController,
         VisionHeightSource *visionHeightSource,
+        Vision3DProcessor *vision3DProcessor,
         QWidget *parent = nullptr
     );
 
@@ -56,6 +61,10 @@ private:
     VisionHeightSource *visionHeightSource;
 
     HeightTargetController *heightTargetController;
+
+    Vision3DProcessor *vision3DProcessor;
+
+    
 
 
     // ========================================================
@@ -252,6 +261,65 @@ private:
         int8_t,
         HagieState::BODY_COUNT
     > testEncoderDirection {};
+
+
+    // ========================================================
+    // CONFIGURACION VISION 3D - CAMARAS
+    // ========================================================
+
+    QComboBox *configVisionCameraCombo =
+        nullptr;
+
+    QCheckBox *configVisionCameraEnabled =
+        nullptr;
+
+    std::array<
+        QCheckBox *,
+        HagieState::BODY_COUNT
+    > configVisionCameraBodyChecks {};
+
+
+    QDoubleSpinBox *configVisionCameraPositionX =
+        nullptr;
+
+    QDoubleSpinBox *configVisionCameraPositionY =
+        nullptr;
+
+    QDoubleSpinBox *configVisionCameraPositionZ =
+        nullptr;
+
+    QDoubleSpinBox *configVisionCameraHeight =
+        nullptr;
+
+    QDoubleSpinBox *configVisionCameraRoll =
+        nullptr;
+
+    QDoubleSpinBox *configVisionCameraPitch =
+        nullptr;
+
+        std::array<
+    Vision3DProcessor::CameraConfig,
+        Vision3DProcessor::CAMERA_COUNT
+    > visionCameraConfigs {};
+
+    /*
+    * Cámara actualmente mostrada
+    * en los widgets de configuración.
+    */
+    std::size_t currentVisionCamera =
+        0;
+
+    
+
+    
+
+    void loadVisionCameraIntoWidgets(
+        std::size_t camera
+    );
+
+    void saveVisionCameraFromWidgets(
+        std::size_t camera
+    );
 
 
     // ========================================================
