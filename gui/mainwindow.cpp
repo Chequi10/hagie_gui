@@ -23,6 +23,7 @@
 #include <QSettings>
 #include <QScrollArea>
 #include "vision/vision_height_source.h"
+#include "vision/vision_3d_worker.h"
 
 
 
@@ -32,6 +33,7 @@ MainWindow::MainWindow(
     HeightTargetController *heightTargetController,
     VisionHeightSource *visionHeightSource,
     Vision3DProcessor *vision3DProcessor,
+    Vision3DWorker *vision3DWorker,
     QWidget *parent)
     : QMainWindow(parent),
     state(hagieState),
@@ -39,6 +41,7 @@ MainWindow::MainWindow(
     heightTargetController(heightTargetController),
     visionHeightSource(visionHeightSource),
     vision3DProcessor(vision3DProcessor),
+    vision3DWorker(vision3DWorker),
     centralStack(nullptr)
 {
     setWindowTitle(
@@ -2841,45 +2844,142 @@ QWidget *MainWindow::createConfigurationPage()
         );
 
     configVisionSourceCombo =
-        new QComboBox();
+    new QComboBox();
+
 
     configVisionSourceCombo->addItem(
-        "SIMULACIÓN",
+        "SIMULACIÓN ALTURAS",
         0
     );
 
     configVisionSourceCombo->addItem(
-        "CÁMARAS 3D",
+        "SIMULACIÓN CÁMARAS 3D",
         1
     );
 
+    configVisionSourceCombo->addItem(
+        "CÁMARAS 3D REALES",
+        2
+    );
+
+
     connect(
-            configVisionSourceCombo,
-            QOverload<int>::of(
-                &QComboBox::currentIndexChanged
-            ),
-            this,
-            [this](int index)
+        configVisionSourceCombo,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this](int index)
+        {
+            if (visionHeightSource == nullptr)
             {
-                if (visionHeightSource == nullptr)
+                return;
+            }
+
+
+            /*
+            * ====================================================
+            * MODO 0
+            * SIMULACIÓN DIRECTA DE ALTURAS
+            * ====================================================
+            */
+            if (index == 0)
+            {
+                /*
+                * Detener el worker de nubes.
+                */
+                if (vision3DWorker != nullptr)
                 {
-                    return;
+                    vision3DWorker->stop();
                 }
 
-                if (index == 0)
-                {
-                    visionHeightSource->setSourceMode(
-                        VisionHeightSource::SourceMode::SIMULATION
-                    );
-                }
-                else
-                {
-                    visionHeightSource->setSourceMode(
-                        VisionHeightSource::SourceMode::EXTERNAL
-                    );
-                }
+
+                /*
+                * VisionHeightSource vuelve a generar
+                * alturas simuladas internamente.
+                */
+                visionHeightSource->setSourceMode(
+                    VisionHeightSource::SourceMode::SIMULATION
+                );
+
+
+                return;
             }
+
+
+            /*
+            * ====================================================
+            * MODO 1
+            * SIMULACIÓN DE CÁMARAS 3D
+            * ====================================================
+            */
+            if (index == 1)
+            {
+                /*
+                * Desactivar la simulación directa
+                * de alturas.
+                */
+                visionHeightSource->setSourceMode(
+                    VisionHeightSource::SourceMode::EXTERNAL
+                );
+
+
+                /*
+                * Arrancar Vision3DWorker.
+                *
+                * En este momento tiene instaladas las
+                * SimulatedPointCloudSource creadas
+                * en main.cpp.
+                */
+                if (vision3DWorker != nullptr)
+                {
+                    if (!vision3DWorker->isRunning())
+                    {
+                        if (!vision3DWorker->start())
+                        {
+                            qWarning(
+                                "No se pudo iniciar Vision3DWorker"
+                            );
+                        }
+                    }
+                }
+
+
+                return;
+            }
+
+
+            /*
+            * ====================================================
+            * MODO 2
+            * CÁMARAS 3D REALES
+            * ====================================================
+            *
+            * Todavía no tenemos instalada una fuente
+            * real ZED GMSL2.
+            *
+            * Por seguridad dejamos EXTERNAL pero
+            * detenemos el worker actual, que todavía
+            * contiene las fuentes simuladas.
+            */
+            if (index == 2)
+            {
+                if (vision3DWorker != nullptr)
+                {
+                    vision3DWorker->stop();
+                }
+
+
+                visionHeightSource->setSourceMode(
+                    VisionHeightSource::SourceMode::EXTERNAL
+                );
+
+
+                return;
+            }
+        }
     );
+    
     visionSourceLayout->addWidget(
         visionSourceLabel
     );

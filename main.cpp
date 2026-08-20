@@ -8,6 +8,12 @@
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_processor.h"
 #include "vision/vision_3d_worker.h"
+#include "vision/simulated_point_cloud_source.h"
+#include <memory>
+
+
+
+
 
 
 
@@ -144,6 +150,51 @@ int main(
         &visionHeightSource
     );
 
+    /*
+    * ========================================================
+    * FUENTES SIMULADAS DE NUBE DE PUNTOS
+    * ========================================================
+    *
+    * Estas fuentes permiten probar exactamente la misma
+    * cadena que utilizarán las cámaras 3D reales.
+    *
+    * Cámara 0 -> cuerpos 1 y 2
+    * Cámara 1 -> cuerpos 3 y 4
+    * Cámara 2 -> cuerpos 5 y 6
+    *
+    * IMPORTANTE:
+    *
+    * Las fuentes quedan instaladas en Vision3DWorker,
+    * pero el worker todavía NO se inicia aquí.
+    *
+    * La selección del modo de visión desde la GUI
+    * decidirá posteriormente cuándo utilizarlo.
+    */
+    for (std::size_t camera = 0;
+        camera < Vision3DProcessor::CAMERA_COUNT;
+        ++camera)
+    {
+        auto source =
+            std::make_unique<
+                SimulatedPointCloudSource
+            >(
+                camera
+            );
+
+
+        if (!vision3DWorker.setPointCloudSource(
+                camera,
+                std::move(source)
+            ))
+        {
+            qWarning(
+                "No se pudo instalar la fuente simulada "
+                "de la cámara %zu",
+                camera
+            );
+        }
+    }
+
 
     if (!visionHeightSource.start())
     {
@@ -170,7 +221,8 @@ int main(
         &stm32Worker,
         &heightTargetController,
         &visionHeightSource,
-        &vision3DProcessor
+        &vision3DProcessor,
+        &vision3DWorker
     );
 
 

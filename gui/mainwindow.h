@@ -26,6 +26,7 @@ class QSpinBox;
 class QDoubleSpinBox;
 class QComboBox;
 class VisionHeightSource;
+class Vision3DWorker;
 
 
 class MainWindow : public QMainWindow
@@ -41,6 +42,7 @@ public:
         HeightTargetController *heightTargetController,
         VisionHeightSource *visionHeightSource,
         Vision3DProcessor *vision3DProcessor,
+        Vision3DWorker *vision3DWorker,
         QWidget *parent = nullptr
     );
 
@@ -63,6 +65,8 @@ private:
     HeightTargetController *heightTargetController;
 
     Vision3DProcessor *vision3DProcessor;
+
+    Vision3DWorker *vision3DWorker;
 
     
 

@@ -11,7 +11,9 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-add_executable(hagie_gui
+add_executable(
+    hagie_gui
+
     main.cpp
 
     gui/mainwindow.cpp
@@ -33,24 +35,28 @@ add_executable(hagie_gui
     vision/vision_height_source.cpp
     vision/vision_3d_processor.cpp
     vision/vision_3d_worker.cpp
-    
+    vision/simulated_point_cloud_source.cpp
 )
 
-target_include_directories(hagie_gui
+target_include_directories(
+    hagie_gui
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(hagie_gui
+target_link_libraries(
+    hagie_gui
     PRIVATE
     Qt6::Widgets
 )
 
+
 add_executable(
     vision_3d_processor_test
+
     tests/vision_3d_processor_test.cpp
+
     vision/vision_3d_processor.cpp
-    
 )
 
 target_include_directories(
