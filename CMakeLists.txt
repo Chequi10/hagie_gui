@@ -9,7 +9,24 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+
+# ============================================================
+# OPCIONES
+# ============================================================
+
+option(
+    HAGIE_ENABLE_ZED_SDK
+    "Enable ZED SDK support"
+    OFF
+)
+
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+
+# ============================================================
+# EJECUTABLE PRINCIPAL
+# ============================================================
 
 add_executable(
     hagie_gui
@@ -36,7 +53,11 @@ add_executable(
     vision/vision_3d_processor.cpp
     vision/vision_3d_worker.cpp
     vision/simulated_point_cloud_source.cpp
+
+    vision/zed_gmsl_point_cloud_source.cpp
+    vision/zed_gmsl_point_cloud_source.h
 )
+
 
 target_include_directories(
     hagie_gui
@@ -44,12 +65,65 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+
 target_link_libraries(
     hagie_gui
     PRIVATE
     Qt6::Widgets
 )
 
+
+# ============================================================
+# ZED SDK
+# ============================================================
+
+if(HAGIE_ENABLE_ZED_SDK)
+
+    message(
+        STATUS
+        "ZED SDK support ENABLED"
+    )
+
+    find_package(
+        ZED REQUIRED
+    )
+
+    find_package(
+        CUDA REQUIRED
+    )
+
+    target_compile_definitions(
+        hagie_gui
+        PRIVATE
+        HAGIE_ENABLE_ZED_SDK
+    )
+
+    target_include_directories(
+        hagie_gui
+        PRIVATE
+        ${ZED_INCLUDE_DIRS}
+        ${CUDA_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(
+        hagie_gui
+        PRIVATE
+        ${ZED_LIBRARIES}
+        ${CUDA_LIBRARIES}
+    )
+
+else()
+
+    message(
+        STATUS
+        "ZED SDK support DISABLED"
+    )
+
+endif()
+
+# ============================================================
+# TEST VISION 3D PROCESSOR
+# ============================================================
 
 add_executable(
     vision_3d_processor_test
@@ -59,12 +133,17 @@ add_executable(
     vision/vision_3d_processor.cpp
 )
 
+
 target_include_directories(
     vision_3d_processor_test
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+
+# ============================================================
+# TEST VISION 3D WORKER
+# ============================================================
 
 add_executable(
     vision_3d_worker_test
@@ -78,6 +157,7 @@ add_executable(
     vision/vision_3d_processor.cpp
     vision/vision_3d_worker.cpp
 )
+
 
 target_include_directories(
     vision_3d_worker_test

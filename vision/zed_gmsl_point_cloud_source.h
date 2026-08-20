@@ -1,0 +1,117 @@
+#ifndef ZED_GMSL_POINT_CLOUD_SOURCE_H
+#define ZED_GMSL_POINT_CLOUD_SOURCE_H
+
+
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+
+#include "vision/point_cloud_source.h"
+
+
+/*
+ * ============================================================
+ * ZED SDK
+ * ============================================================
+ *
+ * En la Jetson AGX Orin, cuando esté instalado el ZED SDK,
+ * se habilitará:
+ *
+ * #include <sl/Camera.hpp>
+ *
+ * Por ahora queda comentado para permitir compilar
+ * el proyecto en la PC de desarrollo sin ZED SDK.
+ */
+#ifdef HAGIE_ENABLE_ZED_SDK
+
+#include <sl/Camera.hpp>
+
+#endif
+
+
+class ZedGmslPointCloudSource
+    : public PointCloudSource
+{
+public:
+
+    /*
+     * cameraIndex:
+     * índice lógico dentro de Hagie:
+     *
+     * 0 -> cámara 1
+     * 1 -> cámara 2
+     * 2 -> cámara 3
+     *
+     * serialNumber:
+     * número de serie físico de la ZED.
+     *
+     * Usaremos el serial para que la asignación
+     * física de cámaras no dependa del orden
+     * detectado por Linux / ZED Link.
+     */
+    ZedGmslPointCloudSource(
+        std::size_t cameraIndex,
+        uint32_t serialNumber
+    );
+
+
+    ~ZedGmslPointCloudSource() override;
+
+
+    bool start() override;
+
+    void stop() override;
+
+    bool isRunning() const override;
+
+
+    bool getPointCloud(
+        Vision3DProcessor::PointCloud& cloud
+    ) override;
+
+
+    std::size_t getCameraIndex() const override;
+
+
+    uint32_t getSerialNumber() const;
+
+
+private:
+
+    std::size_t cameraIndex;
+
+    uint32_t serialNumber;
+
+    std::atomic<bool> running {false};
+
+
+    /*
+     * ========================================================
+     * OBJETO ZED SDK
+     * ========================================================
+     *
+     * Cuando habilitemos el SDK en la Jetson:
+     *
+     * sl::Camera camera;
+     *
+     * También podremos mantener:
+     *
+     * sl::Mat pointCloud;
+     * sl::RuntimeParameters runtimeParameters;
+     *
+     * Por ahora quedan comentados.
+     */
+
+    #ifdef HAGIE_ENABLE_ZED_SDK
+
+        sl::Camera camera;
+
+        sl::Mat zedPointCloud;
+
+        sl::RuntimeParameters runtimeParameters;
+
+    #endif
+};
+
+
+#endif

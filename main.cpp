@@ -104,6 +104,52 @@ int main(
     */
     Vision3DProcessor vision3DProcessor;
 
+
+    /*
+    * ========================================================
+    * MAPEO DE EJES ZED -> HAGIE
+    * ========================================================
+    *
+    * ZED con RIGHT_HANDED_Z_UP_X_FORWARD:
+    *
+    * X -> longitudinal / adelante
+    * Y -> lateral
+    * Z -> vertical
+    *
+    * Hagie:
+    *
+    * X -> lateral
+    * Y -> longitudinal
+    * Z -> vertical
+    */
+    /*
+    Vision3DProcessor::AxisMapping axisMapping;
+
+    axisMapping.lateral =
+        Vision3DProcessor::Axis::Y;
+
+    axisMapping.longitudinal =
+        Vision3DProcessor::Axis::X;
+
+    axisMapping.vertical =
+        Vision3DProcessor::Axis::Z;
+
+
+    axisMapping.lateral_sign =
+        1;
+
+    axisMapping.longitudinal_sign =
+        1;
+
+    axisMapping.vertical_sign =
+        1;
+
+
+    vision3DProcessor.setAxisMapping(
+        axisMapping
+    );
+    */
+
     /*
      * ========================================================
      * VISIÓN 3D
