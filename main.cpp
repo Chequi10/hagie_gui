@@ -7,6 +7,7 @@
 #include "stm32/stm32_worker.h"
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_processor.h"
+#include "vision/vision_3d_worker.h"
 
 
 
@@ -122,6 +123,27 @@ int main(
         &hagieState
     );
 
+    /*
+    * ========================================================
+    * WORKER DE VISIÓN 3D
+    * ========================================================
+    *
+    * Coordina:
+    *
+    * - adquisición de nubes de puntos;
+    * - procesamiento de cada cámara;
+    * - fusión multicámara;
+    * - publicación en VisionHeightSource.
+    *
+    * NO controla válvulas.
+    * NO envía comandos a STM32.
+    */
+    Vision3DWorker vision3DWorker(
+        &hagieState,
+        &vision3DProcessor,
+        &visionHeightSource
+    );
+
 
     if (!visionHeightSource.start())
     {
@@ -163,7 +185,7 @@ int main(
     int result =
         app.exec();
 
-
+    vision3DWorker.stop();
     /*
      * ========================================================
      * CIERRE ORDENADO
