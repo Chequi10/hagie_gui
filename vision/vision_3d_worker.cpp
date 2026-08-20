@@ -310,7 +310,44 @@ bool Vision3DWorker::processCamera(
 void Vision3DWorker::workerLoop()
 {
     while (running.load())
-    {
+    {   
+        /*
+        * ====================================================
+        * ACTUALIZAR ORIENTACIÓN DESDE IMU
+        * ====================================================
+        *
+        * La STM32 publica la IMU en HagieState.
+        *
+        * Vision3DProcessor utiliza roll y pitch para
+        * compensar la inclinación de la máquina antes
+        * de calcular las alturas.
+        */
+        if (state != nullptr &&
+            processor != nullptr)
+        {
+            HagieState::ImuState imu =
+                state->getImuState();
+
+
+            Vision3DProcessor::Orientation orientation;
+
+
+            orientation.valid =
+                imu.valid;
+
+
+            orientation.roll_deg =
+                imu.roll_deg;
+
+
+            orientation.pitch_deg =
+                imu.pitch_deg;
+
+
+            processor->setOrientation(
+                orientation
+            );
+        }
         /*
          * Resultado independiente de cada cámara.
          */
