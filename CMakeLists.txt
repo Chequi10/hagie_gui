@@ -32,6 +32,7 @@ add_executable(hagie_gui
 
     vision/vision_height_source.cpp
     vision/vision_3d_processor.cpp
+    vision/vision_3d_worker.cpp
     
 )
 
@@ -49,10 +50,31 @@ add_executable(
     vision_3d_processor_test
     tests/vision_3d_processor_test.cpp
     vision/vision_3d_processor.cpp
+    
 )
 
 target_include_directories(
     vision_3d_processor_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+
+add_executable(
+    vision_3d_worker_test
+
+    tests/vision_3d_worker_test.cpp
+    tests/synthetic_point_cloud_source_test.cpp
+
+    core/hagie_state.cpp
+
+    vision/vision_height_source.cpp
+    vision/vision_3d_processor.cpp
+    vision/vision_3d_worker.cpp
+)
+
+target_include_directories(
+    vision_3d_worker_test
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
