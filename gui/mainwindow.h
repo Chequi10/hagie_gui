@@ -301,6 +301,14 @@ private:
     QDoubleSpinBox *configVisionCameraPitch =
         nullptr;
 
+    std::array<
+        uint32_t,
+        Vision3DProcessor::CAMERA_COUNT
+        > visionCameraSerialNumbers {};
+
+    QSpinBox *configVisionCameraSerial =
+        nullptr;
+
         std::array<
     Vision3DProcessor::CameraConfig,
         Vision3DProcessor::CAMERA_COUNT

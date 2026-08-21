@@ -25,6 +25,11 @@
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_worker.h"
 
+#include <memory>
+
+#include "vision/simulated_point_cloud_source.h"
+#include "vision/zed_gmsl_point_cloud_source.h"
+
 
 
 MainWindow::MainWindow(
@@ -2916,32 +2921,66 @@ QWidget *MainWindow::createConfigurationPage()
             if (index == 1)
             {
                 /*
-                * Desactivar la simulación directa
-                * de alturas.
+                * La salida de visión vendrá desde
+                * Vision3DWorker.
                 */
                 visionHeightSource->setSourceMode(
                     VisionHeightSource::SourceMode::EXTERNAL
                 );
 
 
-                /*
-                * Arrancar Vision3DWorker.
-                *
-                * En este momento tiene instaladas las
-                * SimulatedPointCloudSource creadas
-                * en main.cpp.
-                */
-                if (vision3DWorker != nullptr)
+                if (vision3DWorker == nullptr)
                 {
-                    if (!vision3DWorker->isRunning())
+                    return;
+                }
+
+
+                /*
+                * Detener antes de reemplazar las fuentes.
+                */
+                vision3DWorker->stop();
+
+
+                /*
+                * Instalar las tres fuentes simuladas.
+                */
+                for (std::size_t camera = 0;
+                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    ++camera)
+                {
+                    vision3DWorker->clearPointCloudSource(
+                        camera
+                    );
+
+
+                    auto source =
+                        std::make_unique<
+                            SimulatedPointCloudSource
+                        >(
+                            camera
+                        );
+
+
+                    if (!vision3DWorker->setPointCloudSource(
+                            camera,
+                            std::move(source)
+                        ))
                     {
-                        if (!vision3DWorker->start())
-                        {
-                            qWarning(
-                                "No se pudo iniciar Vision3DWorker"
-                            );
-                        }
+                        qWarning(
+                            "No se pudo instalar la fuente simulada "
+                            "de la cámara %zu",
+                            camera
+                        );
                     }
+                }
+
+
+                if (!vision3DWorker->start())
+                {
+                    qWarning(
+                        "No se pudo iniciar Vision3DWorker "
+                        "en simulación de cámaras 3D"
+                    );
                 }
 
 
@@ -2964,15 +3003,108 @@ QWidget *MainWindow::createConfigurationPage()
             */
             if (index == 2)
             {
-                if (vision3DWorker != nullptr)
-                {
-                    vision3DWorker->stop();
-                }
-
-
+                /*
+                * Los resultados vendrán desde
+                * las cámaras ZED reales.
+                */
                 visionHeightSource->setSourceMode(
                     VisionHeightSource::SourceMode::EXTERNAL
                 );
+
+
+                if (vision3DWorker == nullptr)
+                {
+                    return;
+                }
+
+
+                /*
+                * Detener el worker antes de cambiar
+                * las fuentes de nube.
+                */
+                vision3DWorker->stop();
+
+
+                bool configurationValid =
+                    true;
+
+
+                for (std::size_t camera = 0;
+                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    ++camera)
+                {
+                    /*
+                    * Quitar cualquier fuente anterior,
+                    * incluida la simulada.
+                    */
+                    vision3DWorker->clearPointCloudSource(
+                        camera
+                    );
+
+
+                    uint32_t serial =
+                        visionCameraSerialNumbers[camera];
+
+
+                    /*
+                    * Serial cero significa que todavía
+                    * no se asignó una ZED física.
+                    */
+                    if (serial == 0)
+                    {
+                        qWarning(
+                            "Cámara ZED %zu sin número de serie configurado",
+                            camera
+                        );
+
+                        configurationValid =
+                            false;
+
+                        continue;
+                    }
+
+
+                    auto source =
+                        std::make_unique<
+                            ZedGmslPointCloudSource
+                        >(
+                            camera,
+                            serial
+                        );
+
+
+                    if (!vision3DWorker->setPointCloudSource(
+                            camera,
+                            std::move(source)
+                        ))
+                    {
+                        qWarning(
+                            "No se pudo instalar ZED cámara %zu "
+                            "serial %u",
+                            camera,
+                            serial
+                        );
+
+                        configurationValid =
+                            false;
+                    }
+                }
+
+
+                /*
+                * Arrancar solamente si las tres
+                * cámaras tienen serial configurado.
+                */
+                if (configurationValid)
+                {
+                    if (!vision3DWorker->start())
+                    {
+                        qWarning(
+                            "No se pudo iniciar Vision3DWorker "
+                            "con cámaras ZED GMSL2"
+                        );
+                    }
+                }
 
 
                 return;
@@ -3126,6 +3258,43 @@ QWidget *MainWindow::createConfigurationPage()
 
     visionCameraMainLayout->addLayout(
         cameraSelectorLayout
+    );
+
+    /*
+    * Número de serie ZED.
+    */
+    QHBoxLayout *cameraSerialLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraSerialLabel =
+        new QLabel(
+            "Serial ZED:"
+        );
+
+    configVisionCameraSerial =
+        new QSpinBox();
+
+    configVisionCameraSerial->setRange(
+        0,
+        999999999
+    );
+
+    configVisionCameraSerial->setSpecialValueText(
+        "NO CONFIGURADO"
+    );
+
+    cameraSerialLayout->addWidget(
+        cameraSerialLabel
+    );
+
+    cameraSerialLayout->addWidget(
+        configVisionCameraSerial
+    );
+
+    cameraSerialLayout->addStretch();
+
+    visionCameraMainLayout->addLayout(
+        cameraSerialLayout
     );
 
 
@@ -4248,6 +4417,10 @@ void MainWindow::saveVisionCameraFromWidgets(
         return;
     }
 
+    visionCameraSerialNumbers[camera] =
+        static_cast<uint32_t>(
+            configVisionCameraSerial->value()
+        );
 
     Vision3DProcessor::CameraConfig& config =
         visionCameraConfigs[camera];
@@ -4324,6 +4497,11 @@ void MainWindow::loadVisionCameraIntoWidgets(
         return;
     }
 
+    configVisionCameraSerial->setValue(
+        static_cast<int>(
+            visionCameraSerialNumbers[camera]
+        )
+    );
 
     const Vision3DProcessor::CameraConfig& config =
         visionCameraConfigs[camera];
@@ -4438,6 +4616,8 @@ void MainWindow::saveConfiguration()
                 ->value()
         );
 
+        
+
         settings.endGroup();
     }
 
@@ -4545,6 +4725,13 @@ void MainWindow::saveConfiguration()
             config.enabled
         );
 
+        settings.setValue(
+            "serial_number",
+            static_cast<qulonglong>(
+                visionCameraSerialNumbers[camera]
+            )
+        );
+
 
         /*
         * Cuerpos atendidos por esta cámara.
@@ -4601,6 +4788,8 @@ void MainWindow::saveConfiguration()
             "pitch_offset_deg",
             config.geometry.pitch_offset_deg
         );
+
+        
 
 
         settings.endGroup();
@@ -4699,6 +4888,8 @@ void MainWindow::loadConfiguration()
             configEncoderDirectionCombo[body]
                 ->setCurrentIndex(index);
         }
+
+        
 
         settings.endGroup();
     }
@@ -4803,6 +4994,14 @@ void MainWindow::loadConfiguration()
                 "enabled",
                 false
             ).toBool();
+
+        visionCameraSerialNumbers[camera] =
+            static_cast<uint32_t>(
+                settings.value(
+                    "serial_number",
+                    0
+                ).toULongLong()
+            );    
 
 
         /*
