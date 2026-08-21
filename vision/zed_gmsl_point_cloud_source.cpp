@@ -1,6 +1,9 @@
 #include "vision/zed_gmsl_point_cloud_source.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <sstream>
+#include <string>
 
 
 ZedGmslPointCloudSource::ZedGmslPointCloudSource(
@@ -386,4 +389,102 @@ bool ZedGmslPointCloudSource::getPointCloud(
     return false;
 
 #endif
+}
+
+std::vector<uint32_t>
+ZedGmslPointCloudSource::detectConnectedSerialNumbers()
+{
+    std::vector<uint32_t> serialNumbers;
+
+
+#ifdef HAGIE_ENABLE_ZED_SDK
+
+    /*
+     * ========================================================
+     * HARDWARE REAL
+     * ========================================================
+     */
+    auto devices =
+        sl::Camera::getDeviceList();
+
+
+    for (const auto& device : devices)
+    {
+        if (device.serial_number == 0)
+        {
+            continue;
+        }
+
+
+        serialNumbers.push_back(
+            device.serial_number
+        );
+    }
+
+
+#else
+
+    /*
+     * ========================================================
+     * SIMULACIÓN PARA DESARROLLO
+     * ========================================================
+     *
+     * Permite simular cámaras ZED conectadas mediante:
+     *
+     * HAGIE_ZED_FAKE_SERIALS=11111111,98765432,44444
+     *
+     * Si la variable no existe, devuelve lista vacía.
+     */
+    const char *fakeSerials =
+        std::getenv(
+            "HAGIE_ZED_FAKE_SERIALS"
+        );
+
+
+    if (fakeSerials != nullptr)
+    {
+        std::stringstream stream(
+            fakeSerials
+        );
+
+
+        std::string item;
+
+
+        while (std::getline(
+            stream,
+            item,
+            ','
+        ))
+        {
+            try
+            {
+                unsigned long value =
+                    std::stoul(
+                        item
+                    );
+
+
+                if (value != 0)
+                {
+                    serialNumbers.push_back(
+                        static_cast<uint32_t>(
+                            value
+                        )
+                    );
+                }
+            }
+            catch (...)
+            {
+                /*
+                 * Ignorar valores inválidos.
+                 */
+            }
+        }
+    }
+
+#endif
+
+
+    return serialNumbers;
 }

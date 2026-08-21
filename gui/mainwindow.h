@@ -301,6 +301,18 @@ private:
     QDoubleSpinBox *configVisionCameraPitch =
         nullptr;
 
+    QPushButton *configVisionDetectButton =
+        nullptr;
+
+    QLabel *configVisionCameraStatusLabel =
+        nullptr;
+
+    QComboBox *configVisionDetectedSerialCombo =
+        nullptr;
+
+    QPushButton *configVisionAssignDetectedButton =
+        nullptr;
+
     std::array<
         uint32_t,
         Vision3DProcessor::CAMERA_COUNT

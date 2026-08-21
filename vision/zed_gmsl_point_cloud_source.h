@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "vision/point_cloud_source.h"
 
@@ -57,6 +58,19 @@ public:
 
     ~ZedGmslPointCloudSource() override;
 
+    /*
+    * ========================================================
+    * DETECCIÓN DE CÁMARAS ZED
+    * ========================================================
+    *
+    * Devuelve los números de serie de todas las
+    * cámaras ZED visibles por el SDK.
+    *
+    * Con HAGIE_ENABLE_ZED_SDK deshabilitado
+    * devuelve un vector vacío.
+    */
+    static std::vector<uint32_t>
+    detectConnectedSerialNumbers();
 
     bool start() override;
 

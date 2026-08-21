@@ -3297,6 +3297,439 @@ QWidget *MainWindow::createConfigurationPage()
         cameraSerialLayout
     );
 
+    /*
+    * Estado de detección de la cámara seleccionada.
+    */
+    configVisionCameraStatusLabel =
+        new QLabel(
+            "Estado ZED: NO DETECTADA"
+        );
+
+    configVisionCameraStatusLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+
+    /*
+    * Botón de detección automática.
+    */
+    configVisionDetectButton =
+        new QPushButton(
+            "DETECTAR CÁMARAS ZED"
+        );
+
+    visionCameraMainLayout->addWidget(
+        configVisionCameraStatusLabel
+    );
+
+    visionCameraMainLayout->addWidget(
+        configVisionDetectButton
+    );
+
+
+    /*
+    * Seriales ZED detectados pero todavía
+    * no asignados a ninguna cámara lógica.
+    */
+    QHBoxLayout *detectedSerialLayout =
+        new QHBoxLayout();
+
+    QLabel *detectedSerialLabel =
+        new QLabel(
+            "ZED nueva detectada:"
+        );
+
+    configVisionDetectedSerialCombo =
+        new QComboBox();
+
+    configVisionDetectedSerialCombo->setEnabled(
+        false
+    );
+
+    detectedSerialLayout->addWidget(
+        detectedSerialLabel
+    );
+
+    detectedSerialLayout->addWidget(
+        configVisionDetectedSerialCombo
+    );
+
+    detectedSerialLayout->addStretch();
+
+    visionCameraMainLayout->addLayout(
+        detectedSerialLayout
+    );
+
+
+    /*
+    * Asignar la ZED seleccionada a la
+    * cámara lógica actualmente seleccionada.
+    */
+    configVisionAssignDetectedButton =
+        new QPushButton(
+            "ASIGNAR A CÁMARA SELECCIONADA"
+        );
+
+    configVisionAssignDetectedButton->setEnabled(
+        false
+    );
+
+    visionCameraMainLayout->addWidget(
+        configVisionAssignDetectedButton
+    );
+
+    /*
+    * ========================================================
+    * DETECCIÓN AUTOMÁTICA DE CÁMARAS ZED
+    * ========================================================
+    */
+   
+    connect(
+        configVisionDetectButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            /*
+            * Guardar cualquier cambio manual
+            * del serial de la cámara seleccionada.
+            */
+            saveVisionCameraFromWidgets(
+                currentVisionCamera
+            );
+
+
+            /*
+            * Consultar cámaras visibles por ZED SDK.
+            *
+            * Con HAGIE_ENABLE_ZED_SDK=OFF
+            * devuelve una lista vacía.
+            */
+            const auto detectedSerials =
+                ZedGmslPointCloudSource::
+                    detectConnectedSerialNumbers();
+
+            /*
+            * Limpiar la lista de cámaras nuevas.
+            */
+            configVisionDetectedSerialCombo->clear();
+
+
+            /*
+            * ====================================================
+            * 1. REVISAR CÁMARAS ASIGNADAS
+            * ====================================================
+            */
+            for (std::size_t camera = 0;
+                camera < Vision3DProcessor::CAMERA_COUNT;
+                ++camera)
+            {
+                uint32_t assignedSerial =
+                    visionCameraSerialNumbers[camera];
+
+
+                if (assignedSerial == 0)
+                {
+                    qInfo(
+                        "Camera %zu: SIN SERIAL ASIGNADO",
+                        camera + 1
+                    );
+
+                    continue;
+                }
+
+
+                bool detected =
+                    false;
+
+
+                for (uint32_t detectedSerial :
+                    detectedSerials)
+                {
+                    if (detectedSerial ==
+                        assignedSerial)
+                    {
+                        detected =
+                            true;
+
+                        break;
+                    }
+                }
+
+
+                if (detected)
+                {
+                    qInfo(
+                        "Camera %zu: DETECTADA - Serial %u",
+                        camera + 1,
+                        assignedSerial
+                    );
+                }
+                else
+                {
+                    qWarning(
+                        "Camera %zu: NO ENCONTRADA - Serial %u",
+                        camera + 1,
+                        assignedSerial
+                    );
+                }
+            }
+
+
+            /*
+            * ====================================================
+            * 2. BUSCAR CÁMARAS NUEVAS
+            * ====================================================
+            *
+            * Una cámara nueva es un serial detectado
+            * que no está asignado a ninguna de las
+            * tres posiciones lógicas.
+            */
+            for (uint32_t detectedSerial :
+                detectedSerials)
+            {
+                bool alreadyAssigned =
+                    false;
+
+
+                for (std::size_t camera = 0;
+                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    ++camera)
+                {
+                    if (visionCameraSerialNumbers[camera] ==
+                        detectedSerial)
+                    {
+                        alreadyAssigned =
+                            true;
+
+                        break;
+                    }
+                }
+
+
+                if (!alreadyAssigned)
+                {
+                    qInfo(
+                        "ZED NUEVA DETECTADA - Serial %u",
+                        detectedSerial
+                    );
+
+                    configVisionDetectedSerialCombo->addItem(
+                        QString::number(
+                            detectedSerial
+                        ),
+                        QVariant::fromValue(
+                            static_cast<qulonglong>(
+                                detectedSerial
+                            )
+                        )
+                    );
+                }
+
+                bool hasNewCameras =
+                    configVisionDetectedSerialCombo->count() > 0;
+
+                configVisionDetectedSerialCombo->setEnabled(
+                    hasNewCameras
+                );
+
+                configVisionAssignDetectedButton->setEnabled(
+                    hasNewCameras
+                );
+            }
+
+
+            /*
+            * ====================================================
+            * 3. ACTUALIZAR ESTADO DE LA CÁMARA SELECCIONADA
+            * ====================================================
+            */
+            uint32_t selectedSerial =
+                visionCameraSerialNumbers[
+                    currentVisionCamera
+                ];
+
+
+            if (selectedSerial == 0)
+            {
+                configVisionCameraStatusLabel
+                    ->setText(
+                        "Estado ZED: SIN CÁMARA ASIGNADA"
+                    );
+
+                return;
+            }
+
+
+            bool selectedDetected =
+                false;
+
+
+            for (uint32_t detectedSerial :
+                detectedSerials)
+            {
+                if (detectedSerial ==
+                    selectedSerial)
+                {
+                    selectedDetected =
+                        true;
+
+                    break;
+                }
+            }
+
+
+            if (selectedDetected)
+            {
+                configVisionCameraStatusLabel
+                    ->setText(
+                        QString(
+                            "Estado ZED: DETECTADA - Serial %1"
+                        ).arg(
+                            selectedSerial
+                        )
+                    );
+            }
+            else
+            {
+                configVisionCameraStatusLabel
+                    ->setText(
+                        QString(
+                            "Estado ZED: NO ENCONTRADA - Serial %1"
+                        ).arg(
+                            selectedSerial
+                        )
+                    );
+            }
+
+
+            /*
+            * Resumen.
+            */
+            qInfo(
+                "ZED: %zu cámara(s) física(s) detectada(s)",
+                detectedSerials.size()
+            );
+        }
+        );
+
+        connect(
+            configVisionAssignDetectedButton,
+            &QPushButton::clicked,
+            this,
+            [this]()
+            {
+                if (configVisionDetectedSerialCombo == nullptr)
+                {
+                    return;
+                }
+
+
+                if (configVisionDetectedSerialCombo->count() == 0)
+                {
+                    return;
+                }
+
+
+                uint32_t newSerial =
+                    static_cast<uint32_t>(
+                        configVisionDetectedSerialCombo
+                            ->currentData()
+                            .toULongLong()
+                    );
+
+
+                if (newSerial == 0)
+                {
+                    return;
+                }
+
+
+                /*
+                * Asignar a la cámara lógica seleccionada.
+                */
+                visionCameraSerialNumbers[
+                    currentVisionCamera
+                ] =
+                    newSerial;
+
+
+                /*
+                * Reflejarlo inmediatamente
+                * en el campo de la GUI.
+                */
+                configVisionCameraSerial->setValue(
+                    static_cast<int>(
+                        newSerial
+                    )
+                );
+
+
+                /*
+                * Guardar configuración.
+                */
+                saveConfiguration();
+
+
+                /*
+                * Mostrar estado actualizado.
+                */
+                configVisionCameraStatusLabel->setText(
+                    QString(
+                        "Estado ZED: ASIGNADA - Serial %1"
+                    ).arg(
+                        newSerial
+                    )
+                );
+
+
+                /*
+                * Quitar esta cámara de la lista
+                * de nuevas disponibles.
+                */
+                int currentIndex =
+                    configVisionDetectedSerialCombo
+                        ->currentIndex();
+
+
+                if (currentIndex >= 0)
+                {
+                    configVisionDetectedSerialCombo
+                        ->removeItem(
+                            currentIndex
+                        );
+                }
+
+
+                bool hasRemaining =
+                    configVisionDetectedSerialCombo
+                        ->count() > 0;
+
+
+                configVisionDetectedSerialCombo
+                    ->setEnabled(
+                        hasRemaining
+                    );
+
+
+                configVisionAssignDetectedButton
+                    ->setEnabled(
+                        hasRemaining
+                    );
+
+
+                qInfo(
+                    "ZED serial %u asignada a Camera %zu",
+                    newSerial,
+                    currentVisionCamera + 1
+                );
+            }
+        );
+    
+
+    
+    
+
 
     /*
     * Cámara habilitada.
