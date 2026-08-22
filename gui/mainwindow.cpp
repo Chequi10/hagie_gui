@@ -22,6 +22,7 @@
 #include <QDoubleSpinBox>
 #include <QSettings>
 #include <QScrollArea>
+#include <iostream>
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_worker.h"
 
@@ -305,6 +306,17 @@ MainWindow::MainWindow(
      */
     loadConfiguration();
 
+    /*
+    * ========================================================
+    * DETECCIÓN INICIAL DE CÁMARAS ZED
+    * ========================================================
+    *
+    * La GUI ya existe y la configuración ya fue cargada.
+    * Ahora sí podemos comparar los seriales guardados
+    * contra las cámaras detectadas físicamente.
+    */
+    refreshZedCameraDetection();
+
     syncConfigurationToWorker();
 
 
@@ -396,7 +408,7 @@ void MainWindow::updateTestPage()
             );
 
         constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-            500;
+            1000;
 
         bool visionFresh =
             bodyState.vision_valid &&
@@ -1446,10 +1458,13 @@ QWidget *MainWindow::createFaultsPage()
             ->setWordWrap(true);
 
 
-        QPushButton *clearButton =
+        clearNoMovementButtons[body] =
             new QPushButton(
                 "Borrar NO_MOVEMENT"
             );
+
+        QPushButton *clearButton =
+            clearNoMovementButtons[body];
 
         connect(
             clearButton,
@@ -2090,7 +2105,7 @@ QWidget *MainWindow::createTestsPage()
                     );
 
                 constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-                    500;
+                    1000;
 
                 bool visionFresh =
                     bodyState.vision_valid &&
@@ -2105,7 +2120,8 @@ QWidget *MainWindow::createTestsPage()
                 if (!system.stm32_connected ||
                     !system.vision_running ||
                     !visionFresh ||
-                    bodyState.faults != 0)
+                    bodyState.faults != 0 ||
+                    !isBodyCoveredByActiveCamera(body))
                 {
                     return;
                 }
@@ -2569,7 +2585,7 @@ QWidget *MainWindow::createTestsPage()
                         );
 
                     constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-                        500;
+                        1000;
 
                     bool visionFresh =
                         bodyState.vision_valid &&
@@ -2577,10 +2593,48 @@ QWidget *MainWindow::createTestsPage()
                         (nowMs - bodyState.vision_timestamp_ms) <=
                             VISION_STALE_TIMEOUT_MS;
 
+
+                    bool bodyCovered =
+                        isBodyCoveredByActiveCamera(body);
+
                     if (!system.stm32_connected ||
                         !system.vision_running ||
                         !visionFresh ||
-                        bodyState.faults != 0)
+                        bodyState.faults != 0 ||
+                        !bodyCovered)
+                    {
+                        std::cout
+                            << "AUTO VISION CANCEL body="
+                            << body
+                            << " stm32="
+                            << system.stm32_connected
+                            << " vision_running="
+                            << system.vision_running
+                            << " visionFresh="
+                            << visionFresh
+                            << " vision_valid="
+                            << bodyState.vision_valid
+                            << " vision_age_ms="
+                            << (
+                                bodyState.vision_timestamp_ms != 0
+                                    ? nowMs - bodyState.vision_timestamp_ms
+                                    : 0
+                            )
+                            << " faults=0x"
+                            << std::hex
+                            << bodyState.faults
+                            << std::dec
+                            << " covered="
+                            << bodyCovered
+                            << std::endl;
+                    }
+
+
+                    if (!system.stm32_connected ||
+                    !system.vision_running ||
+                    !visionFresh ||
+                    bodyState.faults != 0 ||
+                    !bodyCovered)
                     {
                         testVisionAutoEnabled[body] =
                             false;
@@ -2659,7 +2713,7 @@ QWidget *MainWindow::createTestsPage()
      * Reenviar consigna AUTO cada 500 ms.
      */
     testAutoTimer->start(
-        500
+        250
     );
 
 
@@ -2791,6 +2845,296 @@ QWidget *MainWindow::createTestsPage()
     return container;
 }
 
+
+void MainWindow::refreshZedCameraDetection()
+{
+    /*
+     * Guardar cualquier cambio manual del serial
+     * de la cámara actualmente seleccionada.
+     */
+    saveVisionCameraFromWidgets(
+        currentVisionCamera
+    );
+
+
+    /*
+     * Obtener las ZED físicamente detectadas.
+     */
+    /*
+    * Consultar físicamente las cámaras una sola vez
+    * y guardar el resultado en cache.
+    */
+    detectedZedSerialNumbers =
+        ZedGmslPointCloudSource::
+            detectConnectedSerialNumbers();
+
+
+    const auto& detectedSerials =
+        detectedZedSerialNumbers;
+
+
+    /*
+     * Limpiar la lista de ZED nuevas.
+     */
+    if (configVisionDetectedSerialCombo != nullptr)
+    {
+        configVisionDetectedSerialCombo->clear();
+    }
+
+
+    /*
+     * ========================================================
+     * 1. REVISAR CÁMARAS ASIGNADAS
+     * ========================================================
+     */
+    for (std::size_t camera = 0;
+         camera < Vision3DProcessor::CAMERA_COUNT;
+         ++camera)
+    {
+        const uint32_t assignedSerial =
+            visionCameraSerialNumbers[camera];
+
+
+        if (assignedSerial == 0)
+        {
+            qInfo(
+                "Camera %zu: SIN SERIAL ASIGNADO",
+                camera + 1
+            );
+
+            continue;
+        }
+
+
+        bool detected = false;
+
+
+        for (uint32_t detectedSerial :
+             detectedSerials)
+        {
+            if (detectedSerial == assignedSerial)
+            {
+                detected = true;
+                break;
+            }
+        }
+
+
+        if (detected)
+        {
+            qInfo(
+                "Camera %zu: DETECTADA - Serial %u",
+                camera + 1,
+                assignedSerial
+            );
+        }
+        else
+        {
+            qWarning(
+                "Camera %zu: NO ENCONTRADA - Serial %u",
+                camera + 1,
+                assignedSerial
+            );
+        }
+    }
+
+
+    /*
+     * ========================================================
+     * 2. BUSCAR ZED DETECTADAS PERO NO ASIGNADAS
+     * ========================================================
+     */
+    for (uint32_t detectedSerial :
+         detectedSerials)
+    {
+        bool alreadyAssigned = false;
+
+
+        for (std::size_t camera = 0;
+             camera < Vision3DProcessor::CAMERA_COUNT;
+             ++camera)
+        {
+            if (visionCameraSerialNumbers[camera] ==
+                detectedSerial)
+            {
+                alreadyAssigned = true;
+                break;
+            }
+        }
+
+
+        if (!alreadyAssigned)
+        {
+            qInfo(
+                "ZED NUEVA DETECTADA - Serial %u",
+                detectedSerial
+            );
+
+
+            if (configVisionDetectedSerialCombo != nullptr)
+            {
+                configVisionDetectedSerialCombo->addItem(
+                    QString::number(
+                        detectedSerial
+                    ),
+                    QVariant::fromValue(
+                        static_cast<qulonglong>(
+                            detectedSerial
+                        )
+                    )
+                );
+            }
+        }
+    }
+
+
+    /*
+     * Habilitar asignación solamente cuando
+     * exista alguna ZED nueva.
+     *
+     * IMPORTANTE:
+     * Esto queda FUERA del for anterior.
+     */
+    const bool hasNewCameras =
+        configVisionDetectedSerialCombo != nullptr &&
+        configVisionDetectedSerialCombo->count() > 0;
+
+
+    if (configVisionDetectedSerialCombo != nullptr)
+    {
+        configVisionDetectedSerialCombo->setEnabled(
+            hasNewCameras
+        );
+    }
+
+
+    if (configVisionAssignDetectedButton != nullptr)
+    {
+        configVisionAssignDetectedButton->setEnabled(
+            hasNewCameras
+        );
+    }
+
+
+    /*
+     * ========================================================
+     * 3. ESTADO DE LA CÁMARA SELECCIONADA
+     * ========================================================
+     */
+    const uint32_t selectedSerial =
+        visionCameraSerialNumbers[
+            currentVisionCamera
+        ];
+
+
+    if (configVisionCameraStatusLabel != nullptr)
+    {
+        if (selectedSerial == 0)
+        {
+            configVisionCameraStatusLabel->setText(
+                "Estado ZED: SIN CÁMARA ASIGNADA"
+            );
+        }
+        else
+        {
+            bool selectedDetected = false;
+
+
+            for (uint32_t detectedSerial :
+                 detectedSerials)
+            {
+                if (detectedSerial ==
+                    selectedSerial)
+                {
+                    selectedDetected = true;
+                    break;
+                }
+            }
+
+
+            if (selectedDetected)
+            {
+                configVisionCameraStatusLabel->setText(
+                    QString(
+                        "Estado ZED: DETECTADA - Serial %1"
+                    ).arg(
+                        selectedSerial
+                    )
+                );
+            }
+            else
+            {
+                configVisionCameraStatusLabel->setText(
+                    QString(
+                        "Estado ZED: NO ENCONTRADA - Serial %1"
+                    ).arg(
+                        selectedSerial
+                    )
+                );
+            }
+        }
+    }
+
+
+    qInfo(
+        "ZED: %zu cámara(s) física(s) detectada(s)",
+        detectedSerials.size()
+    );
+}
+
+
+bool MainWindow::isBodyCoveredByActiveCamera(
+    std::size_t body) const
+{
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return false;
+    }
+
+
+    for (std::size_t camera = 0;
+         camera < Vision3DProcessor::CAMERA_COUNT;
+         ++camera)
+    {
+        const auto& config =
+            visionCameraConfigs[camera];
+
+
+        if (!config.enabled)
+        {
+            continue;
+        }
+
+
+        if (!config.body_enabled[body])
+        {
+            continue;
+        }
+
+
+        const uint32_t serial =
+            visionCameraSerialNumbers[camera];
+
+
+        if (serial == 0)
+        {
+            continue;
+        }
+
+
+        for (uint32_t detectedSerial :
+             detectedZedSerialNumbers)
+        {
+            if (detectedSerial == serial)
+            {
+                return true;
+            }
+        }
+    }
+
+
+    return false;
+}
 /*
  * ============================================================
  * CONFIGURACIÓN
@@ -3003,6 +3347,13 @@ QWidget *MainWindow::createConfigurationPage()
             */
             if (index == 2)
             {
+                
+                /*
+                * Actualizar el cache de cámaras ZED
+                * antes de iniciar visión real.
+                */
+                refreshZedCameraDetection();
+                
                 /*
                 * Los resultados vendrán desde
                 * las cámaras ZED reales.
@@ -3019,14 +3370,20 @@ QWidget *MainWindow::createConfigurationPage()
 
 
                 /*
-                * Detener el worker antes de cambiar
-                * las fuentes de nube.
+                * Detener antes de reemplazar fuentes.
                 */
                 vision3DWorker->stop();
 
 
-                bool configurationValid =
-                    true;
+                /*
+                * Detectar las ZED físicas disponibles.
+                */
+                const auto& detectedSerials =
+                    detectedZedSerialNumbers;
+
+
+                std::size_t usableCameraCount =
+                    0;
 
 
                 for (std::size_t camera = 0;
@@ -3034,36 +3391,84 @@ QWidget *MainWindow::createConfigurationPage()
                     ++camera)
                 {
                     /*
-                    * Quitar cualquier fuente anterior,
-                    * incluida la simulada.
+                    * Limpiar cualquier fuente anterior.
                     */
                     vision3DWorker->clearPointCloudSource(
                         camera
                     );
 
 
-                    uint32_t serial =
-                        visionCameraSerialNumbers[camera];
-
-
                     /*
-                    * Serial cero significa que todavía
-                    * no se asignó una ZED física.
+                    * Si la cámara está deshabilitada,
+                    * se ignora completamente.
                     */
-                    if (serial == 0)
+                    if (!visionCameraConfigs[camera].enabled)
                     {
-                        qWarning(
-                            "Cámara ZED %zu sin número de serie configurado",
-                            camera
+                        qInfo(
+                            "Camera %zu: DESHABILITADA",
+                            camera + 1
                         );
-
-                        configurationValid =
-                            false;
 
                         continue;
                     }
 
 
+                    const uint32_t serial =
+                        visionCameraSerialNumbers[camera];
+
+
+                    /*
+                    * Cámara habilitada pero sin serial.
+                    */
+                    if (serial == 0)
+                    {
+                        qWarning(
+                            "Camera %zu habilitada pero sin serial ZED configurado",
+                            camera + 1
+                        );
+
+                        continue;
+                    }
+
+
+                    /*
+                    * Verificar si esa ZED está físicamente presente.
+                    */
+                    bool physicallyDetected =
+                        false;
+
+
+                    for (uint32_t detectedSerial :
+                        detectedSerials)
+                    {
+                        if (detectedSerial == serial)
+                        {
+                            physicallyDetected =
+                                true;
+
+                            break;
+                        }
+                    }
+
+
+                    if (!physicallyDetected)
+                    {
+                        qWarning(
+                            "Camera %zu habilitada pero NO ENCONTRADA - Serial %u",
+                            camera + 1,
+                            serial
+                        );
+
+                        /*
+                        * No bloqueamos las demás cámaras.
+                        */
+                        continue;
+                    }
+
+
+                    /*
+                    * Instalar la fuente ZED real.
+                    */
                     auto source =
                         std::make_unique<
                             ZedGmslPointCloudSource
@@ -3079,23 +3484,31 @@ QWidget *MainWindow::createConfigurationPage()
                         ))
                     {
                         qWarning(
-                            "No se pudo instalar ZED cámara %zu "
-                            "serial %u",
-                            camera,
+                            "No se pudo instalar ZED Camera %zu - Serial %u",
+                            camera + 1,
                             serial
                         );
 
-                        configurationValid =
-                            false;
+                        continue;
                     }
+
+
+                    ++usableCameraCount;
+
+
+                    qInfo(
+                        "Camera %zu lista para visión - Serial %u",
+                        camera + 1,
+                        serial
+                    );
                 }
 
 
                 /*
-                * Arrancar solamente si las tres
-                * cámaras tienen serial configurado.
+                * Arrancar si existe al menos
+                * una cámara utilizable.
                 */
-                if (configurationValid)
+                if (usableCameraCount > 0)
                 {
                     if (!vision3DWorker->start())
                     {
@@ -3104,6 +3517,19 @@ QWidget *MainWindow::createConfigurationPage()
                             "con cámaras ZED GMSL2"
                         );
                     }
+                    else
+                    {
+                        qInfo(
+                            "Vision3DWorker iniciado con %zu cámara(s)",
+                            usableCameraCount
+                        );
+                    }
+                }
+                else
+                {
+                    qWarning(
+                        "No hay cámaras ZED habilitadas y disponibles"
+                    );
                 }
 
 
@@ -3390,228 +3816,9 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this]()
         {
-            /*
-            * Guardar cualquier cambio manual
-            * del serial de la cámara seleccionada.
-            */
-            saveVisionCameraFromWidgets(
-                currentVisionCamera
-            );
-
-
-            /*
-            * Consultar cámaras visibles por ZED SDK.
-            *
-            * Con HAGIE_ENABLE_ZED_SDK=OFF
-            * devuelve una lista vacía.
-            */
-            const auto detectedSerials =
-                ZedGmslPointCloudSource::
-                    detectConnectedSerialNumbers();
-
-            /*
-            * Limpiar la lista de cámaras nuevas.
-            */
-            configVisionDetectedSerialCombo->clear();
-
-
-            /*
-            * ====================================================
-            * 1. REVISAR CÁMARAS ASIGNADAS
-            * ====================================================
-            */
-            for (std::size_t camera = 0;
-                camera < Vision3DProcessor::CAMERA_COUNT;
-                ++camera)
-            {
-                uint32_t assignedSerial =
-                    visionCameraSerialNumbers[camera];
-
-
-                if (assignedSerial == 0)
-                {
-                    qInfo(
-                        "Camera %zu: SIN SERIAL ASIGNADO",
-                        camera + 1
-                    );
-
-                    continue;
-                }
-
-
-                bool detected =
-                    false;
-
-
-                for (uint32_t detectedSerial :
-                    detectedSerials)
-                {
-                    if (detectedSerial ==
-                        assignedSerial)
-                    {
-                        detected =
-                            true;
-
-                        break;
-                    }
-                }
-
-
-                if (detected)
-                {
-                    qInfo(
-                        "Camera %zu: DETECTADA - Serial %u",
-                        camera + 1,
-                        assignedSerial
-                    );
-                }
-                else
-                {
-                    qWarning(
-                        "Camera %zu: NO ENCONTRADA - Serial %u",
-                        camera + 1,
-                        assignedSerial
-                    );
-                }
-            }
-
-
-            /*
-            * ====================================================
-            * 2. BUSCAR CÁMARAS NUEVAS
-            * ====================================================
-            *
-            * Una cámara nueva es un serial detectado
-            * que no está asignado a ninguna de las
-            * tres posiciones lógicas.
-            */
-            for (uint32_t detectedSerial :
-                detectedSerials)
-            {
-                bool alreadyAssigned =
-                    false;
-
-
-                for (std::size_t camera = 0;
-                    camera < Vision3DProcessor::CAMERA_COUNT;
-                    ++camera)
-                {
-                    if (visionCameraSerialNumbers[camera] ==
-                        detectedSerial)
-                    {
-                        alreadyAssigned =
-                            true;
-
-                        break;
-                    }
-                }
-
-
-                if (!alreadyAssigned)
-                {
-                    qInfo(
-                        "ZED NUEVA DETECTADA - Serial %u",
-                        detectedSerial
-                    );
-
-                    configVisionDetectedSerialCombo->addItem(
-                        QString::number(
-                            detectedSerial
-                        ),
-                        QVariant::fromValue(
-                            static_cast<qulonglong>(
-                                detectedSerial
-                            )
-                        )
-                    );
-                }
-
-                bool hasNewCameras =
-                    configVisionDetectedSerialCombo->count() > 0;
-
-                configVisionDetectedSerialCombo->setEnabled(
-                    hasNewCameras
-                );
-
-                configVisionAssignDetectedButton->setEnabled(
-                    hasNewCameras
-                );
-            }
-
-
-            /*
-            * ====================================================
-            * 3. ACTUALIZAR ESTADO DE LA CÁMARA SELECCIONADA
-            * ====================================================
-            */
-            uint32_t selectedSerial =
-                visionCameraSerialNumbers[
-                    currentVisionCamera
-                ];
-
-
-            if (selectedSerial == 0)
-            {
-                configVisionCameraStatusLabel
-                    ->setText(
-                        "Estado ZED: SIN CÁMARA ASIGNADA"
-                    );
-
-                return;
-            }
-
-
-            bool selectedDetected =
-                false;
-
-
-            for (uint32_t detectedSerial :
-                detectedSerials)
-            {
-                if (detectedSerial ==
-                    selectedSerial)
-                {
-                    selectedDetected =
-                        true;
-
-                    break;
-                }
-            }
-
-
-            if (selectedDetected)
-            {
-                configVisionCameraStatusLabel
-                    ->setText(
-                        QString(
-                            "Estado ZED: DETECTADA - Serial %1"
-                        ).arg(
-                            selectedSerial
-                        )
-                    );
-            }
-            else
-            {
-                configVisionCameraStatusLabel
-                    ->setText(
-                        QString(
-                            "Estado ZED: NO ENCONTRADA - Serial %1"
-                        ).arg(
-                            selectedSerial
-                        )
-                    );
-            }
-
-
-            /*
-            * Resumen.
-            */
-            qInfo(
-                "ZED: %zu cámara(s) física(s) detectada(s)",
-                detectedSerials.size()
-            );
+            refreshZedCameraDetection();
         }
-        );
+    );
 
         connect(
             configVisionAssignDetectedButton,
@@ -4490,6 +4697,8 @@ QWidget *MainWindow::createConfigurationPage()
         saveButton
     );
 
+    
+
     return container;
 }    
 
@@ -4780,6 +4989,24 @@ void MainWindow::updateFaultPage()
     {
         HagieState::BodyState bodyState =
             state->getBodyState(body);
+
+
+            /*
+            * El botón solamente se habilita
+            * si existe realmente NO_MOVEMENT.
+            *
+            * Bit 0x04 = BODY_FAULT_NO_MOVEMENT.
+            */
+            if (clearNoMovementButtons[body] != nullptr)
+            {
+                const bool hasNoMovement =
+                    (bodyState.faults & 0x04U) != 0;
+
+                clearNoMovementButtons[body]
+                    ->setEnabled(
+                        hasNoMovement
+                    );
+            }
 
         QStringList faults;
 

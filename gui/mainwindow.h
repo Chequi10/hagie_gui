@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdint>
 #include <QCheckBox>
+#include <vector>
 
 
 #include "core/hagie_state.h"
@@ -129,6 +130,11 @@ private:
         QLabel *,
         HagieState::BODY_COUNT
     > bodyFaultDetailLabels {};
+
+    std::array<
+        QPushButton *,
+        HagieState::BODY_COUNT
+    > clearNoMovementButtons {};
 
 
     // ========================================================
@@ -321,6 +327,17 @@ private:
     QSpinBox *configVisionCameraSerial =
         nullptr;
 
+
+    /*
+    * Seriales ZED detectados físicamente.
+    *
+    * Se actualizan mediante refreshZedCameraDetection()
+    * y se utilizan desde la lógica de seguridad
+    * sin consultar continuamente el SDK.
+    */
+    std::vector<uint32_t>
+        detectedZedSerialNumbers;
+
         std::array<
     Vision3DProcessor::CameraConfig,
         Vision3DProcessor::CAMERA_COUNT
@@ -333,7 +350,12 @@ private:
     std::size_t currentVisionCamera =
         0;
 
-    
+    bool isBodyCoveredByActiveCamera(
+        std::size_t body
+    ) const;
+
+
+
 
     
 
@@ -502,6 +524,12 @@ private:
     void loadConfiguration();
 
     void syncConfigurationToWorker();
+    /*
+    * Detecta las cámaras ZED conectadas,
+    * compara sus seriales con la configuración
+    * y actualiza la GUI.
+    */
+    void refreshZedCameraDetection();
 };
 
 

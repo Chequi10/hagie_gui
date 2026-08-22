@@ -324,6 +324,32 @@ void STM32Worker::processTxQueue()
         {
             case CommandType::SET_TARGET_HEIGHT:
             {
+                /*
+                * Diagnóstico temporal:
+                * comprobar cuándo sale realmente
+                * la consigna del CUERPO 5 hacia STM32.
+                */
+                if (command.body == 4)
+                {
+                    auto now =
+                        std::chrono::steady_clock::now();
+
+                    auto ms =
+                        std::chrono::duration_cast<
+                            std::chrono::milliseconds
+                        >(
+                            now.time_since_epoch()
+                        ).count();
+
+                    std::cout
+                        << "C5 TARGET TX t="
+                        << ms
+                        << " height="
+                        << command.value
+                        << std::endl;
+                }
+
+
                 stm32->set_target_height(
                     command.body,
                     static_cast<uint16_t>(
@@ -467,7 +493,25 @@ void STM32Worker::setTargetHeight(
         return;
     }
 
+    if (body == 4)
+    {
+        auto now =
+            std::chrono::steady_clock::now();
 
+        auto ms =
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                now.time_since_epoch()
+            ).count();
+
+        std::cout
+            << "C5 TARGET ENQUEUE t="
+            << ms
+            << " height="
+            << height_mm
+            << std::endl;
+    }
     enqueueCommand(
         {
             CommandType::SET_TARGET_HEIGHT,
