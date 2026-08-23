@@ -3075,6 +3075,8 @@ void MainWindow::refreshZedCameraDetection()
         }
     }
 
+    
+
 
     qInfo(
         "ZED: %zu cámara(s) física(s) detectada(s)",
@@ -3731,6 +3733,24 @@ QWidget *MainWindow::createConfigurationPage()
             "Estado ZED: NO DETECTADA"
         );
 
+    configVisionCameraImuLabel =
+        new QLabel(
+            "IMU cámara: NO DISPONIBLE"
+        );
+
+    configVisionCameraMountingErrorLabel =
+        new QLabel(
+            "Error montaje: NO DISPONIBLE"
+        );
+
+    configVisionCameraImuLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    configVisionCameraMountingErrorLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
     configVisionCameraStatusLabel->setStyleSheet(
         "font-weight: bold;"
     );
@@ -3746,6 +3766,14 @@ QWidget *MainWindow::createConfigurationPage()
 
     visionCameraMainLayout->addWidget(
         configVisionCameraStatusLabel
+    );
+
+    visionCameraMainLayout->addWidget(
+        configVisionCameraImuLabel
+    );
+
+    visionCameraMainLayout->addWidget(
+        configVisionCameraMountingErrorLabel
     );
 
     visionCameraMainLayout->addWidget(
@@ -5083,7 +5111,94 @@ void MainWindow::updateDashboard()
     updateSystemStatus();
     updateFaultPage();
     updateTestPage();
+
+    /*
+     * ========================================================
+     * DIAGNÓSTICO EN TIEMPO REAL DE IMU DE CÁMARA
+     * ========================================================
+     */
+    if (vision3DWorker != nullptr &&
+        currentVisionCamera <
+            Vision3DProcessor::CAMERA_COUNT)
+    {
+        PointCloudSource::CameraOrientation
+            cameraOrientation =
+                vision3DWorker->getCameraOrientation(
+                    currentVisionCamera
+                );
+
+
+        if (configVisionCameraImuLabel != nullptr)
+        {
+            if (cameraOrientation.valid)
+            {
+                configVisionCameraImuLabel->setText(
+                    QString(
+                        "IMU cámara: Roll %1° | Pitch %2°"
+                    )
+                        .arg(
+                            cameraOrientation.roll_deg,
+                            0,
+                            'f',
+                            2
+                        )
+                        .arg(
+                            cameraOrientation.pitch_deg,
+                            0,
+                            'f',
+                            2
+                        )
+                );
+            }
+            else
+            {
+                configVisionCameraImuLabel->setText(
+                    "IMU cámara: NO DISPONIBLE"
+                );
+            }
+        }
+
+
+        if (configVisionCameraMountingErrorLabel != nullptr)
+        {
+            float rollOffsetDeg = 0.0f;
+            float pitchOffsetDeg = 0.0f;
+
+
+            if (vision3DWorker->getCameraMountingOffset(
+                    currentVisionCamera,
+                    rollOffsetDeg,
+                    pitchOffsetDeg
+                ))
+            {
+                configVisionCameraMountingErrorLabel->setText(
+                    QString(
+                        "Error montaje: Roll %1° | Pitch %2°"
+                    )
+                        .arg(
+                            rollOffsetDeg,
+                            0,
+                            'f',
+                            2
+                        )
+                        .arg(
+                            pitchOffsetDeg,
+                            0,
+                            'f',
+                            2
+                        )
+                );
+            }
+            else
+            {
+                configVisionCameraMountingErrorLabel->setText(
+                    "Error montaje: NO DISPONIBLE"
+                );
+            }
+        }
+    }
 }
+
 
 void MainWindow::updateSystemStatus()
 {

@@ -10,6 +10,31 @@ class PointCloudSource
 {
 public:
 
+        /*
+     * ========================================================
+     * ORIENTACIÓN PROPIA DE LA CÁMARA
+     * ========================================================
+     *
+     * Orientación medida por una IMU integrada en la cámara,
+     * si la fuente dispone de ella.
+     *
+     * NO reemplaza la IMU general de la Hagie.
+     *
+     * Se utilizará para:
+     *
+     * - calibración del montaje de cada cámara;
+     * - diagnóstico;
+     * - cálculo de roll_offset_deg / pitch_offset_deg.
+     */
+    struct CameraOrientation
+    {
+        float roll_deg = 0.0f;
+
+        float pitch_deg = 0.0f;
+
+        bool valid = false;
+    };
+
     virtual ~PointCloudSource() = default;
 
 
@@ -42,6 +67,28 @@ public:
     virtual bool getPointCloud(
         Vision3DProcessor::PointCloud& cloud
     ) = 0;
+
+        /*
+     * ========================================================
+     * IMU OPCIONAL DE LA CÁMARA
+     * ========================================================
+     *
+     * Devuelve true si la fuente dispone de una orientación
+     * válida proveniente de su propia IMU.
+     *
+     * Por defecto una cámara puede no tener IMU.
+     *
+     * Al tener implementación por defecto NO obliga a las
+     * fuentes simuladas ni a futuras cámaras sin IMU a
+     * implementar esta función.
+     */
+    virtual bool getCameraOrientation(
+        CameraOrientation& orientation)
+    {
+        orientation = CameraOrientation {};
+
+        return false;
+    }
 
 
     /*

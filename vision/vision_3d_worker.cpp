@@ -68,6 +68,8 @@ bool Vision3DWorker::setPointCloudSource(
 }
 
 
+
+
 void Vision3DWorker::clearPointCloudSource(
     std::size_t camera)
 {
@@ -100,6 +102,84 @@ bool Vision3DWorker::hasPointCloudSource(
         pointCloudSources[camera] != nullptr;
 }
 
+PointCloudSource::CameraOrientation
+Vision3DWorker::getCameraOrientation(
+    std::size_t camera) const
+{
+    if (camera >= CAMERA_COUNT)
+    {
+        return
+            PointCloudSource::CameraOrientation {};
+    }
+
+    return
+        cameraOrientations[camera];
+}
+
+bool Vision3DWorker::getCameraMountingOffset(
+    std::size_t camera,
+    float& rollOffsetDeg,
+    float& pitchOffsetDeg) const
+{
+    rollOffsetDeg = 0.0f;
+    pitchOffsetDeg = 0.0f;
+
+
+    if (camera >= CAMERA_COUNT)
+    {
+        return false;
+    }
+
+
+    if (state == nullptr)
+    {
+        return false;
+    }
+
+
+    PointCloudSource::CameraOrientation
+        cameraOrientation =
+            cameraOrientations[camera];
+
+
+    if (!cameraOrientation.valid)
+    {
+        return false;
+    }
+
+
+    HagieState::ImuState imu =
+        state->getImuState();
+
+
+    if (!imu.valid)
+    {
+        return false;
+    }
+
+
+    /*
+     * Diferencia entre la orientación
+     * propia de la cámara y la orientación
+     * general de la máquina.
+     *
+     * Por ahora SOLO diagnóstico.
+     *
+     * No modifica automáticamente
+     * roll_offset_deg ni pitch_offset_deg.
+     */
+    rollOffsetDeg =
+        cameraOrientation.roll_deg
+        - imu.roll_deg;
+
+
+    pitchOffsetDeg =
+        cameraOrientation.pitch_deg
+        - imu.pitch_deg;
+
+
+    return true;
+}
 
 // ============================================================
 // CONTROL
@@ -145,6 +225,7 @@ bool Vision3DWorker::start()
 
             break;
         }
+
     }
 
 
@@ -381,6 +462,38 @@ void Vision3DWorker::workerLoop()
                 continue;
             }
 
+            /*
+            * ====================================================
+            * LEER IMU PROPIA DE LA CÁMARA
+            * ====================================================
+            *
+            * Si la cámara dispone de IMU integrada,
+            * guardar su orientación.
+            *
+            * Esta orientación NO reemplaza la IMU
+            * general de la Hagie.
+            *
+            * Se utilizará posteriormente para
+            * calibración y diagnóstico del montaje.
+            */
+            PointCloudSource::CameraOrientation
+                cameraOrientation;
+
+
+            if (pointCloudSources[camera]
+                    ->getCameraOrientation(
+                        cameraOrientation
+                    ))
+            {
+                cameraOrientations[camera] =
+                    cameraOrientation;
+            }
+            else
+            {
+                cameraOrientations[camera] =
+                    PointCloudSource::CameraOrientation {};
+            }
+
 
             if (processCamera(
                     camera,
@@ -391,6 +504,7 @@ void Vision3DWorker::workerLoop()
                     true;
             }
         }
+        
 
 
         /*

@@ -83,6 +83,10 @@ public:
         Vision3DProcessor::PointCloud& cloud
     ) override;
 
+    bool getCameraOrientation(
+        CameraOrientation& orientation
+    ) override;
+
 
     std::size_t getCameraIndex() const override;
 

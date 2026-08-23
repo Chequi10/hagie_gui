@@ -147,6 +147,42 @@ bool ZedGmslPointCloudSource::start()
 #endif
 }
 
+bool ZedGmslPointCloudSource::getCameraOrientation(
+    CameraOrientation& orientation)
+{
+    orientation =
+        CameraOrientation {};
+
+
+#ifdef HAGIE_ENABLE_ZED_SDK
+
+    if (!running.load())
+    {
+        return false;
+    }
+
+    /*
+     * La lectura real de la IMU ZED
+     * se implementará usando el SDK
+     * cuando compilemos en la Jetson
+     * con HAGIE_ENABLE_ZED_SDK.
+     *
+     * Por ahora dejamos la interfaz
+     * correctamente conectada.
+     */
+
+    return false;
+
+#else
+
+    /*
+     * En la ThinkPad no hay ZED SDK
+     * ni hardware real.
+     */
+    return false;
+
+#endif
+}
 
 void ZedGmslPointCloudSource::stop()
 {

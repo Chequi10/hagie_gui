@@ -313,6 +313,12 @@ private:
     QLabel *configVisionCameraStatusLabel =
         nullptr;
 
+    QLabel *configVisionCameraImuLabel =
+        nullptr;
+
+    QLabel *configVisionCameraMountingErrorLabel =
+        nullptr;    
+
     QComboBox *configVisionDetectedSerialCombo =
         nullptr;
 

@@ -83,6 +83,22 @@ public:
         std::unique_ptr<PointCloudSource> source
     );
 
+    /*
+    * ========================================================
+    * ORIENTACIÓN DE CADA CÁMARA
+    * ========================================================
+    *
+    * Lectura opcional de la IMU integrada
+    * de cada cámara.
+    *
+    * No reemplaza la IMU general de la Hagie.
+    * Se usa para calibración y diagnóstico.
+    */
+    std::array<
+        PointCloudSource::CameraOrientation,
+        CAMERA_COUNT
+    > cameraOrientations {};
+
 
     /*
      * Elimina la fuente asociada a una cámara.
@@ -93,12 +109,24 @@ public:
         std::size_t camera
     );
 
+    bool getCameraMountingOffset(
+        std::size_t camera,
+        float& rollOffsetDeg,
+        float& pitchOffsetDeg
+    ) const;
+
+    
 
     /*
      * Indica si existe una fuente instalada
      * para determinada cámara.
      */
     bool hasPointCloudSource(
+        std::size_t camera
+    ) const;
+
+        PointCloudSource::CameraOrientation
+    getCameraOrientation(
         std::size_t camera
     ) const;
 
