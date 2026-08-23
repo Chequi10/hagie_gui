@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <cmath>
 
 #include "core/hagie_state.h"
 #include "vision/vision_3d_processor.h"
@@ -133,6 +134,10 @@ int main()
      * CÁMARAS SINTÉTICAS
      * ========================================================
      */
+    SyntheticPointCloudSource *camera0Source =
+        nullptr;
+
+
     for (std::size_t camera = 0;
          camera < Vision3DProcessor::CAMERA_COUNT;
          ++camera)
@@ -145,6 +150,25 @@ int main()
             );
 
 
+        /*
+         * Cámara 0 con IMU simulada.
+         *
+         * Roll  = +3.5°
+         * Pitch = -0.2°
+         */
+        if (camera == 0)
+        {
+            camera0Source =
+                source.get();
+
+            camera0Source
+                ->setSimulatedOrientation(
+                    3.5f,
+                    -0.2f
+                );
+        }
+
+
         if (!worker.setPointCloudSource(
                 camera,
                 std::move(source)
@@ -155,12 +179,51 @@ int main()
                 << camera
                 << std::endl;
 
-
             heightSource.stop();
 
             return 1;
         }
     }
+
+
+    /*
+     * ========================================================
+     * IMU GENERAL SIMULADA DE LA HAGIE
+     * ========================================================
+     *
+     * Roll  = +2.0°
+     * Pitch = -1.0°
+     *
+     * Con la cámara 0:
+     *
+     * Error Roll:
+     * 3.5 - 2.0 = +1.5°
+     *
+     * Error Pitch:
+     * -0.2 - (-1.0) = +0.8°
+     */
+        /*
+     * ========================================================
+     * IMU GENERAL NEUTRA PARA TEST DE ALTURAS
+     * ========================================================
+     *
+     * No queremos que la corrección de inclinación
+     * modifique las alturas sintéticas originales.
+     */
+    HagieState::ImuState imuState;
+
+    imuState.valid =
+        true;
+
+    imuState.roll_deg =
+        0.0f;
+
+    imuState.pitch_deg =
+        0.0f;
+
+    state.setImuState(
+        imuState
+    );
 
 
     /*
@@ -173,7 +236,6 @@ int main()
         std::cerr
             << "ERROR: no se pudo iniciar Vision3DWorker"
             << std::endl;
-
 
         heightSource.stop();
 
@@ -191,15 +253,141 @@ int main()
     );
 
 
+    bool testOk =
+        true;
+
+
+    /*
+     * ========================================================
+     * TEST 14 - ERROR DE MONTAJE POR IMU
+     * ========================================================
+    /*
+     * Para este test solamente cambiamos la IMU
+     * general de la Hagie.
+     *
+     * La cámara 0 ya está simulando:
+     *
+     * Roll  = +3.5°
+     * Pitch = -0.2°
+     */
+    HagieState::ImuState mountingTestImu;
+
+    mountingTestImu.valid =
+        true;
+
+    mountingTestImu.roll_deg =
+        2.0f;
+
+    mountingTestImu.pitch_deg =
+        -1.0f;
+
+    state.setImuState(
+        mountingTestImu
+    );   
+
+
+    std::cout
+        << std::endl
+        << "========================================"
+        << std::endl
+        << "TEST 14 - ERROR DE MONTAJE POR IMU"
+        << std::endl
+        << "========================================"
+        << std::endl;
+
+
+    float rollOffsetDeg =
+        0.0f;
+
+    float pitchOffsetDeg =
+        0.0f;
+
+
+    bool mountingOffsetValid =
+        worker.getCameraMountingOffset(
+            0,
+            rollOffsetDeg,
+            pitchOffsetDeg
+        );
+
+
+    std::cout
+        << "IMU Hagie: "
+        << "Roll=2.00 deg "
+        << "Pitch=-1.00 deg"
+        << std::endl;
+
+
+    std::cout
+        << "IMU Camara 1: "
+        << "Roll=3.50 deg "
+        << "Pitch=-0.20 deg"
+        << std::endl;
+
+
+    if (!mountingOffsetValid)
+    {
+        std::cout
+            << "Resultado: NO VALIDO"
+            << std::endl;
+
+        testOk =
+            false;
+    }
+    else
+    {
+        std::cout
+            << "Error montaje: "
+            << "Roll="
+            << rollOffsetDeg
+            << " deg "
+            << "Pitch="
+            << pitchOffsetDeg
+            << " deg"
+            << std::endl;
+
+
+        constexpr float TOLERANCE_DEG =
+            0.01f;
+
+
+        if (
+            std::fabs(
+                rollOffsetDeg - 1.5f
+            ) > TOLERANCE_DEG
+            ||
+            std::fabs(
+                pitchOffsetDeg - 0.8f
+            ) > TOLERANCE_DEG
+        )
+        {
+            std::cout
+                << "TEST 14 FALLIDO"
+                << std::endl;
+
+            testOk =
+                false;
+        }
+        else
+        {
+            std::cout
+                << "TEST 14 OK"
+                << std::endl;
+        }
+    }
+
+    /*
+     * Restaurar IMU neutra para no contaminar
+     * el resto de la prueba.
+     */
+    state.setImuState(
+        imuState
+    );
     /*
      * ========================================================
      * LEER RESULTADO DESDE HAGIESTATE
      * ========================================================
      */
-    bool testOk =
-        true;
-
-
     for (std::size_t body = 0;
          body < HagieState::BODY_COUNT;
          ++body)
@@ -245,7 +433,7 @@ int main()
 
     /*
      * ========================================================
-     * RESULTADO
+     * RESULTADO FINAL
      * ========================================================
      */
     if (!testOk)

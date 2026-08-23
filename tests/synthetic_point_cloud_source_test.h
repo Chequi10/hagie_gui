@@ -31,12 +31,26 @@ public:
 
     std::size_t getCameraIndex() const override;
 
+    bool getCameraOrientation(
+        CameraOrientation& orientation
+    ) override;
+
+    void setSimulatedOrientation(
+        float rollDeg,
+        float pitchDeg
+    );
+
 
 private:
 
     std::size_t cameraIndex;
 
     std::atomic<bool> running;
+
+    float simulatedRollDeg = 0.0f;
+    float simulatedPitchDeg = 0.0f;
+
+    
 };
 
 

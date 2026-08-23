@@ -35,6 +35,41 @@ SyntheticPointCloudSource::getCameraIndex() const
     return cameraIndex;
 }
 
+void SyntheticPointCloudSource::setSimulatedOrientation(
+    float rollDeg,
+    float pitchDeg)
+{
+    simulatedRollDeg =
+        rollDeg;
+
+    simulatedPitchDeg =
+        pitchDeg;
+}
+
+
+bool SyntheticPointCloudSource::getCameraOrientation(
+    CameraOrientation& orientation)
+{
+    if (!running)
+    {
+        orientation =
+            CameraOrientation {};
+
+        return false;
+    }
+
+    orientation.roll_deg =
+        simulatedRollDeg;
+
+    orientation.pitch_deg =
+        simulatedPitchDeg;
+
+    orientation.valid =
+        true;
+
+    return true;
+}
+
 
 bool SyntheticPointCloudSource::getPointCloud(
     Vision3DProcessor::PointCloud& cloud)
