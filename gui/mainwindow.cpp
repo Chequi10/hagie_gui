@@ -3305,7 +3305,33 @@ QWidget *MainWindow::createConfigurationPage()
                         >(
                             camera
                         );
-
+                     /*
+                    * Orientación IMU simulada para comprobar
+                    * el diagnóstico en tiempo real de la GUI.
+                    */
+                    if (camera == 0)
+                    {
+                        source->setSimulatedOrientation(
+                            3.5f,
+                            -0.2f
+                        );
+                    }
+                    else if (camera == 1)
+                    {
+                        source->setSimulatedOrientation(
+                            1.0f,
+                            0.5f
+                        );
+                    }
+                    else if (camera == 2)
+                    {
+                        source->setSimulatedOrientation(
+                            -1.2f,
+                            0.3f
+                        );
+                    }       
+                                        
+                        
 
                     if (!vision3DWorker->setPointCloudSource(
                             camera,
