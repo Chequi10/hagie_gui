@@ -395,6 +395,47 @@ private:
         HagieState::BODY_COUNT
     > configVisionOffsetSpin {};
 
+    std::array<
+    QDoubleSpinBox *,
+    HagieState::BODY_COUNT
+    > configVisionRegionMinX {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMaxX {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMinY {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMaxY {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMinZ {};
+
+
+    std::array<
+        QDoubleSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMaxZ {};
+
+
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configVisionRegionMinPoints {};
+
 
     std::array<
         QComboBox *,
@@ -522,6 +563,8 @@ private:
     void saveConfiguration();
 
     void loadConfiguration();
+
+    void applyVisionBodyRegions();
 
     void syncConfigurationToWorker();
     /*

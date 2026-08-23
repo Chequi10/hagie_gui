@@ -4395,6 +4395,305 @@ QWidget *MainWindow::createConfigurationPage()
             configVisionOffsetSpin[body]
         );
 
+         /*
+         * ====================================================
+         * REGIÓN DE VISIÓN 3D
+         * ====================================================
+         */
+
+        QLabel *visionRegionTitle =
+            new QLabel(
+                "Región visión 3D"
+            );
+
+        visionRegionTitle->setStyleSheet(
+            "font-weight: bold;"
+        );
+
+
+        /*
+         * X mínimo.
+         */
+        QLabel *visionMinXLabel =
+            new QLabel(
+                "X mínimo (m)"
+            );
+
+        configVisionRegionMinX[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMinX[body]
+            ->setDecimals(2);
+
+        configVisionRegionMinX[body]
+            ->setRange(
+                -20.0,
+                20.0
+            );
+
+        configVisionRegionMinX[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * X máximo.
+         */
+        QLabel *visionMaxXLabel =
+            new QLabel(
+                "X máximo (m)"
+            );
+
+        configVisionRegionMaxX[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMaxX[body]
+            ->setDecimals(2);
+
+        configVisionRegionMaxX[body]
+            ->setRange(
+                -20.0,
+                20.0
+            );
+
+        configVisionRegionMaxX[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * Y mínimo.
+         */
+        QLabel *visionMinYLabel =
+            new QLabel(
+                "Y mínimo (m)"
+            );
+
+        configVisionRegionMinY[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMinY[body]
+            ->setDecimals(2);
+
+        configVisionRegionMinY[body]
+            ->setRange(
+                -50.0,
+                50.0
+            );
+
+        configVisionRegionMinY[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * Y máximo.
+         */
+        QLabel *visionMaxYLabel =
+            new QLabel(
+                "Y máximo (m)"
+            );
+
+        configVisionRegionMaxY[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMaxY[body]
+            ->setDecimals(2);
+
+        configVisionRegionMaxY[body]
+            ->setRange(
+                -50.0,
+                50.0
+            );
+
+        configVisionRegionMaxY[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * Z mínimo.
+         */
+        QLabel *visionMinZLabel =
+            new QLabel(
+                "Z mínimo (m)"
+            );
+
+        configVisionRegionMinZ[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMinZ[body]
+            ->setDecimals(2);
+
+        configVisionRegionMinZ[body]
+            ->setRange(
+                -5.0,
+                20.0
+            );
+
+        configVisionRegionMinZ[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * Z máximo.
+         */
+        QLabel *visionMaxZLabel =
+            new QLabel(
+                "Z máximo (m)"
+            );
+
+        configVisionRegionMaxZ[body] =
+            new QDoubleSpinBox();
+
+        configVisionRegionMaxZ[body]
+            ->setDecimals(2);
+
+        configVisionRegionMaxZ[body]
+            ->setRange(
+                -5.0,
+                20.0
+            );
+
+        configVisionRegionMaxZ[body]
+            ->setSingleStep(
+                0.10
+            );
+
+
+        /*
+         * Cantidad mínima de puntos.
+         */
+        QLabel *visionMinPointsLabel =
+            new QLabel(
+                "Puntos mínimos"
+            );
+
+        configVisionRegionMinPoints[body] =
+            new QSpinBox();
+
+        configVisionRegionMinPoints[body]
+            ->setRange(
+                1,
+                100000
+            );
+
+
+        /*
+         * Valores por defecto.
+         *
+         * Coinciden con Vision3DProcessor.
+         */
+        const double defaultMinX =
+            -3.0 +
+            static_cast<double>(body);
+
+        const double defaultMaxX =
+            -2.0 +
+            static_cast<double>(body);
+
+
+        configVisionRegionMinX[body]
+            ->setValue(
+                defaultMinX
+            );
+
+        configVisionRegionMaxX[body]
+            ->setValue(
+                defaultMaxX
+            );
+
+        configVisionRegionMinY[body]
+            ->setValue(
+                -10.0
+            );
+
+        configVisionRegionMaxY[body]
+            ->setValue(
+                10.0
+            );
+
+        configVisionRegionMinZ[body]
+            ->setValue(
+                0.0
+            );
+
+        configVisionRegionMaxZ[body]
+            ->setValue(
+                5.0
+            );
+
+        configVisionRegionMinPoints[body]
+            ->setValue(
+                1
+            );
+
+
+        bodyLayout->addWidget(
+            visionRegionTitle
+        );
+
+        bodyLayout->addWidget(
+            visionMinXLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMinX[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMaxXLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMaxX[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMinYLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMinY[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMaxYLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMaxY[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMinZLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMinZ[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMaxZLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMaxZ[body]
+        );
+
+        bodyLayout->addWidget(
+            visionMinPointsLabel
+        );
+
+        bodyLayout->addWidget(
+            configVisionRegionMinPoints[body]
+        );
 
         bodyGrid->addWidget(
             frame,
@@ -5225,6 +5524,62 @@ void MainWindow::loadVisionCameraIntoWidgets(
     );
 }
 
+void MainWindow::applyVisionBodyRegions()
+{
+    if (vision3DProcessor == nullptr)
+    {
+        return;
+    }
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        Vision3DProcessor::BodyRegion region;
+
+        region.min_x =
+            static_cast<float>(
+                configVisionRegionMinX[body]->value()
+            );
+
+        region.max_x =
+            static_cast<float>(
+                configVisionRegionMaxX[body]->value()
+            );
+
+        region.min_y =
+            static_cast<float>(
+                configVisionRegionMinY[body]->value()
+            );
+
+        region.max_y =
+            static_cast<float>(
+                configVisionRegionMaxY[body]->value()
+            );
+
+        region.min_z =
+            static_cast<float>(
+                configVisionRegionMinZ[body]->value()
+            );
+
+        region.max_z =
+            static_cast<float>(
+                configVisionRegionMaxZ[body]->value()
+            );
+
+        region.min_points =
+            static_cast<std::size_t>(
+                configVisionRegionMinPoints[body]->value()
+            );
+
+        vision3DProcessor->setBodyRegion(
+            body,
+            region
+        );
+    }
+}
+
+
 void MainWindow::saveConfiguration()
 {
     QSettings settings(
@@ -5276,7 +5631,40 @@ void MainWindow::saveConfiguration()
                 ->value()
         );
 
-        
+                settings.setValue(
+            "vision_region_min_x",
+            configVisionRegionMinX[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_max_x",
+            configVisionRegionMaxX[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_min_y",
+            configVisionRegionMinY[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_max_y",
+            configVisionRegionMaxY[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_min_z",
+            configVisionRegionMinZ[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_max_z",
+            configVisionRegionMaxZ[body]->value()
+        );
+
+        settings.setValue(
+            "vision_region_min_points",
+            configVisionRegionMinPoints[body]->value()
+        );
 
         settings.endGroup();
     }
@@ -5479,6 +5867,7 @@ void MainWindow::saveConfiguration()
             
         }
     }
+    applyVisionBodyRegions();
     settings.sync();
 }
 
@@ -5539,6 +5928,64 @@ void MainWindow::loadConfiguration()
                 ).toInt()
             );
 
+                const double defaultMinX =
+            -3.0 +
+            static_cast<double>(body);
+
+        const double defaultMaxX =
+            -2.0 +
+            static_cast<double>(body);
+
+
+        configVisionRegionMinX[body]->setValue(
+            settings.value(
+                "vision_region_min_x",
+                defaultMinX
+            ).toDouble()
+        );
+
+        configVisionRegionMaxX[body]->setValue(
+            settings.value(
+                "vision_region_max_x",
+                defaultMaxX
+            ).toDouble()
+        );
+
+        configVisionRegionMinY[body]->setValue(
+            settings.value(
+                "vision_region_min_y",
+                -10.0
+            ).toDouble()
+        );
+
+        configVisionRegionMaxY[body]->setValue(
+            settings.value(
+                "vision_region_max_y",
+                10.0
+            ).toDouble()
+        );
+
+        configVisionRegionMinZ[body]->setValue(
+            settings.value(
+                "vision_region_min_z",
+                0.0
+            ).toDouble()
+        );
+
+        configVisionRegionMaxZ[body]->setValue(
+            settings.value(
+                "vision_region_max_z",
+                5.0
+            ).toDouble()
+        );
+
+        configVisionRegionMinPoints[body]->setValue(
+            settings.value(
+                "vision_region_min_points",
+                1
+            ).toInt()
+        );    
+
         int index =
             configEncoderDirectionCombo[body]
                 ->findData(direction);
@@ -5553,6 +6000,8 @@ void MainWindow::loadConfiguration()
 
         settings.endGroup();
     }
+
+    applyVisionBodyRegions();
 
 
     /*
