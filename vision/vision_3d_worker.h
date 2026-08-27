@@ -63,6 +63,17 @@ public:
     ) = delete;
 
 
+    void setMachineOrientationOverride(
+        float rollDeg,
+        float pitchDeg
+    );
+
+    void clearMachineOrientationOverride();
+
+    PointCloudSource::CameraOrientation
+    getMachineOrientation() const;
+
+
     // ========================================================
     // FUENTES DE NUBE DE PUNTOS
     // ========================================================
@@ -151,6 +162,8 @@ private:
      */
     void workerLoop();
 
+    
+
 
     /*
      * ========================================================
@@ -197,6 +210,15 @@ private:
     std::atomic<bool> running {false};
 
     std::thread workerThread;
+
+    std::atomic<bool>
+        machineOrientationOverrideEnabled {false};
+
+    std::atomic<float>
+        machineOrientationOverrideRollDeg {0.0f};
+
+    std::atomic<float>
+        machineOrientationOverridePitchDeg {0.0f};
 
 
     /*

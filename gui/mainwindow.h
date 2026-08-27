@@ -313,6 +313,9 @@ private:
     QLabel *configVisionCameraStatusLabel =
         nullptr;
 
+    QLabel *configHagieImuLabel =
+        nullptr;
+
     QLabel *configVisionCameraImuLabel =
         nullptr;
 

@@ -85,7 +85,21 @@ void Vision3DWorker::clearPointCloudSource(
     }
 
 
+    /*
+     * Eliminar la fuente asociada.
+     */
     pointCloudSources[camera].reset();
+
+
+    /*
+     * Invalidar también cualquier orientación
+     * que haya quedado almacenada de la fuente anterior.
+     *
+     * Esto evita, por ejemplo, mostrar datos de una
+     * IMU simulada después de cambiar a cámara real.
+     */
+    cameraOrientations[camera] =
+        PointCloudSource::CameraOrientation {};
 }
 
 
@@ -112,6 +126,19 @@ Vision3DWorker::getCameraOrientation(
             PointCloudSource::CameraOrientation {};
     }
 
+
+    /*
+     * Si el worker está detenido,
+     * no consideramos válida ninguna
+     * orientación de cámara almacenada.
+     */
+    if (!running.load())
+    {
+        return
+            PointCloudSource::CameraOrientation {};
+    }
+
+
     return
         cameraOrientations[camera];
 }
@@ -126,6 +153,11 @@ bool Vision3DWorker::getCameraMountingOffset(
 
 
     if (camera >= CAMERA_COUNT)
+    {
+        return false;
+    }
+
+    if (!running.load())
     {
         return false;
     }
@@ -148,11 +180,12 @@ bool Vision3DWorker::getCameraMountingOffset(
     }
 
 
-    HagieState::ImuState imu =
-        state->getImuState();
+    PointCloudSource::CameraOrientation
+        machineOrientation =
+            getMachineOrientation();
 
 
-    if (!imu.valid)
+    if (!machineOrientation.valid)
     {
         return false;
     }
@@ -170,15 +203,96 @@ bool Vision3DWorker::getCameraMountingOffset(
      */
     rollOffsetDeg =
         cameraOrientation.roll_deg
-        - imu.roll_deg;
+        - machineOrientation.roll_deg;
 
 
     pitchOffsetDeg =
         cameraOrientation.pitch_deg
-        - imu.pitch_deg;
+        - machineOrientation.pitch_deg;
 
 
     return true;
+}
+
+
+void Vision3DWorker::setMachineOrientationOverride(
+    float rollDeg,
+    float pitchDeg)
+{
+    machineOrientationOverrideRollDeg.store(
+        rollDeg
+    );
+
+    machineOrientationOverridePitchDeg.store(
+        pitchDeg
+    );
+
+    machineOrientationOverrideEnabled.store(
+        true
+    );
+}
+
+
+void Vision3DWorker::clearMachineOrientationOverride()
+{
+    machineOrientationOverrideEnabled.store(
+        false
+    );
+}
+
+
+PointCloudSource::CameraOrientation
+Vision3DWorker::getMachineOrientation() const
+{
+    PointCloudSource::CameraOrientation orientation;
+
+
+    /*
+     * ========================================================
+     * ORIENTACIÓN SIMULADA / OVERRIDE
+     * ========================================================
+     */
+    if (machineOrientationOverrideEnabled.load())
+    {
+        orientation.valid =
+            true;
+
+        orientation.roll_deg =
+            machineOrientationOverrideRollDeg.load();
+
+        orientation.pitch_deg =
+            machineOrientationOverridePitchDeg.load();
+
+        return orientation;
+    }
+
+
+    /*
+     * ========================================================
+     * ORIENTACIÓN REAL DE LA HAGIE
+     * ========================================================
+     */
+    if (state == nullptr)
+    {
+        return orientation;
+    }
+
+
+    HagieState::ImuState imu =
+        state->getImuState();
+
+
+    orientation.valid =
+        imu.valid;
+
+    orientation.roll_deg =
+        imu.roll_deg;
+
+    orientation.pitch_deg =
+        imu.pitch_deg;
+
+
+    return orientation;
 }
 
 // ============================================================
@@ -406,23 +520,24 @@ void Vision3DWorker::workerLoop()
         if (state != nullptr &&
             processor != nullptr)
         {
-            HagieState::ImuState imu =
-                state->getImuState();
+            PointCloudSource::CameraOrientation
+                machineOrientation =
+                    getMachineOrientation();
 
 
             Vision3DProcessor::Orientation orientation;
 
 
             orientation.valid =
-                imu.valid;
+                machineOrientation.valid;
 
 
             orientation.roll_deg =
-                imu.roll_deg;
+                machineOrientation.roll_deg;
 
 
             orientation.pitch_deg =
-                imu.pitch_deg;
+                machineOrientation.pitch_deg;
 
 
             processor->setOrientation(

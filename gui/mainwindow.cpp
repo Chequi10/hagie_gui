@@ -3236,7 +3236,14 @@ QWidget *MainWindow::createConfigurationPage()
             */
             if (index == 0)
             {
-                /*
+
+            if (vision3DWorker != nullptr)
+            {
+                vision3DWorker->clearMachineOrientationOverride();
+            }
+            
+       
+                        /*
                 * Detener el worker de nubes.
                 */
                 if (vision3DWorker != nullptr)
@@ -3273,6 +3280,16 @@ QWidget *MainWindow::createConfigurationPage()
                 visionHeightSource->setSourceMode(
                     VisionHeightSource::SourceMode::EXTERNAL
                 );
+
+                if (vision3DWorker != nullptr)
+                {
+                    vision3DWorker->setMachineOrientationOverride(
+                        2.0f,
+                        -1.0f
+                    );
+                }
+
+                
 
 
                 if (vision3DWorker == nullptr)
@@ -3375,6 +3392,15 @@ QWidget *MainWindow::createConfigurationPage()
             */
             if (index == 2)
             {
+                /*
+                * Invalidar cualquier IMU Hagie simulada
+                * al entrar en modo de cámaras reales.
+                */
+
+                if (vision3DWorker != nullptr)
+                {
+                    vision3DWorker->clearMachineOrientationOverride();
+                }
                 
                 /*
                 * Actualizar el cache de cámaras ZED
@@ -3759,6 +3785,11 @@ QWidget *MainWindow::createConfigurationPage()
             "Estado ZED: NO DETECTADA"
         );
 
+    configHagieImuLabel =
+        new QLabel(
+            "IMU Hagie: NO DISPONIBLE"
+        );
+
     configVisionCameraImuLabel =
         new QLabel(
             "IMU cámara: NO DISPONIBLE"
@@ -3768,6 +3799,10 @@ QWidget *MainWindow::createConfigurationPage()
         new QLabel(
             "Error montaje: NO DISPONIBLE"
         );
+
+    configHagieImuLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
 
     configVisionCameraImuLabel->setStyleSheet(
         "font-weight: bold;"
@@ -3794,6 +3829,11 @@ QWidget *MainWindow::createConfigurationPage()
         configVisionCameraStatusLabel
     );
 
+   
+    visionCameraMainLayout->addWidget(
+        configHagieImuLabel
+    );
+
     visionCameraMainLayout->addWidget(
         configVisionCameraImuLabel
     );
@@ -3802,6 +3842,7 @@ QWidget *MainWindow::createConfigurationPage()
         configVisionCameraMountingErrorLabel
     );
 
+   
     visionCameraMainLayout->addWidget(
         configVisionDetectButton
     );
@@ -5137,6 +5178,52 @@ void MainWindow::updateDashboard()
     updateSystemStatus();
     updateFaultPage();
     updateTestPage();
+
+    /*
+    * ========================================================
+    * IMU GENERAL HAGIE EN TIEMPO REAL
+    * ========================================================
+    */
+    if (configHagieImuLabel != nullptr)
+{
+    PointCloudSource::CameraOrientation
+        machineOrientation;
+
+
+    if (vision3DWorker != nullptr)
+    {
+        machineOrientation =
+            vision3DWorker->getMachineOrientation();
+    }
+
+
+    if (machineOrientation.valid)
+    {
+        configHagieImuLabel->setText(
+            QString(
+                "IMU Hagie: Roll %1° | Pitch %2°"
+            )
+                .arg(
+                    machineOrientation.roll_deg,
+                    0,
+                    'f',
+                    2
+                )
+                .arg(
+                    machineOrientation.pitch_deg,
+                    0,
+                    'f',
+                    2
+                )
+        );
+    }
+    else
+    {
+        configHagieImuLabel->setText(
+            "IMU Hagie: NO DISPONIBLE"
+        );
+    }
+}
 
     /*
      * ========================================================
