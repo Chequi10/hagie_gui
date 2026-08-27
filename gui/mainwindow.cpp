@@ -3146,30 +3146,249 @@ bool MainWindow::isBodyCoveredByActiveCamera(
 QWidget *MainWindow::createConfigurationPage()
 {
     QWidget *page =
-        new QWidget();
+    new QWidget();
 
     QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
 
-    QLabel *title =
-        new QLabel(
-            "CONFIGURACIÓN DE CUERPOS"
+    /*
+    * ========================================================
+    * NAVEGACIÓN DE CONFIGURACIÓN
+    * ========================================================
+    */
+    QHBoxLayout *configurationContentLayout =
+        new QHBoxLayout();
+
+
+    /*
+    * Menú lateral.
+    */
+    QFrame *configurationMenuFrame =
+        new QFrame();
+
+    configurationMenuFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    configurationMenuFrame->setMaximumWidth(
+        220
+    );
+
+    QVBoxLayout *configurationMenuLayout =
+        new QVBoxLayout(
+            configurationMenuFrame
         );
 
-    title->setAlignment(
-        Qt::AlignCenter
+
+    /*
+    * Páginas internas.
+    */
+    QStackedWidget *configurationStack =
+        new QStackedWidget();
+
+
+    QWidget *generalPage =
+        new QWidget();
+
+    QVBoxLayout *generalPageLayout =
+        new QVBoxLayout(
+            generalPage
+        );
+
+
+    QWidget *bodiesPage =
+        new QWidget();
+
+    QVBoxLayout *bodiesPageLayout =
+        new QVBoxLayout(
+            bodiesPage
+        );
+
+
+    QWidget *camerasPage =
+        new QWidget();
+
+    QVBoxLayout *camerasPageLayout =
+        new QVBoxLayout(
+            camerasPage
+        );
+
+
+    QWidget *regionsPage =
+        new QWidget();
+
+    QVBoxLayout *regionsPageLayout =
+        new QVBoxLayout(
+            regionsPage
+        );
+
+            
+
+
+    QWidget *controlPage =
+        new QWidget();
+
+    QVBoxLayout *controlPageLayout =
+        new QVBoxLayout(
+            controlPage
+        );
+
+
+    configurationStack->addWidget(
+        generalPage
     );
 
-    title->setStyleSheet(
-        "font-size: 22px;"
-        "font-weight: bold;"
+    configurationStack->addWidget(
+        bodiesPage
     );
 
-    mainLayout->addWidget(title);
+    configurationStack->addWidget(
+        camerasPage
+    );
 
+    configurationStack->addWidget(
+        regionsPage
+    );
+
+    configurationStack->addWidget(
+        controlPage
+    );
+
+    QPushButton *generalButton =
+    new QPushButton(
+        "GENERAL"
+    );
+
+    QPushButton *bodiesButton =
+        new QPushButton(
+            "CUERPOS / ENCODERS"
+        );
+
+    QPushButton *camerasButton =
+        new QPushButton(
+            "CÁMARAS 3D"
+        );
+
+    QPushButton *regionsButton =
+        new QPushButton(
+            "REGIONES 3D"
+        );
+
+    QPushButton *controlButton =
+        new QPushButton(
+            "CONTROL / SEGURIDAD"
+        );
+
+
+    generalButton->setMinimumHeight(50);
+    bodiesButton->setMinimumHeight(50);
+    camerasButton->setMinimumHeight(50);
+    regionsButton->setMinimumHeight(50);
+    controlButton->setMinimumHeight(50);
+
+
+    configurationMenuLayout->addWidget(
+        generalButton
+    );
+
+    configurationMenuLayout->addWidget(
+        bodiesButton
+    );
+
+    configurationMenuLayout->addWidget(
+        camerasButton
+    );
+
+    configurationMenuLayout->addWidget(
+        regionsButton
+    );
+
+    configurationMenuLayout->addWidget(
+        controlButton
+    );
+
+    configurationMenuLayout->addStretch();
+
+    connect(
+        generalButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                0
+            );
+        }
+    );
+
+    connect(
+        bodiesButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                1
+            );
+        }
+    );
+
+    connect(
+        camerasButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                2
+            );
+        }
+    );
+
+    connect(
+        regionsButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                3
+            );
+        }
+    );
+
+    connect(
+        controlButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                4
+            );
+        }
+    );
+
+
+    configurationContentLayout->addWidget(
+        configurationMenuFrame
+    );
+
+    configurationContentLayout->addWidget(
+        configurationStack,
+        1
+    );
 
     
+    mainLayout->addLayout(
+        configurationContentLayout,
+        1
+    );
+
+
+
+        
    
 
     /*
@@ -3602,9 +3821,11 @@ QWidget *MainWindow::createConfigurationPage()
 
     visionSourceLayout->addStretch();
 
-    mainLayout->addWidget(
+    generalPageLayout->addWidget(
         visionSourceFrame
     );
+
+    generalPageLayout->addStretch();
 
     /*
     * ========================================================
@@ -4281,18 +4502,28 @@ QWidget *MainWindow::createConfigurationPage()
     /*
     * Agregar panel completo a Configuración.
     */
-    mainLayout->addWidget(
+    camerasPageLayout->addWidget(
         visionCameraFrame
     );
+
+    camerasPageLayout->addStretch();
 
     QGridLayout *bodyGrid =
         new QGridLayout();
 
+    QGridLayout *regionGrid =
+        new QGridLayout();
+
 
     for (std::size_t body = 0;
-         body < HagieState::BODY_COUNT;
-         ++body)
+        body < HagieState::BODY_COUNT;
+        ++body)
     {
+        /*
+        * ====================================================
+        * PANEL CUERPO / ENCODER
+        * ====================================================
+        */
         QFrame *frame =
             new QFrame();
 
@@ -4301,7 +4532,9 @@ QWidget *MainWindow::createConfigurationPage()
         );
 
         QVBoxLayout *bodyLayout =
-            new QVBoxLayout(frame);
+            new QVBoxLayout(
+                frame
+            );
 
 
         QLabel *bodyTitle =
@@ -4325,8 +4558,46 @@ QWidget *MainWindow::createConfigurationPage()
 
 
         /*
-         * Altura mínima.
-         */
+        * ====================================================
+        * PANEL REGIÓN VISIÓN 3D
+        * ====================================================
+        */
+        QFrame *regionFrame =
+            new QFrame();
+
+        regionFrame->setFrameShape(
+            QFrame::StyledPanel
+        );
+
+        QVBoxLayout *regionLayout =
+            new QVBoxLayout(
+                regionFrame
+            );
+
+
+        QLabel *regionBodyTitle =
+            new QLabel(
+                QString("CUERPO %1")
+                    .arg(body + 1)
+            );
+
+        regionBodyTitle->setAlignment(
+            Qt::AlignCenter
+        );
+
+        regionBodyTitle->setStyleSheet(
+            "font-size: 16px;"
+            "font-weight: bold;"
+        );
+
+        regionLayout->addWidget(
+            regionBodyTitle
+        );
+
+
+        /*
+        * Altura mínima.
+        */
         QLabel *minLabel =
             new QLabel(
                 "Altura mínima (mm)"
@@ -4490,7 +4761,7 @@ QWidget *MainWindow::createConfigurationPage()
             configVisionOffsetSpin[body]
         );
 
-         /*
+                 /*
          * ====================================================
          * REGIÓN DE VISIÓN 3D
          * ====================================================
@@ -4730,77 +5001,99 @@ QWidget *MainWindow::createConfigurationPage()
             );
 
 
-        bodyLayout->addWidget(
+        /*
+         * Agregar controles al panel REGIONES 3D.
+         */
+        regionLayout->addWidget(
             visionRegionTitle
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMinXLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMinX[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMaxXLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMaxX[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMinYLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMinY[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMaxYLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMaxY[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMinZLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMinZ[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMaxZLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMaxZ[body]
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             visionMinPointsLabel
         );
 
-        bodyLayout->addWidget(
+        regionLayout->addWidget(
             configVisionRegionMinPoints[body]
         );
 
+
+        /*
+         * Agregar cada panel a su grid correspondiente.
+         */
         bodyGrid->addWidget(
             frame,
+            body / 3,
+            body % 3
+        );
+
+        regionGrid->addWidget(
+            regionFrame,
             body / 3,
             body % 3
         );
     }
 
 
-    mainLayout->addLayout(
+    bodiesPageLayout->addLayout(
         bodyGrid
     );
+
+    bodiesPageLayout->addStretch();
+
+
+    regionsPageLayout->addLayout(
+        regionGrid
+    );
+
+    regionsPageLayout->addStretch();
 
 
     /*
@@ -4999,9 +5292,11 @@ QWidget *MainWindow::createConfigurationPage()
     );
 
 
-    mainLayout->addWidget(
+    controlPageLayout->addWidget(
         controlFrame
     );
+
+    controlPageLayout->addStretch();
 
 
     QPushButton *saveButton =
