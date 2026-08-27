@@ -102,20 +102,21 @@ public:
 
         bool ai_running = false;
 
-
-        /*
-         * Estado del módulo de visión.
-         */
         bool vision_running = false;
 
 
         uint32_t system_faults = 0;
 
-
         uint32_t stm32_uptime_ticks = 0;
 
-
         uint8_t axiomatic_modules = 0;
+
+
+        uint32_t axiomatic_rx_dropped = 0;
+
+        uint32_t uart_error_count = 0;
+
+        uint32_t jetson_tx_queue_dropped = 0;
     };
 
 

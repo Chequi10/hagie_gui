@@ -1158,6 +1158,15 @@ void STM32Worker::configureCallbacks()
             system.axiomatic_modules =
                 diagnostic.axiomatic_modules;
 
+            system.axiomatic_rx_dropped =
+                diagnostic.axiomatic_rx_dropped;
+
+            system.uart_error_count =
+                diagnostic.uart_error_count;
+
+            system.jetson_tx_queue_dropped =
+                diagnostic.jetson_tx_queue_dropped;
+
 
             state->setSystemState(
                 system

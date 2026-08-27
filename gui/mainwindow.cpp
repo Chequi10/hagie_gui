@@ -108,6 +108,14 @@ MainWindow::MainWindow(
         createConfigurationPage()
     );
 
+    /*
+    * Página 5
+    * Comunicaciones
+    */
+    centralStack->addWidget(
+        createCommunicationsPage()
+    );
+
 
     setCentralWidget(
         centralStack
@@ -1059,9 +1067,10 @@ void MainWindow::createMenus()
             "Fallas"
         );
 
-    diagnosticMenu->addAction(
-        "Comunicaciones"
-    );
+    QAction *communicationsAction =
+        diagnosticMenu->addAction(
+            "Comunicaciones"
+        );
 
     diagnosticMenu->addAction(
         "Logs"
@@ -1074,6 +1083,18 @@ void MainWindow::createMenus()
         [this]()
         {
             centralStack->setCurrentIndex(2);
+        }
+    );
+
+    connect(
+        communicationsAction,
+        &QAction::triggered,
+        this,
+        [this]()
+        {
+            centralStack->setCurrentIndex(
+                5
+            );
         }
     );
 
@@ -1514,6 +1535,291 @@ QWidget *MainWindow::createFaultsPage()
     );
 
     mainLayout->addStretch();
+
+    return page;
+}
+
+/*
+ * ============================================================
+ * COMUNICACIONES
+ * ============================================================
+ */
+
+QWidget *MainWindow::createCommunicationsPage()
+{
+    QWidget *page =
+        new QWidget();
+
+    QVBoxLayout *mainLayout =
+        new QVBoxLayout(page);
+
+
+    QLabel *title =
+        new QLabel(
+            "DIAGNÓSTICO DE COMUNICACIONES"
+        );
+
+    title->setAlignment(
+        Qt::AlignCenter
+    );
+
+    title->setStyleSheet(
+        "font-size: 22px;"
+        "font-weight: bold;"
+    );
+
+    mainLayout->addWidget(
+        title
+    );
+
+
+   /*
+    * ========================================================
+    * STM32
+    * ========================================================
+    */
+    QFrame *stm32Frame =
+        new QFrame();
+
+    stm32Frame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *stm32Layout =
+        new QVBoxLayout(
+            stm32Frame
+        );
+
+    QLabel *stm32Title =
+        new QLabel(
+            "STM32"
+        );
+
+    stm32Title->setStyleSheet(
+        "font-size: 18px;"
+        "font-weight: bold;"
+    );
+
+    communicationsStm32StatusLabel =
+        new QLabel(
+            "Estado: ---"
+        );
+
+    communicationsStm32UptimeLabel =
+        new QLabel(
+            "Uptime: ---"
+        );
+
+    communicationsUartErrorsLabel =
+        new QLabel(
+            "Errores UART: ---"
+        );
+
+    communicationsTxDroppedLabel =
+        new QLabel(
+            "TX descartados: ---"
+        );
+
+    stm32Layout->addWidget(
+        stm32Title
+    );
+
+    stm32Layout->addWidget(
+        communicationsStm32StatusLabel
+    );
+
+    stm32Layout->addWidget(
+        communicationsStm32UptimeLabel
+    );
+
+    stm32Layout->addWidget(
+        communicationsUartErrorsLabel
+    );
+
+    stm32Layout->addWidget(
+        communicationsTxDroppedLabel
+    );
+
+
+    /*
+    * ========================================================
+    * CAN / AXIOMATIC
+    * ========================================================
+    */
+    QFrame *canFrame =
+        new QFrame();
+
+    canFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *canLayout =
+        new QVBoxLayout(
+            canFrame
+        );
+
+    QLabel *canTitle =
+        new QLabel(
+            "CAN / AXIOMATIC"
+        );
+
+    canTitle->setStyleSheet(
+        "font-size: 18px;"
+        "font-weight: bold;"
+    );
+
+    communicationsCanStatusLabel =
+        new QLabel(
+            "Estado CAN: ---"
+        );
+
+    communicationsAxiomaticModulesLabel =
+        new QLabel(
+            "Módulos detectados: ---"
+        );
+
+    communicationsCanDroppedLabel =
+        new QLabel(
+            "RX descartados: ---"
+        );
+
+    canLayout->addWidget(
+        canTitle
+    );
+
+    canLayout->addWidget(
+        communicationsCanStatusLabel
+    );
+
+    canLayout->addWidget(
+        communicationsAxiomaticModulesLabel
+    );
+
+    canLayout->addWidget(
+        communicationsCanDroppedLabel
+    );
+
+
+    /*
+    * ========================================================
+    * IMU HAGIE
+    * ========================================================
+    */
+    QFrame *imuFrame =
+        new QFrame();
+
+    imuFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *imuLayout =
+        new QVBoxLayout(
+            imuFrame
+        );
+
+    QLabel *imuTitle =
+        new QLabel(
+            "IMU HAGIE"
+        );
+
+    imuTitle->setStyleSheet(
+        "font-size: 18px;"
+        "font-weight: bold;"
+    );
+
+    communicationsImuStatusLabel =
+        new QLabel(
+            "Estado: ---"
+        );
+
+    imuLayout->addWidget(
+        imuTitle
+    );
+
+    imuLayout->addWidget(
+        communicationsImuStatusLabel
+    );
+
+
+    /*
+    * ========================================================
+    * VISIÓN 3D
+    * ========================================================
+    */
+    QFrame *visionFrame =
+        new QFrame();
+
+    visionFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *visionLayout =
+        new QVBoxLayout(
+            visionFrame
+        );
+
+    QLabel *visionTitle =
+        new QLabel(
+            "VISIÓN 3D"
+        );
+
+    visionTitle->setStyleSheet(
+        "font-size: 18px;"
+        "font-weight: bold;"
+    );
+
+    communicationsVisionStatusLabel =
+        new QLabel(
+            "Estado: ---"
+        );
+
+    visionLayout->addWidget(
+        visionTitle
+    );
+
+    visionLayout->addWidget(
+        communicationsVisionStatusLabel
+    );
+
+
+    /*
+    * ========================================================
+    * DISTRIBUCIÓN
+    * ========================================================
+    */
+    QGridLayout *communicationsGrid =
+        new QGridLayout();
+
+    communicationsGrid->addWidget(
+        stm32Frame,
+        0,
+        0
+    );
+
+    communicationsGrid->addWidget(
+        canFrame,
+        0,
+        1
+    );
+
+    communicationsGrid->addWidget(
+        imuFrame,
+        1,
+        0
+    );
+
+    communicationsGrid->addWidget(
+        visionFrame,
+        1,
+        1
+    );
+
+    mainLayout->addLayout(
+        communicationsGrid
+    );
+
+    mainLayout->addStretch();
+
 
     return page;
 }
@@ -5477,6 +5783,115 @@ void MainWindow::updateDashboard()
     updateSystemStatus();
     updateFaultPage();
     updateTestPage();
+
+
+    /*
+    * ========================================================
+    * DIAGNÓSTICO DE COMUNICACIONES EN TIEMPO REAL
+    * ========================================================
+    */
+    HagieState::SystemState system =
+        state->getSystemState();
+
+
+    if (communicationsStm32StatusLabel != nullptr)
+    {
+        communicationsStm32StatusLabel->setText(
+            system.stm32_connected
+                ? "Estado: CONECTADA"
+                : "Estado: DESCONECTADA"
+        );
+    }
+
+
+    if (communicationsStm32UptimeLabel != nullptr)
+    {
+        const uint32_t uptimeSeconds =
+            system.stm32_uptime_ticks / 1000U;
+
+        const uint32_t hours =
+            uptimeSeconds / 3600U;
+
+        const uint32_t minutes =
+            (uptimeSeconds % 3600U) / 60U;
+
+        const uint32_t seconds =
+            uptimeSeconds % 60U;
+
+
+        communicationsStm32UptimeLabel->setText(
+            QString("Uptime: %1 h %2 min %3 s")
+                .arg(hours)
+                .arg(minutes)
+                .arg(seconds)
+        );
+    }
+
+
+    if (communicationsUartErrorsLabel != nullptr)
+    {
+        communicationsUartErrorsLabel->setText(
+            QString("Errores UART: %1")
+                .arg(system.uart_error_count)
+        );
+    }
+
+
+    if (communicationsTxDroppedLabel != nullptr)
+    {
+        communicationsTxDroppedLabel->setText(
+            QString("TX descartados: %1")
+                .arg(system.jetson_tx_queue_dropped)
+        );
+    }
+
+
+    if (communicationsCanStatusLabel != nullptr)
+    {
+        communicationsCanStatusLabel->setText(
+            system.can_ok
+                ? "Estado CAN: OK"
+                : "Estado CAN: FALLA"
+        );
+    }
+
+
+    if (communicationsAxiomaticModulesLabel != nullptr)
+    {
+        communicationsAxiomaticModulesLabel->setText(
+            QString("Módulos detectados: %1")
+                .arg(system.axiomatic_modules)
+        );
+    }
+
+
+    if (communicationsCanDroppedLabel != nullptr)
+    {
+        communicationsCanDroppedLabel->setText(
+            QString("RX descartados: %1")
+                .arg(system.axiomatic_rx_dropped)
+        );
+    }
+
+
+    if (communicationsImuStatusLabel != nullptr)
+    {
+        communicationsImuStatusLabel->setText(
+            system.imu_valid
+                ? "Estado: OK"
+                : "Estado: NO DISPONIBLE"
+        );
+    }
+
+
+    if (communicationsVisionStatusLabel != nullptr)
+    {
+        communicationsVisionStatusLabel->setText(
+            system.vision_running
+                ? "Estado: ACTIVA"
+                : "Estado: DETENIDA"
+        );
+    }
 
     /*
     * ========================================================

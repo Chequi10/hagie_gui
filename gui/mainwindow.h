@@ -322,6 +322,33 @@ private:
     QLabel *configVisionCameraMountingErrorLabel =
         nullptr;    
 
+    QLabel *communicationsStm32StatusLabel =
+        nullptr;
+
+    QLabel *communicationsStm32UptimeLabel =
+        nullptr;
+
+    QLabel *communicationsUartErrorsLabel =
+        nullptr;
+
+    QLabel *communicationsTxDroppedLabel =
+        nullptr;
+
+    QLabel *communicationsCanStatusLabel =
+        nullptr;
+
+    QLabel *communicationsAxiomaticModulesLabel =
+        nullptr;
+
+    QLabel *communicationsCanDroppedLabel =
+        nullptr;
+
+    QLabel *communicationsImuStatusLabel =
+        nullptr;
+
+    QLabel *communicationsVisionStatusLabel =
+        nullptr;
+
     QComboBox *configVisionDetectedSerialCombo =
         nullptr;
 
@@ -540,7 +567,7 @@ private:
 
     void updateTestPage();
 
-    
+
 
 
     // ========================================================
@@ -556,6 +583,8 @@ private:
     QWidget *createTestsPage();
 
     QWidget *createConfigurationPage();
+
+    QWidget *createCommunicationsPage();
 
 
     // ========================================================
