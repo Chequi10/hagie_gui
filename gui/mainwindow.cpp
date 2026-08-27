@@ -971,12 +971,7 @@ void MainWindow::createMenus()
             "Cámaras"
         );
 
-    operationMenu->addSeparator();
-
-    QAction *stopAction =
-        operationMenu->addAction(
-            "PARADA TOTAL"
-        );
+   
 
 
     connect(
@@ -999,26 +994,11 @@ void MainWindow::createMenus()
         }
     );
 
-    /*
-     * Más adelante stopAction llamará:
-     *
-     * stm32.stop_all_valves();
-     */
-    connect(
-        stopAction,
-        &QAction::triggered,
-        this,
-        []()
-        {
-            // TODO:
-            // parada total real
-        }
-    );
-
+   
 
     /*
-     * CONFIGURACIÓN
-     */
+    * CONFIGURACIÓN
+    */
     QMenu *configMenu =
         menuBar()->addMenu(
             "Configuración"
@@ -1029,14 +1009,6 @@ void MainWindow::createMenus()
             "Configuración general"
         );
 
-    configMenu->addAction("Máquina");
-    configMenu->addAction("Cuerpos");
-    configMenu->addAction("Encoders");
-    configMenu->addAction("Cámaras");
-    configMenu->addAction("IA");
-    configMenu->addAction("STM32");
-    configMenu->addAction("CAN / Axiomatic");
-
     connect(
         configurationAction,
         &QAction::triggered,
@@ -1046,7 +1018,7 @@ void MainWindow::createMenus()
             centralStack->setCurrentIndex(4);
         }
     );
-
+   
 
     /*
      * TEST
@@ -1059,13 +1031,9 @@ void MainWindow::createMenus()
             "Panel de test"
         );
 
-    testMenu->addSeparator();
+   
 
-    testMenu->addAction("Válvulas");
-    testMenu->addAction("Encoders");
-    testMenu->addAction("Comunicación STM32");
-    testMenu->addAction("IMU");
-    testMenu->addAction("Cámaras");
+   
 
     connect(
         testPageAction,
@@ -1090,10 +1058,6 @@ void MainWindow::createMenus()
         diagnosticMenu->addAction(
             "Fallas"
         );
-
-    diagnosticMenu->addAction(
-        "Estado del sistema"
-    );
 
     diagnosticMenu->addAction(
         "Comunicaciones"
@@ -1253,6 +1217,46 @@ QWidget *MainWindow::createDashboardPage()
 
     mainLayout->addWidget(
         stopButton
+    );
+
+    connect(
+        stopButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            /*
+            * Cancelar todos los modos AUTO locales.
+            */
+            for (std::size_t body = 0;
+                body < HagieState::BODY_COUNT;
+                ++body)
+            {
+                testAutoEnabled[body] =
+                    false;
+
+                testVisionAutoEnabled[body] =
+                    false;
+
+                if (state != nullptr)
+                {
+                    state->setBodyAutoMode(
+                        body,
+                        false
+                    );
+                }
+            }
+
+
+            /*
+            * Orden real de parada a la STM32.
+            */
+            if (stm32Worker != nullptr)
+            {
+                stm32Worker->stopAllValves();
+                qInfo() << "PARADA TOTAL DASHBOARD -> stopAllValves()";
+            }
+        }
     );
 
 
