@@ -164,3 +164,22 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+# ============================================================
+# TEST RGB CAMERA WORKER
+# ============================================================
+
+add_executable(
+    rgb_camera_worker_test
+
+    tests/rgb_camera_worker_test.cpp
+
+    vision/rgb_camera_worker.cpp
+    vision/simulated_rgb_frame_source.cpp
+)
+
+
+target_include_directories(
+    rgb_camera_worker_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
