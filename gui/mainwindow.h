@@ -520,6 +520,18 @@ private:
     bool logPreviousStm32Connected =
         false;
 
+    bool logCanStateInitialized =
+        false;
+
+    bool logPreviousCanOk =
+        false;
+
+    bool logVisionStateInitialized =
+    false;
+
+    bool logPreviousVisionRunning =
+        false;    
+
     /*
     * Fuente utilizada para obtener
     * las mediciones de visión 3D.

@@ -4026,6 +4026,37 @@ QWidget *MainWindow::createConfigurationPage()
                 return;
             }
 
+            QString visionSourceText;
+
+            if (index == 0)
+            {
+                visionSourceText =
+                    "SIMULACIÓN ALTURAS";
+            }
+            else if (index == 1)
+            {
+                visionSourceText =
+                    "SIMULACIÓN CÁMARAS 3D";
+            }
+            else if (index == 2)
+            {
+                visionSourceText =
+                    "CÁMARAS 3D REALES";
+            }
+            else
+            {
+                visionSourceText =
+                    "DESCONOCIDA";
+            }
+
+            addLogMessage(
+                QString(
+                    "Fuente de visión cambiada a %1"
+                ).arg(
+                    visionSourceText
+                )
+            );
+
 
             /*
             * ====================================================
@@ -6098,7 +6129,70 @@ void MainWindow::updateDashboard()
         logPreviousStm32Connected =
             system.stm32_connected;
     }
+    /*
+    * ========================================================
+    * LOG - CAMBIO DE ESTADO CAN / AXIOMATIC
+    * ========================================================
+    */
+    if (!logCanStateInitialized)
+    {
+        logPreviousCanOk =
+            system.can_ok;
 
+        logCanStateInitialized =
+            true;
+
+        addLogMessage(
+            system.can_ok
+                ? "CAN / Axiomatic OK"
+                : "CAN / Axiomatic FALLA"
+        );
+    }
+    else if (system.can_ok !=
+            logPreviousCanOk)
+    {
+        addLogMessage(
+            system.can_ok
+                ? "CAN / Axiomatic OK"
+                : "CAN / Axiomatic FALLA"
+        );
+
+        logPreviousCanOk =
+            system.can_ok;
+    }
+
+
+    /*
+    * ========================================================
+    * LOG - CAMBIO DE ESTADO VISIÓN 3D
+    * ========================================================
+    */
+    if (!logVisionStateInitialized)
+    {
+        logPreviousVisionRunning =
+            system.vision_running;
+
+        logVisionStateInitialized =
+            true;
+
+        addLogMessage(
+            system.vision_running
+                ? "Visión 3D activa"
+                : "Visión 3D detenida"
+        );
+    }
+    else if (system.vision_running !=
+            logPreviousVisionRunning)
+    {
+        addLogMessage(
+            system.vision_running
+                ? "Visión 3D activa"
+                : "Visión 3D detenida"
+        );
+
+        logPreviousVisionRunning =
+            system.vision_running;
+    }
 
     if (communicationsStm32StatusLabel != nullptr)
     {
