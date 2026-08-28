@@ -1380,14 +1380,31 @@ QWidget *MainWindow::createCamerasPage()
         new QHBoxLayout();
 
 
+    constexpr int PHYSICAL_CAMERA_COUNT =
+        7;
+
     for (int camera = 0;
-         camera < 4;
-         ++camera)
+        camera < PHYSICAL_CAMERA_COUNT;
+        ++camera)
     {
+        QString cameraText;
+
+        if (camera < 5)
+        {
+            cameraText =
+                QString("Cámara %1\nFRONTAL 3D + RGB")
+                    .arg(camera + 1);
+        }
+        else
+        {
+            cameraText =
+                QString("Cámara %1\nTRASERA RGB")
+                    .arg(camera + 1);
+        }
+
         QPushButton *button =
             new QPushButton(
-                QString("Cámara %1")
-                    .arg(camera + 1)
+                cameraText
             );
 
         button->setMinimumHeight(
