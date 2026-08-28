@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <QCheckBox>
 #include <vector>
+#include <QPlainTextEdit>
 
 
 #include "core/hagie_state.h"
@@ -496,7 +497,28 @@ private:
 
 
     QSpinBox *configTargetTimeoutSpin =
+    nullptr;
+
+    QPlainTextEdit *logsTextEdit =
         nullptr;
+
+    QPushButton *logsClearButton =
+        nullptr;
+
+    QPushButton *logsSaveButton =
+        nullptr;
+
+    QPushButton *logsPauseButton =
+        nullptr;
+
+    bool logsPaused =
+        false;
+
+    bool logStm32StateInitialized =
+        false;
+
+    bool logPreviousStm32Connected =
+        false;
 
     /*
     * Fuente utilizada para obtener
@@ -567,6 +589,10 @@ private:
 
     void updateTestPage();
 
+    void addLogMessage(
+        const QString& message
+    );
+
 
 
 
@@ -585,6 +611,9 @@ private:
     QWidget *createConfigurationPage();
 
     QWidget *createCommunicationsPage();
+
+    QWidget *createLogsPage();
+
 
 
     // ========================================================

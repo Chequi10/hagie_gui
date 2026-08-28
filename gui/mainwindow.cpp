@@ -23,6 +23,11 @@
 #include <QSettings>
 #include <QScrollArea>
 #include <iostream>
+#include <QPlainTextEdit>
+#include <QDateTime>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_worker.h"
 
@@ -114,6 +119,14 @@ MainWindow::MainWindow(
     */
     centralStack->addWidget(
         createCommunicationsPage()
+    );
+
+    /*
+    * Página 6
+    * Logs
+    */
+    centralStack->addWidget(
+        createLogsPage()
     );
 
 
@@ -1072,9 +1085,10 @@ void MainWindow::createMenus()
             "Comunicaciones"
         );
 
-    diagnosticMenu->addAction(
-        "Logs"
-    );
+    QAction *logsAction =
+        diagnosticMenu->addAction(
+            "Logs"
+        );
 
     connect(
         faultAction,
@@ -1094,6 +1108,18 @@ void MainWindow::createMenus()
         {
             centralStack->setCurrentIndex(
                 5
+            );
+        }
+    );
+
+    connect(
+        logsAction,
+        &QAction::triggered,
+        this,
+        [this]()
+        {
+            centralStack->setCurrentIndex(
+                6
             );
         }
     );
@@ -1824,6 +1850,250 @@ QWidget *MainWindow::createCommunicationsPage()
     return page;
 }
 
+/*
+ * ============================================================
+ * LOGS
+ * ============================================================
+ */
+
+QWidget *MainWindow::createLogsPage()
+{
+    QWidget *page =
+        new QWidget();
+
+    QVBoxLayout *mainLayout =
+        new QVBoxLayout(page);
+
+
+    QLabel *title =
+        new QLabel(
+            "DIAGNÓSTICO - LOGS"
+        );
+
+    title->setAlignment(
+        Qt::AlignCenter
+    );
+
+    title->setStyleSheet(
+        "font-size: 22px;"
+        "font-weight: bold;"
+    );
+
+    mainLayout->addWidget(
+        title
+    );
+
+
+   logsTextEdit =
+        new QPlainTextEdit();
+
+    logsTextEdit->setReadOnly(
+        true
+    );
+
+    logsTextEdit->setLineWrapMode(
+        QPlainTextEdit::NoWrap
+    );
+
+
+    QHBoxLayout *buttonsLayout =
+        new QHBoxLayout();
+
+
+    logsClearButton =
+        new QPushButton(
+            "LIMPIAR"
+        );
+
+    logsSaveButton =
+        new QPushButton(
+            "GUARDAR LOG"
+        );
+
+    logsPauseButton =
+        new QPushButton(
+            "PAUSAR"
+        );
+
+
+    logsClearButton->setMinimumHeight(
+        50
+    );
+
+    logsSaveButton->setMinimumHeight(
+        50
+    );
+
+    logsPauseButton->setMinimumHeight(
+        50
+    );
+
+
+    buttonsLayout->addWidget(
+        logsClearButton
+    );
+
+    buttonsLayout->addWidget(
+        logsSaveButton
+    );
+
+    buttonsLayout->addWidget(
+        logsPauseButton
+    );
+
+
+    mainLayout->addWidget(
+        logsTextEdit,
+        1
+    );
+
+    mainLayout->addLayout(
+        buttonsLayout
+    );
+
+    /*
+    * Limpiar visor de logs.
+    */
+    connect(
+        logsClearButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            if (logsTextEdit != nullptr)
+            {
+                logsTextEdit->clear();
+            }
+        }
+    );
+
+
+    /*
+    * Pausar / reanudar visualización de logs.
+    */
+    connect(
+        logsPauseButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            logsPaused =
+                !logsPaused;
+
+            logsPauseButton->setText(
+                logsPaused
+                    ? "REANUDAR"
+                    : "PAUSAR"
+            );
+        }
+    );
+
+
+    /*
+    * Guardar logs en archivo de texto.
+    */
+    connect(
+        logsSaveButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            if (logsTextEdit == nullptr)
+            {
+                return;
+            }
+
+            const QString defaultName =
+                QString(
+                    "hagie_log_%1.txt"
+                ).arg(
+                    QDateTime::currentDateTime()
+                        .toString(
+                            "yyyyMMdd_HHmmss"
+                        )
+                );
+
+            const QString fileName =
+                QFileDialog::getSaveFileName(
+                    this,
+                    "Guardar log",
+                    defaultName,
+                    "Archivos de texto (*.txt)"
+                );
+
+            if (fileName.isEmpty())
+            {
+                return;
+            }
+
+            QFile file(
+                fileName
+            );
+
+            if (!file.open(
+                    QIODevice::WriteOnly |
+                    QIODevice::Text))
+            {
+                return;
+            }
+
+            QTextStream stream(
+                &file
+            );
+
+            stream <<
+                logsTextEdit->toPlainText();
+
+            file.close();
+        }
+    );
+
+
+
+
+    addLogMessage(
+        "Sistema de logs iniciado"
+    );
+
+
+    return page;
+}
+
+/*
+ * ============================================================
+ * AGREGAR MENSAJE AL LOG
+ * ============================================================
+ */
+
+void MainWindow::addLogMessage(
+    const QString& message)
+{
+    if (logsPaused)
+    {
+        return;
+    }
+
+    if (logsTextEdit == nullptr)
+    {
+        return;
+    }
+
+
+    const QString timestamp =
+        QDateTime::currentDateTime()
+            .toString(
+                "HH:mm:ss"
+            );
+
+
+    logsTextEdit->appendPlainText(
+        QString("[%1] %2")
+            .arg(
+                timestamp,
+                message
+            )
+    );
+}
 
 /*
  * ============================================================
@@ -5792,6 +6062,32 @@ void MainWindow::updateDashboard()
     */
     HagieState::SystemState system =
         state->getSystemState();
+
+    /*
+    * ========================================================
+    * LOG - CAMBIO DE ESTADO STM32
+    * ========================================================
+    */
+    if (!logStm32StateInitialized)
+    {
+        logPreviousStm32Connected =
+            system.stm32_connected;
+
+        logStm32StateInitialized =
+            true;
+    }
+    else if (system.stm32_connected !=
+            logPreviousStm32Connected)
+    {
+        addLogMessage(
+            system.stm32_connected
+                ? "STM32 conectada"
+                : "STM32 desconectada"
+        );
+
+        logPreviousStm32Connected =
+            system.stm32_connected;
+    }
 
 
     if (communicationsStm32StatusLabel != nullptr)
