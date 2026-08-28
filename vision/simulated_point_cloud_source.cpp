@@ -87,17 +87,20 @@ bool SimulatedPointCloudSource::getPointCloud(
     cloud.clear();
 
 
-    /*
+        /*
      * ========================================================
      * SIMULACIÓN DE NUBES DE PUNTOS
      * ========================================================
      *
      * Cámara 0 -> cuerpos 1 y 2
-     * Cámara 1 -> cuerpos 3 y 4
-     * Cámara 2 -> cuerpos 5 y 6
+     * Cámara 1 -> cuerpos 2 y 3
+     * Cámara 2 -> cuerpos 3 y 4
+     * Cámara 3 -> cuerpos 4 y 5
+     * Cámara 4 -> cuerpos 5 y 6
      *
-     * Los valores coinciden con los utilizados
-     * en las pruebas de Vision3DProcessor.
+     * Se utiliza solapamiento entre cámaras para que
+     * los cuerpos intermedios puedan ser observados
+     * por más de una cámara.
      */
 
 
@@ -112,14 +115,12 @@ bool SimulatedPointCloudSource::getPointCloud(
                 {-2.5f, 0.0f, 0.40f}
             );
 
-
             /*
              * Cuerpo 2 -> 500 mm
              */
             cloud.push_back(
                 {-1.5f, 0.0f, 0.50f}
             );
-
 
             break;
         }
@@ -128,20 +129,18 @@ bool SimulatedPointCloudSource::getPointCloud(
         case 1:
         {
             /*
+             * Cuerpo 2 -> 500 mm
+             */
+            cloud.push_back(
+                {-1.5f, 0.0f, 0.50f}
+            );
+
+            /*
              * Cuerpo 3 -> 600 mm
              */
             cloud.push_back(
                 {-0.5f, 0.0f, 0.60f}
             );
-
-
-            /*
-             * Cuerpo 4 -> 700 mm
-             */
-            cloud.push_back(
-                {0.5f, 0.0f, 0.70f}
-            );
-
 
             break;
         }
@@ -150,12 +149,51 @@ bool SimulatedPointCloudSource::getPointCloud(
         case 2:
         {
             /*
+             * Cuerpo 3 -> 600 mm
+             */
+            cloud.push_back(
+                {-0.5f, 0.0f, 0.60f}
+            );
+
+            /*
+             * Cuerpo 4 -> 700 mm
+             */
+            cloud.push_back(
+                {0.5f, 0.0f, 0.70f}
+            );
+
+            break;
+        }
+
+
+        case 3:
+        {
+            /*
+             * Cuerpo 4 -> 700 mm
+             */
+            cloud.push_back(
+                {0.5f, 0.0f, 0.70f}
+            );
+
+            /*
              * Cuerpo 5 -> 800 mm
              */
             cloud.push_back(
                 {1.5f, 0.0f, 0.80f}
             );
 
+            break;
+        }
+
+
+        case 4:
+        {
+            /*
+             * Cuerpo 5 -> 800 mm
+             */
+            cloud.push_back(
+                {1.5f, 0.0f, 0.80f}
+            );
 
             /*
              * Cuerpo 6 -> 900 mm
@@ -163,7 +201,6 @@ bool SimulatedPointCloudSource::getPointCloud(
             cloud.push_back(
                 {2.5f, 0.0f, 0.90f}
             );
-
 
             break;
         }
@@ -174,7 +211,5 @@ bool SimulatedPointCloudSource::getPointCloud(
             return false;
         }
     }
-
-
     return true;
 }

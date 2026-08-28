@@ -17,7 +17,7 @@ public:
 
     static constexpr std::size_t BODY_COUNT = 6;
 
-    static constexpr std::size_t CAMERA_COUNT = 3;
+    static constexpr std::size_t CAMERA_COUNT = 5;
 
 
     // ========================================================

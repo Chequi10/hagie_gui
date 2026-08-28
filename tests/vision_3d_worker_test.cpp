@@ -65,55 +65,52 @@ int main()
 
 
     /*
-     * ========================================================
-     * CONFIGURACIÓN DE LAS 3 CÁMARAS
-     * ========================================================
-     *
-     * Cámara 0 -> cuerpos 0 y 1
-     * Cámara 1 -> cuerpos 2 y 3
-     * Cámara 2 -> cuerpos 4 y 5
-     */
+    * ========================================================
+    * CONFIGURACIÓN DE LAS 5 CÁMARAS
+    * ========================================================
+    *
+    * Cámara 0 -> cuerpos 0 y 1
+    * Cámara 1 -> cuerpos 1 y 2
+    * Cámara 2 -> cuerpos 2 y 3
+    * Cámara 3 -> cuerpos 3 y 4
+    * Cámara 4 -> cuerpos 4 y 5
+    */
     for (std::size_t camera = 0;
-         camera < Vision3DProcessor::CAMERA_COUNT;
-         ++camera)
+        camera < Vision3DProcessor::CAMERA_COUNT;
+        ++camera)
     {
         Vision3DProcessor::CameraConfig config;
-
 
         config.enabled =
             true;
 
-
         /*
-         * Primero deshabilitar todos los cuerpos.
-         */
+        * Primero deshabilitar todos los cuerpos.
+        */
         for (std::size_t body = 0;
-             body < HagieState::BODY_COUNT;
-             ++body)
+            body < HagieState::BODY_COUNT;
+            ++body)
         {
             config.body_enabled[body] =
                 false;
         }
 
-
         /*
-         * Dos cuerpos por cámara.
-         */
-        std::size_t firstBody =
-            camera * 2;
-
-
-        config.body_enabled[firstBody] =
+        * Dos cuerpos consecutivos por cámara,
+        * con solapamiento entre cámaras vecinas.
+        */
+        config.body_enabled[camera] =
             true;
 
-        config.body_enabled[firstBody + 1] =
+        config.body_enabled[camera + 1] =
             true;
-
 
         processor.setCameraConfig(
             camera,
             config
         );
+
+        
     }
 
 

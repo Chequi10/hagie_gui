@@ -4104,7 +4104,7 @@ QWidget *MainWindow::createConfigurationPage()
 
 
                 /*
-                * Instalar las tres fuentes simuladas.
+                * Instalar las cinco fuentes simuladas.
                 */
                 for (std::size_t camera = 0;
                     camera < Vision3DProcessor::CAMERA_COUNT;
@@ -4145,7 +4145,22 @@ QWidget *MainWindow::createConfigurationPage()
                             -1.2f,
                             0.3f
                         );
-                    }       
+                    }   
+                    
+                    else if (camera == 3)
+                    {
+                        source->setSimulatedOrientation(
+                            0.8f,
+                            -0.4f
+                        );
+                    }
+                    else if (camera == 4)
+                    {
+                        source->setSimulatedOrientation(
+                            -0.6f,
+                            0.2f
+                        );
+                    }
                                         
                         
 
@@ -4458,21 +4473,16 @@ QWidget *MainWindow::createConfigurationPage()
     configVisionCameraCombo =
         new QComboBox();
 
-    configVisionCameraCombo->addItem(
-        "CÁMARA 1",
-        0
-    );
-
-    configVisionCameraCombo->addItem(
-        "CÁMARA 2",
-        1
-    );
-
-    configVisionCameraCombo->addItem(
-        "CÁMARA 3",
-        2
-    );
-
+    for (std::size_t camera = 0;
+        camera < Vision3DProcessor::CAMERA_COUNT;
+        ++camera)
+    {
+        configVisionCameraCombo->addItem(
+            QString("CÁMARA %1")
+                .arg(camera + 1),
+            static_cast<int>(camera)
+        );
+    }
 
     connect(
         configVisionCameraCombo,
@@ -6989,7 +6999,7 @@ void MainWindow::saveConfiguration()
 
 
     /*
-    * Guardar las tres configuraciones.
+    * Guardar las configuraciones de cámaras 3D.
     */
     for (std::size_t camera = 0;
         camera < Vision3DProcessor::CAMERA_COUNT;
@@ -7358,13 +7368,42 @@ void MainWindow::loadConfiguration()
             body < HagieState::BODY_COUNT;
             ++body)
         {
-            config.body_enabled[body] =
-                settings.value(
-                    QString("body_%1")
-                        .arg(body + 1),
-                    false
-                ).toBool();
+           bool defaultBodyEnabled =
+            false;
+
+        if (camera == 0)
+        {
+            defaultBodyEnabled =
+                (body == 0 || body == 1);
         }
+        else if (camera == 1)
+        {
+            defaultBodyEnabled =
+                (body == 1 || body == 2);
+        }
+        else if (camera == 2)
+        {
+            defaultBodyEnabled =
+                (body == 2 || body == 3);
+        }
+        else if (camera == 3)
+        {
+            defaultBodyEnabled =
+                (body == 3 || body == 4);
+        }
+        else if (camera == 4)
+        {
+            defaultBodyEnabled =
+                (body == 4 || body == 5);
+        }
+
+        config.body_enabled[body] =
+            settings.value(
+                QString("body_%1")
+                    .arg(body + 1),
+                defaultBodyEnabled
+            ).toBool();
+                }
 
 
         /*

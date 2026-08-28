@@ -84,41 +84,31 @@ bool SyntheticPointCloudSource::getPointCloud(
 
 
     /*
-     * ========================================================
-     * NUBES SINTÉTICAS POR CÁMARA
-     * ========================================================
-     *
-     * Se generan puntos simples y conocidos.
-     *
-     * Estas nubes sirven solamente para probar
-     * la capa de adquisición y el futuro
-     * Vision3DWorker.
-     *
-     * Cámara 0 -> cuerpos 1 y 2
-     * Cámara 1 -> cuerpos 3 y 4
-     * Cámara 2 -> cuerpos 5 y 6
-     */
+    * ========================================================
+    * NUBES SINTÉTICAS POR CÁMARA
+    * ========================================================
+    *
+    * Cámara 0 -> cuerpos 1 y 2
+    * Cámara 1 -> cuerpos 2 y 3
+    * Cámara 2 -> cuerpos 3 y 4
+    * Cámara 3 -> cuerpos 4 y 5
+    * Cámara 4 -> cuerpos 5 y 6
+    *
+    * Se utiliza solapamiento entre cámaras vecinas.
+    */
 
 
     switch (cameraIndex)
     {
         case 0:
         {
-            /*
-             * Cuerpo 1 -> 400 mm
-             */
             cloud.push_back(
                 {-2.5f, 0.0f, 0.40f}
             );
 
-
-            /*
-             * Cuerpo 2 -> 500 mm
-             */
             cloud.push_back(
                 {-1.5f, 0.0f, 0.50f}
             );
-
 
             break;
         }
@@ -126,21 +116,13 @@ bool SyntheticPointCloudSource::getPointCloud(
 
         case 1:
         {
-            /*
-             * Cuerpo 3 -> 600 mm
-             */
+            cloud.push_back(
+                {-1.5f, 0.0f, 0.50f}
+            );
+
             cloud.push_back(
                 {-0.5f, 0.0f, 0.60f}
             );
-
-
-            /*
-             * Cuerpo 4 -> 700 mm
-             */
-            cloud.push_back(
-                {0.5f, 0.0f, 0.70f}
-            );
-
 
             break;
         }
@@ -148,21 +130,41 @@ bool SyntheticPointCloudSource::getPointCloud(
 
         case 2:
         {
-            /*
-             * Cuerpo 5 -> 800 mm
-             */
+            cloud.push_back(
+                {-0.5f, 0.0f, 0.60f}
+            );
+
+            cloud.push_back(
+                {0.5f, 0.0f, 0.70f}
+            );
+
+            break;
+        }
+
+
+        case 3:
+        {
+            cloud.push_back(
+                {0.5f, 0.0f, 0.70f}
+            );
+
             cloud.push_back(
                 {1.5f, 0.0f, 0.80f}
             );
 
+            break;
+        }
 
-            /*
-             * Cuerpo 6 -> 900 mm
-             */
+
+        case 4:
+        {
+            cloud.push_back(
+                {1.5f, 0.0f, 0.80f}
+            );
+
             cloud.push_back(
                 {2.5f, 0.0f, 0.90f}
             );
-
 
             break;
         }
