@@ -20,6 +20,7 @@
 
 #include "vision/rgb_camera_worker.h"
 #include "vision/simulated_rgb_frame_source.h"
+#include "ai/tassel_detector.h"
 
 
 class QStackedWidget;
@@ -603,6 +604,8 @@ private:
 
     std::size_t selectedRgbCamera =
         0;
+
+    TasselDetector tasselDetector;
     // ========================================================
     // ACTUALIZACIÓN GUI
     // ========================================================

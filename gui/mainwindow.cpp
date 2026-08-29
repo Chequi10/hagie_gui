@@ -14,6 +14,10 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QTimer>
+#include <QPainter>
+#include <QPen>
+
+#include "ai/tassel_detector.h"
 #include "stm32/stm32_worker.h"
 #include "core/height_target_controller.h"
 #include <QStringList>
@@ -1536,13 +1540,63 @@ void MainWindow::updateCameraPage()
     );
 
 
-    QPixmap pixmap =
-        QPixmap::fromImage(
-            image.copy()
+    QImage displayImage =
+    image.copy();
+
+
+    TasselDetector::Result detectionResult;
+
+    if (tasselDetector.processFrame(
+            selectedRgbCamera,
+            frame,
+            detectionResult
+        ))
+    {
+        QPainter painter(
+            &displayImage
+        );
+
+        QPen pen;
+
+        pen.setWidth(
+            3
+        );
+
+        painter.setPen(
+            pen
         );
 
 
-    mainCameraLabel->setPixmap(
+        for (const auto& detection :
+            detectionResult.detections)
+        {
+            painter.drawRect(
+                detection.x,
+                detection.y,
+                detection.width,
+                detection.height
+            );
+        }
+
+
+        painter.drawText(
+            10,
+            25,
+            QString(
+                "Panojas detectadas: %1"
+            ).arg(
+                detectionResult.detections.size()
+            )
+        );
+    }
+
+
+    QPixmap pixmap =
+        QPixmap::fromImage(
+            displayImage
+        );
+
+        mainCameraLabel->setPixmap(
         pixmap.scaled(
             mainCameraLabel->size(),
             Qt::KeepAspectRatio,
