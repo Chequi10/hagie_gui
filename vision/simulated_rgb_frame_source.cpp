@@ -3,6 +3,26 @@
 #include <chrono>
 
 
+namespace
+{
+
+std::uint64_t getCurrentTimestampMs()
+{
+    const auto now =
+        std::chrono::steady_clock::now()
+            .time_since_epoch();
+
+
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<
+            std::chrono::milliseconds
+        >(now).count()
+    );
+}
+
+}
+
+
 SimulatedRgbFrameSource::SimulatedRgbFrameSource(
     std::size_t cameraIndex)
     : cameraIndex(cameraIndex),
@@ -13,7 +33,11 @@ SimulatedRgbFrameSource::SimulatedRgbFrameSource(
 
 bool SimulatedRgbFrameSource::start()
 {
-    running = true;
+    startTimestampMs =
+        getCurrentTimestampMs();
+
+    running =
+        true;
 
     return true;
 }
@@ -21,7 +45,8 @@ bool SimulatedRgbFrameSource::start()
 
 void SimulatedRgbFrameSource::stop()
 {
-    running = false;
+    running =
+        false;
 }
 
 
@@ -42,6 +67,40 @@ bool SimulatedRgbFrameSource::getFrame(
     Frame& frame)
 {
     if (!running)
+    {
+        frame =
+            Frame {};
+
+        return false;
+    }
+
+
+    const std::uint64_t nowMs =
+        getCurrentTimestampMs();
+
+
+    /*
+     * ========================================================
+     * RETARDO SIMULADO DE CÁMARAS TRASERAS
+     * ========================================================
+     *
+     * Cámaras físicas:
+     *
+     * 0..4 = frontales
+     * 5..6 = traseras
+     *
+     * Las traseras comienzan a entregar imágenes
+     * 2000 ms después para simular el avance de
+     * la máquina desde adelante hacia atrás.
+     */
+
+    constexpr std::uint64_t REAR_CAMERA_DELAY_MS =
+        2000;
+
+
+    if (cameraIndex >= 5 &&
+        nowMs < startTimestampMs +
+                REAR_CAMERA_DELAY_MS)
     {
         frame =
             Frame {};
@@ -76,10 +135,6 @@ bool SimulatedRgbFrameSource::getFrame(
     /*
      * Cada cámara genera una imagen RGB
      * de un tono diferente.
-     *
-     * Por ahora sólo sirve para verificar
-     * que las 7 fuentes funcionan de forma
-     * independiente.
      */
     const std::uint8_t baseValue =
         static_cast<std::uint8_t>(
@@ -111,16 +166,8 @@ bool SimulatedRgbFrameSource::getFrame(
     }
 
 
-    const auto now =
-        std::chrono::steady_clock::now()
-            .time_since_epoch();
-
     frame.timestamp_ms =
-        static_cast<std::uint64_t>(
-            std::chrono::duration_cast<
-                std::chrono::milliseconds
-            >(now).count()
-        );
+        nowMs;
 
     frame.valid =
         true;

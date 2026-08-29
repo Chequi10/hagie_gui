@@ -23,6 +23,7 @@
 #include "ai/tassel_detector.h"
 #include "ai/tassel_counter.h"
 
+#include "ai/tassel_verifier.h"
 
 
 class QStackedWidget;
@@ -609,6 +610,8 @@ private:
 
     TasselDetector tasselDetector;
     TasselCounter tasselCounter;
+
+    TasselVerifier tasselVerifier;
     // ========================================================
     // ACTUALIZACIÓN GUI
     // ========================================================

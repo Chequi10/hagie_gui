@@ -1505,9 +1505,13 @@ void MainWindow::updateCameraPage()
         7;
 
 
+    std::uint64_t latestTimestampMs =
+        0;
+
+
     for (std::size_t camera = 0;
-         camera < RGB_CAMERA_COUNT;
-         ++camera)
+        camera < RGB_CAMERA_COUNT;
+        ++camera)
     {
         RgbFrameSource::Frame cameraFrame;
 
@@ -1529,18 +1533,128 @@ void MainWindow::updateCameraPage()
         }
 
 
+        if (cameraFrame.timestamp_ms >
+            latestTimestampMs)
+        {
+            latestTimestampMs =
+                cameraFrame.timestamp_ms;
+        }
+
+
         TasselDetector::Result cameraResult;
 
-        if (tasselDetector.processFrame(
+        if (!tasselDetector.processFrame(
                 camera,
                 cameraFrame,
                 cameraResult
             ))
         {
-            tasselCounter.processDetections(
-                cameraResult
+            continue;
+        }
+
+
+        /*
+        * Estado antes del tracking.
+        */
+        const TasselCounter::State stateBefore =
+            tasselCounter.getState();
+
+
+        /*
+        * El TasselCounter elimina duplicados
+        * entre frames.
+        */
+        tasselCounter.processDetections(
+            cameraResult
+        );
+
+
+        /*
+        * Estado después del tracking.
+        */
+        const TasselCounter::State stateAfter =
+            tasselCounter.getState();
+
+
+        std::uint64_t newUniqueDetections =
+            0;
+
+
+        if (camera < 5)
+        {
+            newUniqueDetections =
+                stateAfter.front_count -
+                stateBefore.front_count;
+        }
+        else
+        {
+            newUniqueDetections =
+                stateAfter.rear_count -
+                stateBefore.rear_count;
+        }
+
+
+        /*
+        * No apareció ninguna panoja nueva.
+        */
+        if (newUniqueDetections == 0)
+        {
+            continue;
+        }
+
+
+        /*
+        * Creamos un resultado que contiene solamente
+        * las detecciones nuevas confirmadas por
+        * el tracker.
+        *
+        * TasselVerifier por ahora usa cantidad
+        * y timestamp, no posición.
+        */
+        TasselDetector::Result uniqueResult =
+            cameraResult;
+
+
+        uniqueResult.detections.resize(
+            static_cast<std::size_t>(
+                newUniqueDetections
+            )
+        );
+
+
+        /*
+        * Cámaras 0..4:
+        * detección frontal.
+        */
+        if (camera < 5)
+        {
+            tasselVerifier.processFrontDetections(
+                uniqueResult
             );
         }
+
+        /*
+        * Cámaras 5..6:
+        * verificación trasera.
+        */
+        else
+        {
+            tasselVerifier.processRearDetections(
+                uniqueResult
+            );
+        }
+    }
+
+
+    /*
+    * Actualizamos vencimientos de panojas
+    * pendientes de verificación.
+    */
+    if (latestTimestampMs != 0)
+    {
+        tasselVerifier.update(
+            latestTimestampMs
+        );
     }
 
 
@@ -1638,6 +1752,9 @@ void MainWindow::updateCameraPage()
         const TasselCounter::State counterState =
             tasselCounter.getState();
 
+        const TasselVerifier::State verifierState =
+            tasselVerifier.getState();
+
 
         painter.drawText(
             10,
@@ -1668,6 +1785,38 @@ void MainWindow::updateCameraPage()
                 "Trasero acumulado: %1"
             ).arg(
                 counterState.rear_count
+            )
+        );
+
+        painter.drawText(
+            10,
+            100,
+            QString(
+                "Pendientes: %1"
+            ).arg(
+                verifierState.pending
+            )
+        );
+
+
+        painter.drawText(
+            10,
+            125,
+            QString(
+                "Removidas: %1"
+            ).arg(
+                verifierState.verified_removed
+            )
+        );
+
+
+        painter.drawText(
+            10,
+            150,
+            QString(
+                "Siguen presentes: %1"
+            ).arg(
+                verifierState.verified_remaining
             )
         );
     }

@@ -66,6 +66,8 @@ add_executable(
     ai/tassel_detector.h
     ai/tassel_counter.cpp
     ai/tassel_counter.h
+    ai/tassel_verifier.cpp
+    ai/tassel_verifier.h
 )
 
 

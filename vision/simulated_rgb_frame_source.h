@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 
 #include "vision/rgb_frame_source.h"
 
@@ -36,4 +37,7 @@ private:
     std::size_t cameraIndex;
 
     std::atomic<bool> running;
+
+    std::uint64_t startTimestampMs =
+        0;
 };
