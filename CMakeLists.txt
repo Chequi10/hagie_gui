@@ -232,3 +232,21 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+# ============================================================
+# TEST TASSEL VERIFIER
+# ============================================================
+
+add_executable(
+    tassel_verifier_test
+
+    tests/tassel_verifier_test.cpp
+
+    ai/tassel_verifier.cpp
+)
+
+
+target_include_directories(
+    tassel_verifier_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
