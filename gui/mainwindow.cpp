@@ -28,6 +28,8 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QTextStream>
+#include <QImage>
+#include <QPixmap>
 #include "vision/vision_height_source.h"
 #include "vision/vision_3d_worker.h"
 
@@ -133,6 +135,28 @@ MainWindow::MainWindow(
     setCentralWidget(
         centralStack
     );
+
+    /*
+    * ========================================================
+    * CÁMARAS RGB SIMULADAS
+    * ========================================================
+    */
+    for (std::size_t camera = 0;
+        camera < RgbCameraWorker::CAMERA_COUNT;
+        ++camera)
+    {
+        auto source =
+            std::make_unique<
+                SimulatedRgbFrameSource
+            >(camera);
+
+        rgbCameraWorker.setFrameSource(
+            camera,
+            std::move(source)
+        );
+    }
+
+    rgbCameraWorker.start();
 
 
     /*
@@ -369,6 +393,13 @@ MainWindow::MainWindow(
         &QTimer::timeout,
         this,
         &MainWindow::updateDashboard
+    );
+
+    connect(
+        dashboardTimer,
+        &QTimer::timeout,
+        this,
+        &MainWindow::updateCameraPage
     );
 
 
@@ -1349,26 +1380,28 @@ QWidget *MainWindow::createCamerasPage()
      * Más adelante acá irá el widget
      * de video real.
      */
-    QLabel *mainCamera =
+    mainCameraLabel =
         new QLabel(
             "CÁMARA PRINCIPAL\n\n"
             "VIDEO"
         );
 
-    mainCamera->setAlignment(
+    mainCameraLabel->setAlignment(
         Qt::AlignCenter
     );
 
-    mainCamera->setMinimumHeight(250);
+    mainCameraLabel->setMinimumHeight(
+        250
+    );
 
-    mainCamera->setStyleSheet(
+    mainCameraLabel->setStyleSheet(
         "background-color: black;"
         "color: white;"
         "font-size: 28px;"
     );
 
     layout->addWidget(
-        mainCamera,
+        mainCameraLabel,
         1
     );
 
@@ -1411,6 +1444,31 @@ QWidget *MainWindow::createCamerasPage()
             60
         );
 
+        connect(
+            button,
+            &QPushButton::clicked,
+            this,
+            [this, camera]()
+            {
+                selectedRgbCamera =
+                    static_cast<std::size_t>(
+                        camera
+                    );
+
+                if (mainCameraLabel != nullptr)
+                {
+                    mainCameraLabel->setText(
+                        QString(
+                            "CÁMARA %1\n\n"
+                            "RGB SIMULADA"
+                        ).arg(
+                            camera + 1
+                        )
+                    );
+                }
+            }
+        );
+
         cameraSelector->addWidget(
             button
         );
@@ -1425,7 +1483,73 @@ QWidget *MainWindow::createCamerasPage()
     return page;
 }
 
+void MainWindow::updateCameraPage()
+{
+    if (mainCameraLabel == nullptr)
+    {
+        return;
+    }
 
+
+    RgbFrameSource::Frame frame;
+
+
+    if (!rgbCameraWorker.getFrame(
+            selectedRgbCamera,
+            frame
+        ))
+    {
+        mainCameraLabel->setText(
+            QString(
+                "CÁMARA %1\n\n"
+                "SIN FRAME RGB"
+            ).arg(
+                selectedRgbCamera + 1
+            )
+        );
+
+        return;
+    }
+
+
+    if (!frame.valid ||
+        frame.width == 0 ||
+        frame.height == 0 ||
+        frame.data.empty())
+    {
+        return;
+    }
+
+
+    QImage image(
+        frame.data.data(),
+        static_cast<int>(
+            frame.width
+        ),
+        static_cast<int>(
+            frame.height
+        ),
+        static_cast<int>(
+            frame.width * 3
+        ),
+        QImage::Format_RGB888
+    );
+
+
+    QPixmap pixmap =
+        QPixmap::fromImage(
+            image.copy()
+        );
+
+
+    mainCameraLabel->setPixmap(
+        pixmap.scaled(
+            mainCameraLabel->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation
+        )
+    );
+}
 /*
  * ============================================================
  * FALLAS

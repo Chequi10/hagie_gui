@@ -16,6 +16,10 @@
 #include "core/hagie_state.h"
 
 #include "vision/vision_3d_processor.h"
+#include "vision/rgb_camera_worker.h"
+
+#include "vision/rgb_camera_worker.h"
+#include "vision/simulated_rgb_frame_source.h"
 
 
 class QStackedWidget;
@@ -588,7 +592,17 @@ private:
         HagieState::BODY_COUNT
     > testVisionAutoEnabled {};
 
+    // ========================================================
+    // CÁMARAS RGB
+    // ========================================================
 
+    RgbCameraWorker rgbCameraWorker;
+
+    QLabel *mainCameraLabel =
+        nullptr;
+
+    std::size_t selectedRgbCamera =
+        0;
     // ========================================================
     // ACTUALIZACIÓN GUI
     // ========================================================
@@ -604,6 +618,7 @@ private:
     void addLogMessage(
         const QString& message
     );
+    void updateCameraPage();
 
 
 

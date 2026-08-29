@@ -56,6 +56,12 @@ add_executable(
 
     vision/zed_gmsl_point_cloud_source.cpp
     vision/zed_gmsl_point_cloud_source.h
+
+    vision/rgb_camera_worker.cpp
+    vision/rgb_camera_worker.h
+    vision/rgb_frame_source.h
+    vision/simulated_rgb_frame_source.cpp
+    vision/simulated_rgb_frame_source.h
 )
 
 
