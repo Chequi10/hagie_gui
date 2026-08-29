@@ -189,3 +189,23 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+# ============================================================
+# TEST TASSEL DETECTOR
+# ============================================================
+
+add_executable(
+    tassel_detector_test
+
+    tests/tassel_detector_test.cpp
+
+    ai/tassel_detector.cpp
+
+    vision/simulated_rgb_frame_source.cpp
+)
+
+
+target_include_directories(
+    tassel_detector_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
