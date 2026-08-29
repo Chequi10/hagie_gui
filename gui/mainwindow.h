@@ -21,6 +21,8 @@
 #include "vision/rgb_camera_worker.h"
 #include "vision/simulated_rgb_frame_source.h"
 #include "ai/tassel_detector.h"
+#include "ai/tassel_counter.h"
+
 
 
 class QStackedWidget;
@@ -606,6 +608,7 @@ private:
         0;
 
     TasselDetector tasselDetector;
+    TasselCounter tasselCounter;
     // ========================================================
     // ACTUALIZACIÓN GUI
     // ========================================================

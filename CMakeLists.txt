@@ -64,6 +64,8 @@ add_executable(
     vision/simulated_rgb_frame_source.h
     ai/tassel_detector.cpp
     ai/tassel_detector.h
+    ai/tassel_counter.cpp
+    ai/tassel_counter.h
 )
 
 

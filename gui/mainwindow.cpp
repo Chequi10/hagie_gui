@@ -1495,6 +1495,61 @@ void MainWindow::updateCameraPage()
     }
 
 
+    /*
+     * ========================================================
+     * PROCESAMIENTO Y CONTEO DE LAS 7 CÁMARAS
+     * ========================================================
+     */
+
+    constexpr std::size_t RGB_CAMERA_COUNT =
+        7;
+
+
+    for (std::size_t camera = 0;
+         camera < RGB_CAMERA_COUNT;
+         ++camera)
+    {
+        RgbFrameSource::Frame cameraFrame;
+
+        if (!rgbCameraWorker.getFrame(
+                camera,
+                cameraFrame
+            ))
+        {
+            continue;
+        }
+
+
+        if (!cameraFrame.valid ||
+            cameraFrame.width == 0 ||
+            cameraFrame.height == 0 ||
+            cameraFrame.data.empty())
+        {
+            continue;
+        }
+
+
+        TasselDetector::Result cameraResult;
+
+        if (tasselDetector.processFrame(
+                camera,
+                cameraFrame,
+                cameraResult
+            ))
+        {
+            tasselCounter.processDetections(
+                cameraResult
+            );
+        }
+    }
+
+
+    /*
+     * ========================================================
+     * VISUALIZACIÓN DE LA CÁMARA SELECCIONADA
+     * ========================================================
+     */
+
     RgbFrameSource::Frame frame;
 
 
@@ -1541,7 +1596,7 @@ void MainWindow::updateCameraPage()
 
 
     QImage displayImage =
-    image.copy();
+        image.copy();
 
 
     TasselDetector::Result detectionResult;
@@ -1556,6 +1611,7 @@ void MainWindow::updateCameraPage()
             &displayImage
         );
 
+
         QPen pen;
 
         pen.setWidth(
@@ -1568,7 +1624,7 @@ void MainWindow::updateCameraPage()
 
 
         for (const auto& detection :
-            detectionResult.detections)
+             detectionResult.detections)
         {
             painter.drawRect(
                 detection.x,
@@ -1579,13 +1635,39 @@ void MainWindow::updateCameraPage()
         }
 
 
+        const TasselCounter::State counterState =
+            tasselCounter.getState();
+
+
         painter.drawText(
             10,
             25,
             QString(
-                "Panojas detectadas: %1"
+                "Detectadas: %1"
             ).arg(
                 detectionResult.detections.size()
+            )
+        );
+
+
+        painter.drawText(
+            10,
+            50,
+            QString(
+                "Frontal acumulado: %1"
+            ).arg(
+                counterState.front_count
+            )
+        );
+
+
+        painter.drawText(
+            10,
+            75,
+            QString(
+                "Trasero acumulado: %1"
+            ).arg(
+                counterState.rear_count
             )
         );
     }
@@ -1596,7 +1678,8 @@ void MainWindow::updateCameraPage()
             displayImage
         );
 
-        mainCameraLabel->setPixmap(
+
+    mainCameraLabel->setPixmap(
         pixmap.scaled(
             mainCameraLabel->size(),
             Qt::KeepAspectRatio,
