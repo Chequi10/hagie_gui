@@ -211,3 +211,22 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# ============================================================
+# TEST TASSEL COUNTER
+# ============================================================
+
+add_executable(
+    tassel_counter_test
+
+    tests/tassel_counter_test.cpp
+
+    ai/tassel_counter.cpp
+)
+
+
+target_include_directories(
+    tassel_counter_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
