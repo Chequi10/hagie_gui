@@ -3,14 +3,45 @@
 #include "ai/tassel_counter.h"
 
 
+static TasselDetector::Detection makeDetection(
+    int x,
+    int y,
+    int width = 30,
+    int height = 50)
+{
+    TasselDetector::Detection detection;
+
+    detection.x =
+        x;
+
+    detection.y =
+        y;
+
+    detection.width =
+        width;
+
+    detection.height =
+        height;
+
+    detection.confidence =
+        0.90f;
+
+    return detection;
+}
+
+
 int main()
 {
     TasselCounter counter;
 
 
     /*
-     * Simulamos una detección de cámara frontal.
-     * Cámara 1 = índice 0.
+     * ========================================================
+     * CÁMARA FRONTAL
+     * ========================================================
+     *
+     * Frame 1:
+     * aparecen dos panojas nuevas.
      */
     TasselDetector::Result frontResult;
 
@@ -20,9 +51,21 @@ int main()
     frontResult.camera_index =
         0;
 
-    frontResult.detections.resize(
-        2
-    );
+    frontResult.timestamp_ms =
+        1000;
+
+    frontResult.detections =
+    {
+        makeDetection(
+            100,
+            100
+        ),
+
+        makeDetection(
+            300,
+            100
+        )
+    };
 
 
     counter.processDetections(
@@ -31,15 +74,27 @@ int main()
 
 
     /*
-     * Simulamos otra cámara frontal.
-     * Cámara 5 = índice 4.
+     * Frame 2:
+     * mismas dos panojas ligeramente desplazadas.
+     *
+     * NO deben sumarse nuevamente.
      */
-    frontResult.camera_index =
-        4;
+    frontResult.timestamp_ms =
+        1100;
 
-    frontResult.detections.resize(
-        3
-    );
+    frontResult.detections =
+    {
+        makeDetection(
+            105,
+            103
+        ),
+
+        makeDetection(
+            295,
+            105
+        )
+    };
+
 
     counter.processDetections(
         frontResult
@@ -47,8 +102,46 @@ int main()
 
 
     /*
-     * Simulamos cámara trasera.
-     * Cámara 6 = índice 5.
+     * Frame 3:
+     * aparece una tercera panoja lejos
+     * de las anteriores.
+     *
+     * Debe sumar solamente 1.
+     */
+    frontResult.timestamp_ms =
+        1200;
+
+    frontResult.detections =
+    {
+        makeDetection(
+            105,
+            103
+        ),
+
+        makeDetection(
+            295,
+            105
+        ),
+
+        makeDetection(
+            500,
+            150
+        )
+    };
+
+
+    counter.processDetections(
+        frontResult
+    );
+
+
+    /*
+     * ========================================================
+     * CÁMARA TRASERA
+     * ========================================================
+     *
+     * Una panoja aparece en dos frames.
+     * Debe contarse solamente una vez.
      */
     TasselDetector::Result rearResult;
 
@@ -58,9 +151,34 @@ int main()
     rearResult.camera_index =
         5;
 
-    rearResult.detections.resize(
-        1
+    rearResult.timestamp_ms =
+        2000;
+
+    rearResult.detections =
+    {
+        makeDetection(
+            200,
+            120
+        )
+    };
+
+
+    counter.processDetections(
+        rearResult
     );
+
+
+    rearResult.timestamp_ms =
+        2100;
+
+    rearResult.detections =
+    {
+        makeDetection(
+            205,
+            123
+        )
+    };
+
 
     counter.processDetections(
         rearResult
@@ -68,36 +186,30 @@ int main()
 
 
     /*
-     * Cámara 7 = índice 6.
+     * Leemos resultado.
      */
-    rearResult.camera_index =
-        6;
-
-    rearResult.detections.resize(
-        2
-    );
-
-    counter.processDetections(
-        rearResult
-    );
-
-
     const TasselCounter::State state =
         counter.getState();
 
 
     std::cout
-        << "Conteo frontal: "
+        << "Conteo frontal unico: "
         << state.front_count
         << std::endl;
 
     std::cout
-        << "Conteo trasero: "
+        << "Conteo trasero unico: "
         << state.rear_count
         << std::endl;
 
 
-    if (state.front_count != 5)
+    /*
+     * Esperamos:
+     *
+     * frontal = 3
+     * trasero  = 1
+     */
+    if (state.front_count != 3)
     {
         std::cerr
             << "ERROR: conteo frontal incorrecto"
@@ -107,7 +219,7 @@ int main()
     }
 
 
-    if (state.rear_count != 3)
+    if (state.rear_count != 1)
     {
         std::cerr
             << "ERROR: conteo trasero incorrecto"
