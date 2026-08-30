@@ -69,7 +69,10 @@ void TasselVerifier::processRearDetections(
 
     /*
      * Cámara 5 = trasera izquierda.
+     * Cubre cuerpos 0,1,2.
+     *
      * Cámara 6 = trasera derecha.
+     * Cubre cuerpos 3,4,5.
      */
     if (result.camera_index < 5 ||
         result.camera_index >= 7)
@@ -78,14 +81,39 @@ void TasselVerifier::processRearDetections(
     }
 
 
-    const bool rearIsLeft =
-        result.camera_index == 5;
-
-
     for (const auto& detection :
          result.detections)
     {
-        (void)detection;
+        /*
+         * Detección inválida.
+         */
+        if (detection.body_index >=
+            BODY_COUNT)
+        {
+            continue;
+        }
+
+
+        /*
+         * =====================================================
+         * VALIDACIÓN DE ZONA DE LA CÁMARA TRASERA
+         * =====================================================
+         *
+         * CAM 5 solamente puede informar cuerpos 0..2.
+         * CAM 6 solamente puede informar cuerpos 3..5.
+         */
+        if (result.camera_index == 5 &&
+            detection.body_index >= 3)
+        {
+            continue;
+        }
+
+
+        if (result.camera_index == 6 &&
+            detection.body_index < 3)
+        {
+            continue;
+        }
 
 
         for (auto it =
@@ -95,28 +123,24 @@ void TasselVerifier::processRearDetections(
         {
             /*
              * =================================================
-             * ZONA FÍSICA
+             * MISMO CUERPO FÍSICO
              * =================================================
              *
-             * body 0..2 -> cuerpos físicos 1..3 -> izquierda
-             * body 3..5 -> cuerpos físicos 4..6 -> derecha
+             * La detección trasera solamente puede verificar
+             * una panoja frontal perteneciente exactamente
+             * al mismo cuerpo.
              */
-
-            const bool pendingIsLeft =
-                it->body_index < 3;
-
-
-            /*
-             * Una cámara trasera sólo puede verificar
-             * panojas pertenecientes a su mitad.
-             */
-            if (pendingIsLeft !=
-                rearIsLeft)
+            if (it->body_index !=
+                detection.body_index)
             {
                 continue;
             }
 
 
+            /*
+             * El tiempo trasero no puede ser anterior
+             * al tiempo de detección frontal.
+             */
             if (result.timestamp_ms <
                 it->timestamp_ms)
             {
@@ -129,12 +153,19 @@ void TasselVerifier::processRearDetections(
                 it->timestamp_ms;
 
 
+            /*
+             * Todavía no pudo llegar físicamente
+             * desde la cámara frontal a la trasera.
+             */
             if (age < MIN_DELAY_MS)
             {
                 continue;
             }
 
 
+            /*
+             * Ya salió de la ventana válida.
+             */
             if (age > MAX_DELAY_MS)
             {
                 continue;
@@ -142,10 +173,14 @@ void TasselVerifier::processRearDetections(
 
 
             /*
-             * Encontramos una panoja frontal pendiente
-             * perteneciente a la misma zona física.
+             * =================================================
+             * PANOJA ENCONTRADA NUEVAMENTE
+             * =================================================
              *
-             * Reapareció atrás:
+             * Fue vista adelante y reapareció atrás
+             * en el mismo cuerpo.
+             *
+             * Por lo tanto:
              * NO fue removida.
              */
             pendingTassels.erase(

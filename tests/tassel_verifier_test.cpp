@@ -368,7 +368,180 @@ int main()
             << std::endl;
 
         return 1;
-    }    
+    }   
+    
+        /*
+     * ========================================================
+     * CASO 5:
+     * MISMA CÁMARA TRASERA, CUERPO INCORRECTO
+     * ========================================================
+     *
+     * La panoja fue detectada adelante
+     * en el cuerpo 2 (índice 1).
+     *
+     * Luego aparece una detección atrás
+     * en la misma cámara trasera izquierda,
+     * pero correspondiente al cuerpo 1.
+     *
+     * NO debe verificarla.
+     */
+
+    verifier.reset();
+
+
+    TasselDetector::Result bodyFrontResult;
+
+    bodyFrontResult.valid =
+        true;
+
+    bodyFrontResult.camera_index =
+        0;
+
+    bodyFrontResult.timestamp_ms =
+        1000;
+
+    bodyFrontResult.detections =
+    {
+        makeDetection(
+            1
+        )
+    };
+
+
+    verifier.processFrontDetections(
+        bodyFrontResult
+    );
+
+
+    TasselDetector::Result wrongBodyRearResult;
+
+    wrongBodyRearResult.valid =
+        true;
+
+    wrongBodyRearResult.camera_index =
+        5;
+
+    wrongBodyRearResult.timestamp_ms =
+        3000;
+
+    wrongBodyRearResult.detections =
+    {
+        makeDetection(
+            0
+        )
+    };
+
+
+    verifier.processRearDetections(
+        wrongBodyRearResult
+    );
+
+
+    state =
+        verifier.getState();
+
+
+    std::cout
+        << "Cuerpo incorrecto - pendientes: "
+        << state.pending
+        << std::endl;
+
+    std::cout
+        << "Cuerpo incorrecto - presentes: "
+        << state.verified_remaining
+        << std::endl;
+
+
+    if (state.pending != 1)
+    {
+        std::cerr
+            << "ERROR: se verificó una panoja con cuerpo incorrecto"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    if (state.verified_remaining != 0)
+    {
+        std::cerr
+            << "ERROR: hubo verificación entre cuerpos distintos"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+     * Ahora llega una detección de la misma
+     * cámara trasera izquierda,
+     * pero correspondiente al cuerpo correcto.
+     *
+     * Sí debe verificarla.
+     */
+
+    TasselDetector::Result correctBodyRearResult;
+
+    correctBodyRearResult.valid =
+        true;
+
+    correctBodyRearResult.camera_index =
+        5;
+
+    correctBodyRearResult.timestamp_ms =
+        3200;
+
+    correctBodyRearResult.detections =
+    {
+        makeDetection(
+            1
+        )
+    };
+
+
+    verifier.processRearDetections(
+        correctBodyRearResult
+    );
+
+
+    state =
+        verifier.getState();
+
+
+    std::cout
+        << "Cuerpo correcto - pendientes: "
+        << state.pending
+        << std::endl;
+
+    std::cout
+        << "Cuerpo correcto - presentes: "
+        << state.verified_remaining
+        << std::endl;
+
+
+    if (state.pending != 0)
+    {
+        std::cerr
+            << "ERROR: la detección del cuerpo correcto no verificó la panoja"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    if (state.verified_remaining != 1)
+    {
+        std::cerr
+            << "ERROR: verificación por cuerpo incorrecta"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST CUERPO OK"
+        << std::endl;
 
 
     return 0;
