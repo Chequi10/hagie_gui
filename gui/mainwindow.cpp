@@ -1553,73 +1553,51 @@ void MainWindow::updateCameraPage()
         }
 
 
-        /*
-        * Estado antes del tracking.
-        */
-        const TasselCounter::State stateBefore =
-            tasselCounter.getState();
+                /*
+         * =====================================================
+         * TRACKING DE PANOJAS ÚNICAS
+         * =====================================================
+         *
+         * TasselCounter devuelve exactamente cuáles
+         * detecciones son nuevas.
+         *
+         * Esto conserva correctamente:
+         *
+         * - posición
+         * - body_index
+         * - tamaño
+         * - confianza
+         *
+         * y evita usar solamente una cantidad.
+         */
+        const std::vector<
+            TasselDetector::Detection
+        > newDetections =
+            tasselCounter.processDetections(
+                cameraResult
+            );
 
 
         /*
-        * El TasselCounter elimina duplicados
-        * entre frames.
-        */
-        tasselCounter.processDetections(
-            cameraResult
-        );
-
-
-        /*
-        * Estado después del tracking.
-        */
-        const TasselCounter::State stateAfter =
-            tasselCounter.getState();
-
-
-        std::uint64_t newUniqueDetections =
-            0;
-
-
-        if (camera < 5)
-        {
-            newUniqueDetections =
-                stateAfter.front_count -
-                stateBefore.front_count;
-        }
-        else
-        {
-            newUniqueDetections =
-                stateAfter.rear_count -
-                stateBefore.rear_count;
-        }
-
-
-        /*
-        * No apareció ninguna panoja nueva.
-        */
-        if (newUniqueDetections == 0)
+         * No apareció ninguna panoja nueva.
+         */
+        if (newDetections.empty())
         {
             continue;
         }
 
 
         /*
-        * Creamos un resultado que contiene solamente
-        * las detecciones nuevas confirmadas por
-        * el tracker.
-        *
-        * TasselVerifier por ahora usa cantidad
-        * y timestamp, no posición.
-        */
+         * Creamos un resultado que contiene
+         * exclusivamente las detecciones nuevas
+         * confirmadas por el tracker.
+         */
         TasselDetector::Result uniqueResult =
             cameraResult;
 
 
-        uniqueResult.detections.resize(
-            static_cast<std::size_t>(
-                newUniqueDetections
-            )
-        );
+        uniqueResult.detections =
+            newDetections;
 
 
         /*

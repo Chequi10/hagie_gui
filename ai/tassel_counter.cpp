@@ -9,6 +9,7 @@ void TasselCounter::reset()
     state =
         State {};
 
+
     for (auto& cameraTracks :
          trackedTassels)
     {
@@ -17,19 +18,24 @@ void TasselCounter::reset()
 }
 
 
-void TasselCounter::processDetections(
+std::vector<TasselDetector::Detection>
+TasselCounter::processDetections(
     const TasselDetector::Result& result)
 {
+    std::vector<TasselDetector::Detection>
+        newDetections;
+
+
     if (!result.valid)
     {
-        return;
+        return newDetections;
     }
 
 
     if (result.camera_index >=
         CAMERA_COUNT)
     {
-        return;
+        return newDetections;
     }
 
 
@@ -55,6 +61,7 @@ void TasselCounter::processDetections(
                 {
                     return true;
                 }
+
 
                 return
                     (result.timestamp_ms -
@@ -87,6 +94,17 @@ void TasselCounter::processDetections(
         for (auto& track :
              cameraTracks)
         {
+            /*
+             * Una panoja sólo puede continuar
+             * un track del mismo cuerpo físico.
+             */
+            if (track.body_index !=
+                detection.body_index)
+            {
+                continue;
+            }
+
+
             const int dx =
                 centerX -
                 track.center_x;
@@ -129,6 +147,9 @@ void TasselCounter::processDetections(
             matchedTrack->center_y =
                 centerY;
 
+            matchedTrack->body_index =
+                detection.body_index;
+
             matchedTrack->last_seen_timestamp_ms =
                 result.timestamp_ms;
 
@@ -137,7 +158,9 @@ void TasselCounter::processDetections(
 
 
         /*
-         * Nueva panoja.
+         * ====================================================
+         * NUEVA PANOJA
+         * ====================================================
          */
         TrackedTassel newTrack;
 
@@ -147,12 +170,27 @@ void TasselCounter::processDetections(
         newTrack.center_y =
             centerY;
 
+        newTrack.body_index =
+            detection.body_index;
+
         newTrack.last_seen_timestamp_ms =
             result.timestamp_ms;
 
 
         cameraTracks.push_back(
             newTrack
+        );
+
+
+        /*
+         * Guardamos exactamente cuál fue
+         * la detección nueva.
+         *
+         * Esto permitirá que TasselVerifier
+         * reciba su body_index correcto.
+         */
+        newDetections.push_back(
+            detection
         );
 
 
@@ -165,6 +203,9 @@ void TasselCounter::processDetections(
             ++state.rear_count;
         }
     }
+
+
+    return newDetections;
 }
 
 

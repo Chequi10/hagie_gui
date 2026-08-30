@@ -34,7 +34,8 @@ public:
     void reset();
 
 
-    void processDetections(
+    std::vector<TasselDetector::Detection>
+    processDetections(
         const TasselDetector::Result& result
     );
 
@@ -50,6 +51,9 @@ private:
             0;
 
         int center_y =
+            0;
+
+        std::size_t body_index =
             0;
 
         std::uint64_t last_seen_timestamp_ms =
