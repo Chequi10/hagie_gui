@@ -1507,6 +1507,8 @@ void MainWindow::updateCameraPage()
 
     std::uint64_t latestTimestampMs =
         0;
+    bool aiProcessedFrame =
+        false;
 
 
     for (std::size_t camera = 0;
@@ -1551,6 +1553,13 @@ void MainWindow::updateCameraPage()
         {
             continue;
         }
+
+        /*
+        * El detector procesó correctamente
+        * al menos un frame RGB en este ciclo.
+        */
+        aiProcessedFrame =
+            true;
 
 
                 /*
@@ -1611,6 +1620,8 @@ void MainWindow::updateCameraPage()
             );
         }
 
+
+
         /*
         * Cámaras 5..6:
         * verificación trasera.
@@ -1619,6 +1630,35 @@ void MainWindow::updateCameraPage()
         {
             tasselVerifier.processRearDetections(
                 uniqueResult
+            );
+        }
+    }
+
+    /*
+    * ========================================================
+    * ESTADO DEL MÓDULO DE IA
+    * ========================================================
+    *
+    * La IA se considera activa cuando el detector
+    * pudo procesar al menos un frame RGB válido
+    * durante este ciclo de actualización.
+    *
+    * Actualmente TasselDetector utiliza detecciones
+    * simuladas. Más adelante YOLO reemplazará solamente
+    * esa etapa de detección.
+    */
+    if (state != nullptr)
+    {
+        HagieState::SystemState system =
+            state->getSystemState();
+
+        if (system.ai_running != aiProcessedFrame)
+        {
+            system.ai_running =
+                aiProcessedFrame;
+
+            state->setSystemState(
+                system
             );
         }
     }
