@@ -11,6 +11,10 @@ class TasselVerifier
 {
 public:
 
+    static constexpr std::size_t BODY_COUNT =
+        6;
+
+
     struct State
     {
         std::uint64_t pending =
@@ -55,6 +59,9 @@ private:
     struct PendingTassel
     {
         std::uint64_t timestamp_ms =
+            0;
+
+        std::size_t body_index =
             0;
     };
 

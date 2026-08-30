@@ -27,6 +27,9 @@ public:
 
         int height =
             0;
+
+        std::size_t body_index =
+            0;
     };
 
 

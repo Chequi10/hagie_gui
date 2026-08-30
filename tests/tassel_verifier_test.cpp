@@ -3,9 +3,13 @@
 #include "ai/tassel_verifier.h"
 
 
-static TasselDetector::Detection makeDetection()
+static TasselDetector::Detection makeDetection(
+    std::size_t bodyIndex = 0)
 {
     TasselDetector::Detection detection;
+
+    detection.body_index =
+        bodyIndex;
 
     detection.x =
         100;
@@ -202,6 +206,169 @@ int main()
     std::cout
         << "TEST OK"
         << std::endl;
+
+    /*
+    * ========================================================
+    * CASO 4:
+    * VERIFICACIÓN POR ZONA FÍSICA
+    * ========================================================
+    *
+    * Una panoja del cuerpo 5 (índice 4)
+    * pertenece a la mitad derecha.
+    *
+    * La cámara trasera izquierda (índice 5)
+    * NO debe poder verificarla.
+    */
+
+    verifier.reset();
+
+
+    TasselDetector::Result rightFrontResult;
+
+    rightFrontResult.valid =
+        true;
+
+    rightFrontResult.camera_index =
+        3;
+
+    rightFrontResult.timestamp_ms =
+        1000;
+
+    rightFrontResult.detections =
+    {
+        makeDetection(
+            4
+        )
+    };
+
+
+    verifier.processFrontDetections(
+        rightFrontResult
+    );
+
+
+    TasselDetector::Result leftRearResult;
+
+    leftRearResult.valid =
+        true;
+
+    leftRearResult.camera_index =
+        5;
+
+    leftRearResult.timestamp_ms =
+        3000;
+
+    leftRearResult.detections =
+    {
+        makeDetection(
+            0
+        )
+    };
+
+
+    verifier.processRearDetections(
+        leftRearResult
+    );
+
+
+    state =
+        verifier.getState();
+
+
+    std::cout
+        << "Zona incorrecta - pendientes: "
+        << state.pending
+        << std::endl;
+
+    std::cout
+        << "Zona incorrecta - presentes: "
+        << state.verified_remaining
+        << std::endl;
+
+
+    if (state.pending != 1)
+    {
+        std::cerr
+            << "ERROR: la trasera izquierda verificó una panoja derecha"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    if (state.verified_remaining != 0)
+    {
+        std::cerr
+            << "ERROR: hubo verificación cruzada entre zonas"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+    * Ahora llega la cámara trasera derecha.
+    *
+    * Sí debe verificarla.
+    */
+
+    TasselDetector::Result rightRearResult;
+
+    rightRearResult.valid =
+        true;
+
+    rightRearResult.camera_index =
+        6;
+
+    rightRearResult.timestamp_ms =
+        3200;
+
+    rightRearResult.detections =
+    {
+        makeDetection(
+            4
+        )
+    };
+
+
+    verifier.processRearDetections(
+        rightRearResult
+    );
+
+
+    state =
+        verifier.getState();
+
+
+    std::cout
+        << "Zona correcta - pendientes: "
+        << state.pending
+        << std::endl;
+
+    std::cout
+        << "Zona correcta - presentes: "
+        << state.verified_remaining
+        << std::endl;
+
+
+    if (state.pending != 0)
+    {
+        std::cerr
+            << "ERROR: la trasera derecha no verificó la panoja"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    if (state.verified_remaining != 1)
+    {
+        std::cerr
+            << "ERROR: verificación derecha incorrecta"
+            << std::endl;
+
+        return 1;
+    }    
 
 
     return 0;

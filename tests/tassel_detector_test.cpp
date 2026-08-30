@@ -1,5 +1,6 @@
 #include <iostream>
-
+#include <thread>
+#include <chrono>
 #include "ai/tassel_detector.h"
 #include "vision/simulated_rgb_frame_source.h"
 
@@ -37,6 +38,21 @@ int main()
 
 
         RgbFrameSource::Frame frame;
+
+
+        /*
+        * Las cámaras traseras 6 y 7
+        * tienen un retardo simulado de 2 segundos.
+        */
+        if (camera >= 5)
+        {
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(
+                    2100
+                )
+            );
+        }
+
 
         if (!source.getFrame(frame))
         {

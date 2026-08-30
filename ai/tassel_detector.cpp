@@ -31,9 +31,18 @@ bool TasselDetector::processFrame(
      * DETECTOR SIMULADO DE PANOJAS
      * ========================================================
      *
-     * Por ahora generamos detecciones conocidas.
-     * Más adelante este bloque será reemplazado
-     * por YOLO / TensorRT.
+     * Cámaras frontales:
+     *
+     * CAM 0 -> cuerpos 0 y 1
+     * CAM 1 -> cuerpos 1 y 2
+     * CAM 2 -> cuerpos 2 y 3
+     * CAM 3 -> cuerpos 3 y 4
+     * CAM 4 -> cuerpos 4 y 5
+     *
+     * Cámaras traseras:
+     *
+     * CAM 5 -> zona izquierda, cuerpos 0..2
+     * CAM 6 -> zona derecha, cuerpos 3..5
      */
 
 
@@ -57,6 +66,34 @@ bool TasselDetector::processFrame(
 
     detection1.height =
         50;
+
+
+    /*
+     * Asignación del cuerpo.
+     */
+    if (cameraIndex < 5)
+    {
+        detection1.body_index =
+            cameraIndex;
+    }
+    else if (cameraIndex == 5)
+    {
+        /*
+         * Trasera izquierda.
+         * Por simulación usamos cuerpo 1.
+         */
+        detection1.body_index =
+            0;
+    }
+    else
+    {
+        /*
+         * Trasera derecha.
+         * Por simulación usamos cuerpo 4.
+         */
+        detection1.body_index =
+            3;
+    }
 
 
     result.detections.push_back(
@@ -90,6 +127,14 @@ bool TasselDetector::processFrame(
 
         detection2.height =
             45;
+
+
+        /*
+         * Segundo cuerpo cubierto
+         * por la cámara frontal.
+         */
+        detection2.body_index =
+            cameraIndex + 1;
 
 
         result.detections.push_back(
