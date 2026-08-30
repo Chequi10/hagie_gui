@@ -53,6 +53,13 @@ public:
     ~TasselDetector() = default;
 
 
+    static std::size_t bodyFromImagePosition(
+        std::size_t cameraIndex,
+        int centerX,
+        std::size_t imageWidth
+    );
+
+
     bool processFrame(
         std::size_t cameraIndex,
         const RgbFrameSource::Frame& frame,
