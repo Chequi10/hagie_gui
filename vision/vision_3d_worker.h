@@ -111,6 +111,18 @@ public:
         CAMERA_COUNT
     > cameraOrientations {};
 
+    /*
+     * Timestamp de captura de la última
+     * nube válida de cada cámara.
+     *
+     * Unidad: milisegundos monotónicos.
+     */
+    std::array<
+        std::uint64_t,
+        CAMERA_COUNT
+    > latestPointCloudTimestampMs {};
+
+
 
     /*
      * Elimina la fuente asociada a una cámara.
@@ -139,7 +151,8 @@ public:
 
     bool getLatestPointCloud(
         std::size_t camera,
-        Vision3DProcessor::PointCloud& cloud
+        Vision3DProcessor::PointCloud& cloud,
+        std::uint64_t& timestampMs
     ) const;
 
         PointCloudSource::CameraOrientation

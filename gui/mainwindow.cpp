@@ -1597,12 +1597,54 @@ void MainWindow::updateCameraPage()
             {
                 Vision3DProcessor::PointCloud cloud3D;
 
+                std::uint64_t cloudTimestampMs =
+                    0;
+
 
                 if (vision3DWorker->getLatestPointCloud(
                         camera,
-                        cloud3D
+                        cloud3D,
+                        cloudTimestampMs
                     ))
                 {
+
+                    /*
+                    * =================================================
+                    * VALIDACION TEMPORAL RGB <-> NUBE 3D
+                    * =================================================
+                    *
+                    * Evita asociar una detección RGB con una nube
+                    * demasiado vieja.
+                    */
+                    constexpr std::uint64_t
+                        MAX_RGB_CLOUD_DELTA_MS =
+                            150;
+
+
+                    const std::uint64_t timeDeltaMs =
+                        (cameraFrame.timestamp_ms >
+                        cloudTimestampMs)
+                        ?
+                        (cameraFrame.timestamp_ms -
+                        cloudTimestampMs)
+                        :
+                        (cloudTimestampMs -
+                        cameraFrame.timestamp_ms);
+
+
+                    if (timeDeltaMs >
+                        MAX_RGB_CLOUD_DELTA_MS)
+                    {
+                        /*
+                        * La nube no corresponde temporalmente
+                        * con este frame RGB.
+                        *
+                        * Al quedar validDetections vacío,
+                        * estas detecciones frontales no
+                        * entrarán al contador.
+                        */
+                        continue;
+                    }
                     Vision3DProcessor::CameraConfig cameraConfig =
                         vision3DProcessor->getCameraConfig(
                             camera

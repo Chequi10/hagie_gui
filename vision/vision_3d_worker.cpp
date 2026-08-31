@@ -118,8 +118,13 @@ bool Vision3DWorker::hasPointCloudSource(
 
 bool Vision3DWorker::getLatestPointCloud(
     std::size_t camera,
-    Vision3DProcessor::PointCloud& cloud) const
+    Vision3DProcessor::PointCloud& cloud,
+    std::uint64_t& timestampMs) const
 {
+    timestampMs =
+        0;
+
+
     if (camera >= CAMERA_COUNT)
     {
         cloud.clear();
@@ -141,6 +146,9 @@ bool Vision3DWorker::getLatestPointCloud(
 
     cloud =
         latestPointClouds[camera];
+
+    timestampMs =
+        latestPointCloudTimestampMs[camera];
 
 
     return true;
@@ -512,6 +520,23 @@ bool Vision3DWorker::processCamera(
         return false;
     }
 
+
+        /*
+     * Timestamp monotónico asociado a esta nube.
+     *
+     * Debe usar la misma base temporal que los
+     * frames RGB para poder comparar antigüedad.
+     */
+    const std::uint64_t cloudTimestampMs =
+        static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()
+            ).count()
+        );
+
     /*
      * Guardar una copia de la nube más reciente.
      *
@@ -528,6 +553,10 @@ bool Vision3DWorker::processCamera(
 
         latestPointCloudValid[camera] =
             true;
+
+
+        latestPointCloudTimestampMs[camera] =
+            cloudTimestampMs;
     }
 
 
