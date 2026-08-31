@@ -417,6 +417,11 @@ private:
         const Point3D& point
     ) const;
 
+        Point3D levelPointWithOrientation(
+        const Point3D& point,
+        const CameraGeometry& geometry
+    ) const;
+
 
     TemporalFilterConfig temporalFilterConfig;
 

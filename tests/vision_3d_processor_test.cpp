@@ -2072,6 +2072,175 @@ int main()
         << "TEST REGION 3D OK"
         << std::endl;
 
+        /*
+     * ========================================================
+     * TEST 16 - OFFSET DE MONTAJE POR CAMARA
+     * ========================================================
+     *
+     * Verifica que getDetectionPosition3D()
+     * utilice el roll/pitch recibido en CameraGeometry
+     * y no la geometría global del processor.
+     */
+    Vision3DProcessor cameraGeometryProcessor;
+
+
+    Vision3DProcessor::Orientation testOrientation;
+
+    testOrientation.valid =
+        true;
+
+    testOrientation.roll_deg =
+        0.0f;
+
+    testOrientation.pitch_deg =
+        0.0f;
+
+
+    cameraGeometryProcessor.setOrientation(
+        testOrientation
+    );
+
+
+    Vision3DProcessor::PointCloud geometryCloud;
+
+
+    Vision3DProcessor::Point3D geometryPoint;
+
+    geometryPoint.x =
+        0.0f;
+
+    geometryPoint.y =
+        1.0f;
+
+    geometryPoint.z =
+        1.0f;
+
+    geometryPoint.image_x =
+        100;
+
+    geometryPoint.image_y =
+        100;
+
+    geometryPoint.image_coordinates_valid =
+        true;
+
+
+    geometryCloud.push_back(
+        geometryPoint
+    );
+
+
+    /*
+     * Cámara A:
+     * montaje perfectamente nivelado.
+     */
+    Vision3DProcessor::CameraGeometry geometryA;
+
+    geometryA.position_x_mm =
+        0.0f;
+
+    geometryA.position_y_mm =
+        0.0f;
+
+    geometryA.position_z_mm =
+        0.0f;
+
+    geometryA.roll_offset_deg =
+        0.0f;
+
+    geometryA.pitch_offset_deg =
+        0.0f;
+
+
+    /*
+     * Cámara B:
+     * misma posición física,
+     * pero con 10 grados de pitch de montaje.
+     */
+    Vision3DProcessor::CameraGeometry geometryB =
+        geometryA;
+
+    geometryB.pitch_offset_deg =
+        10.0f;
+
+
+    Vision3DProcessor::Point3D positionA;
+    Vision3DProcessor::Point3D positionB;
+
+
+    const bool validGeometryA =
+        cameraGeometryProcessor.getDetectionPosition3D(
+            geometryCloud,
+            90,
+            90,
+            20,
+            20,
+            geometryA,
+            positionA
+        );
+
+
+    const bool validGeometryB =
+        cameraGeometryProcessor.getDetectionPosition3D(
+            geometryCloud,
+            90,
+            90,
+            20,
+            20,
+            geometryB,
+            positionB
+        );
+
+
+    std::cout
+        << "TEST 16 - GEOMETRIA POR CAMARA"
+        << std::endl;
+
+    std::cout
+        << "Camara A Z: "
+        << positionA.z
+        << " | Camara B Z: "
+        << positionB.z
+        << std::endl;
+
+
+    if (!validGeometryA ||
+        !validGeometryB)
+    {
+        std::cerr
+            << "ERROR: no obtuvo posicion 3D"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+     * Con diferente pitch de montaje,
+     * la posición corregida debe cambiar.
+     *
+     * Si ambas Z fueran prácticamente iguales,
+     * significaría que se sigue ignorando
+     * geometry.pitch_offset_deg.
+     */
+    if (std::fabs(
+            positionA.z -
+            positionB.z
+        ) < 0.01f)
+    {
+        std::cerr
+            << "ERROR: el offset de montaje "
+            << "de la camara no fue aplicado"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST GEOMETRIA POR CAMARA OK"
+        << std::endl;    
+
 
     return 0;
 }

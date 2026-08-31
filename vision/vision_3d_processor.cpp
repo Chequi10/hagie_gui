@@ -419,8 +419,24 @@ Vision3DProcessor::levelPointWithOrientation(
     const Point3D& point) const
 {
     /*
+     * Mantener compatibilidad con el procesamiento
+     * que utiliza la geometría general.
+     */
+    return levelPointWithOrientation(
+        point,
+        cameraGeometry
+    );
+}
+
+
+Vision3DProcessor::Point3D
+Vision3DProcessor::levelPointWithOrientation(
+    const Point3D& point,
+    const CameraGeometry& geometry) const
+{
+    /*
      * Si la IMU todavía no es válida,
-     * no modificamos el punto.
+     * mantenemos el comportamiento actual.
      */
     if (!orientation.valid)
     {
@@ -433,21 +449,21 @@ Vision3DProcessor::levelPointWithOrientation(
 
 
     /*
-     * Sumamos la inclinación instantánea
-     * de la máquina y el offset fijo
-     * de montaje de la cámara.
+     * Inclinación instantánea de la máquina
+     * más offset fijo de ESTA cámara.
      */
     float roll =
         -(
             orientation.roll_deg +
-            cameraGeometry.roll_offset_deg
+            geometry.roll_offset_deg
         )
         * DEG_TO_RAD;
+
 
     float pitch =
         -(
             orientation.pitch_deg +
-            cameraGeometry.pitch_offset_deg
+            geometry.pitch_offset_deg
         )
         * DEG_TO_RAD;
 
@@ -466,20 +482,13 @@ Vision3DProcessor::levelPointWithOrientation(
 
 
     /*
-     * --------------------------------------------------------
-     * CORRECCIÓN DE ROLL
-     * --------------------------------------------------------
+     * Corrección de roll.
      *
-     * Rotación alrededor del eje longitudinal Y.
-     *
-     * Sistema interno:
-     *
-     * X = lateral
-     * Y = longitudinal
-     * Z = vertical
+     * Rotación alrededor de Y.
      */
     Point3D afterRoll =
         point;
+
 
     afterRoll.x =
         cosRoll * point.x +
@@ -494,14 +503,13 @@ Vision3DProcessor::levelPointWithOrientation(
 
 
     /*
-     * --------------------------------------------------------
-     * CORRECCIÓN DE PITCH
-     * --------------------------------------------------------
+     * Corrección de pitch.
      *
-     * Rotación alrededor del eje lateral X.
+     * Rotación alrededor de X.
      */
     Point3D leveled =
         afterRoll;
+
 
     leveled.x =
         afterRoll.x;
@@ -598,7 +606,8 @@ bool Vision3DProcessor::getDetectionPosition3D(
 
         Point3D leveledPoint =
             levelPointWithOrientation(
-                machinePoint
+                machinePoint,
+                geometry
             );
 
 
@@ -977,9 +986,10 @@ Vision3DProcessor::calculateBodyHeight(
          *    utilizando la IMU.
          */
         Point3D leveledPoint =
-            levelPointWithOrientation(
-                machinePoint
-            );
+        levelPointWithOrientation(
+            machinePoint,
+            geometry
+        );
 
 
         /*
