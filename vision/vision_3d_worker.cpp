@@ -116,6 +116,36 @@ bool Vision3DWorker::hasPointCloudSource(
         pointCloudSources[camera] != nullptr;
 }
 
+bool Vision3DWorker::getLatestPointCloud(
+    std::size_t camera,
+    Vision3DProcessor::PointCloud& cloud) const
+{
+    if (camera >= CAMERA_COUNT)
+    {
+        cloud.clear();
+        return false;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        latestPointCloudMutex
+    );
+
+
+    if (!latestPointCloudValid[camera])
+    {
+        cloud.clear();
+        return false;
+    }
+
+
+    cloud =
+        latestPointClouds[camera];
+
+
+    return true;
+}
+
 PointCloudSource::CameraOrientation
 Vision3DWorker::getCameraOrientation(
     std::size_t camera) const
@@ -480,6 +510,24 @@ bool Vision3DWorker::processCamera(
     if (!source->getPointCloud(cloud))
     {
         return false;
+    }
+
+    /*
+     * Guardar una copia de la nube más reciente.
+     *
+     * Otro hilo podrá usarla para relacionar
+     * detecciones RGB con puntos XYZ.
+     */
+    {
+        std::lock_guard<std::mutex> lock(
+            latestPointCloudMutex
+        );
+
+        latestPointClouds[camera] =
+            cloud;
+
+        latestPointCloudValid[camera] =
+            true;
     }
 
 

@@ -15,6 +15,9 @@ void TasselCounter::reset()
     {
         cameraTracks.clear();
     }
+
+
+    frontPhysicalTracks.clear();
 }
 
 
@@ -73,6 +76,40 @@ TasselCounter::processDetections(
 
         cameraTracks.end()
     );
+
+        /*
+     * ========================================================
+     * ELIMINAR TRACKS FISICOS FRONTALES VIEJOS
+     * ========================================================
+     */
+    if (result.camera_index < 5)
+    {
+        frontPhysicalTracks.erase(
+            std::remove_if(
+                frontPhysicalTracks.begin(),
+                frontPhysicalTracks.end(),
+
+                [&result](
+                    const FrontPhysicalTrack& track)
+                {
+                    if (result.timestamp_ms <
+                        track.last_seen_timestamp_ms)
+                    {
+                        return true;
+                    }
+
+
+                    return
+                        (result.timestamp_ms -
+                         track.last_seen_timestamp_ms)
+                        >
+                        FRONT_3D_TRACK_TIMEOUT_MS;
+                }
+            ),
+
+            frontPhysicalTracks.end()
+        );
+    }
 
 
     for (const auto& detection :
@@ -156,6 +193,130 @@ TasselCounter::processDetections(
             continue;
         }
 
+                /*
+         * ====================================================
+         * DEDUPLICACION 3D ENTRE CAMARAS FRONTALES
+         * ====================================================
+         *
+         * Llegamos acá porque esta detección es nueva
+         * para ESTA cámara.
+         *
+         * Ahora comprobamos si otra cámara frontal
+         * ya observó físicamente la misma panoja.
+         */
+        if (result.camera_index < 5 &&
+            detection.position_3d_valid)
+        {
+            FrontPhysicalTrack* matchedPhysicalTrack =
+                nullptr;
+
+
+            for (auto& physicalTrack :
+                 frontPhysicalTracks)
+            {
+                /*
+                 * Nunca fusionar panojas asignadas
+                 * a cuerpos diferentes.
+                 */
+                if (physicalTrack.body_index !=
+                    detection.body_index)
+                {
+                    continue;
+                }
+
+
+                const float dx =
+                    detection.position_x -
+                    physicalTrack.position_x;
+
+                const float dy =
+                    detection.position_y -
+                    physicalTrack.position_y;
+
+                const float dz =
+                    detection.position_z -
+                    physicalTrack.position_z;
+
+
+                const float distance =
+                    std::sqrt(
+                        dx * dx +
+                        dy * dy +
+                        dz * dz
+                    );
+
+
+                if (distance <=
+                    FRONT_3D_MATCH_DISTANCE_M)
+                {
+                    matchedPhysicalTrack =
+                        &physicalTrack;
+
+                    break;
+                }
+            }
+
+
+            /*
+             * Ya fue vista físicamente por otra
+             * cámara frontal.
+             *
+             * Creamos igualmente el track local
+             * de esta cámara para que en el próximo
+             * frame funcione el tracking por píxeles,
+             * pero NO incrementamos el conteo.
+             */
+            if (matchedPhysicalTrack != nullptr)
+            {
+                TrackedTassel newCameraTrack;
+
+                newCameraTrack.center_x =
+                    centerX;
+
+                newCameraTrack.center_y =
+                    centerY;
+
+                newCameraTrack.body_index =
+                    detection.body_index;
+
+                newCameraTrack.last_seen_timestamp_ms =
+                    result.timestamp_ms;
+
+
+                cameraTracks.push_back(
+                    newCameraTrack
+                );
+
+                        /*
+                
+
+
+                /*
+                 * Actualizar la posición física con
+                 * la observación más reciente.
+                 */
+                matchedPhysicalTrack->position_x =
+                    detection.position_x;
+
+                matchedPhysicalTrack->position_y =
+                    detection.position_y;
+
+                matchedPhysicalTrack->position_z =
+                    detection.position_z;
+
+                matchedPhysicalTrack->last_seen_timestamp_ms =
+                    result.timestamp_ms;
+
+
+                /*
+                 * IMPORTANTE:
+                 *
+                 * No se agrega a newDetections
+                 * y no aumenta front_count.
+                 */
+                continue;
+            }
+        }
 
         /*
          * ====================================================
@@ -180,6 +341,37 @@ TasselCounter::processDetections(
         cameraTracks.push_back(
             newTrack
         );
+
+                /*
+         * Si esta panoja frontal tiene una posición
+         * física 3D válida, la registramos en el
+         * tracker compartido entre cámaras.
+         */
+        if (result.camera_index < 5 &&
+            detection.position_3d_valid)
+        {
+            FrontPhysicalTrack physicalTrack;
+
+            physicalTrack.position_x =
+                detection.position_x;
+
+            physicalTrack.position_y =
+                detection.position_y;
+
+            physicalTrack.position_z =
+                detection.position_z;
+
+            physicalTrack.body_index =
+                detection.body_index;
+
+            physicalTrack.last_seen_timestamp_ms =
+                result.timestamp_ms;
+
+
+            frontPhysicalTracks.push_back(
+                physicalTrack
+            );
+        }
 
 
         /*

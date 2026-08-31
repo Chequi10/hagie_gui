@@ -30,6 +30,28 @@ public:
 
         std::size_t body_index =
             0;
+
+        /*
+        * Posición física 3D de la panoja
+        * expresada en coordenadas de la máquina.
+        *
+        * X = lateral
+        * Y = longitudinal
+        * Z = vertical
+        *
+        * Unidad: metros.
+        */
+        float position_x =
+            0.0f;
+
+        float position_y =
+            0.0f;
+
+        float position_z =
+            0.0f;
+
+        bool position_3d_valid =
+            false;
     };
 
 

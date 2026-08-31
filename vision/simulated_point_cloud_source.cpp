@@ -86,6 +86,49 @@ bool SimulatedPointCloudSource::getPointCloud(
 
     cloud.clear();
 
+        /*
+     * Agrega una panoja simulada con:
+     *
+     * - posición física XYZ
+     * - posición correspondiente en la imagen RGB
+     *
+     * Así simulamos la asociación RGB + profundidad
+     * que entregará la ZED real.
+     */
+    auto addSimulatedTassel =
+        [&cloud](
+            float x,
+            float y,
+            float z,
+            int imageX,
+            int imageY)
+        {
+            Vision3DProcessor::Point3D point;
+
+            point.x =
+                x;
+
+            point.y =
+                y;
+
+            point.z =
+                z;
+
+            point.image_x =
+                imageX;
+
+            point.image_y =
+                imageY;
+
+            point.image_coordinates_valid =
+                true;
+
+
+            cloud.push_back(
+                point
+            );
+        };
+
 
         /*
      * ========================================================
@@ -109,17 +152,25 @@ bool SimulatedPointCloudSource::getPointCloud(
         case 0:
         {
             /*
-             * Cuerpo 1 -> 400 mm
+             * Cámara 0
+             *
+             * Detección 1 -> Cuerpo 1
+             * Detección 2 -> Cuerpo 2
              */
-            cloud.push_back(
-                {-2.5f, 0.0f, 0.40f}
+            addSimulatedTassel(
+                -2.5f,
+                0.0f,
+                0.40f,
+                95,
+                85
             );
 
-            /*
-             * Cuerpo 2 -> 500 mm
-             */
-            cloud.push_back(
-                {-1.5f, 0.0f, 0.50f}
+            addSimulatedTassel(
+                -1.5f,
+                0.0f,
+                0.50f,
+                174,
+                67
             );
 
             break;
@@ -129,17 +180,24 @@ bool SimulatedPointCloudSource::getPointCloud(
         case 1:
         {
             /*
-             * Cuerpo 2 -> 500 mm
+             * La primera detección representa
+             * la MISMA zona física C2 que también
+             * observa la cámara 0.
              */
-            cloud.push_back(
-                {-1.5f, 0.0f, 0.50f}
+            addSimulatedTassel(
+                -1.5f,
+                0.0f,
+                0.50f,
+                95,
+                85
             );
 
-            /*
-             * Cuerpo 3 -> 600 mm
-             */
-            cloud.push_back(
-                {-0.5f, 0.0f, 0.60f}
+            addSimulatedTassel(
+                -0.5f,
+                0.0f,
+                0.60f,
+                174,
+                67
             );
 
             break;
@@ -148,18 +206,20 @@ bool SimulatedPointCloudSource::getPointCloud(
 
         case 2:
         {
-            /*
-             * Cuerpo 3 -> 600 mm
-             */
-            cloud.push_back(
-                {-0.5f, 0.0f, 0.60f}
+            addSimulatedTassel(
+                -0.5f,
+                0.0f,
+                0.60f,
+                95,
+                85
             );
 
-            /*
-             * Cuerpo 4 -> 700 mm
-             */
-            cloud.push_back(
-                {0.5f, 0.0f, 0.70f}
+            addSimulatedTassel(
+                0.5f,
+                0.0f,
+                0.70f,
+                174,
+                67
             );
 
             break;
@@ -168,18 +228,20 @@ bool SimulatedPointCloudSource::getPointCloud(
 
         case 3:
         {
-            /*
-             * Cuerpo 4 -> 700 mm
-             */
-            cloud.push_back(
-                {0.5f, 0.0f, 0.70f}
+            addSimulatedTassel(
+                0.5f,
+                0.0f,
+                0.70f,
+                95,
+                85
             );
 
-            /*
-             * Cuerpo 5 -> 800 mm
-             */
-            cloud.push_back(
-                {1.5f, 0.0f, 0.80f}
+            addSimulatedTassel(
+                1.5f,
+                0.0f,
+                0.80f,
+                174,
+                67
             );
 
             break;
@@ -188,18 +250,20 @@ bool SimulatedPointCloudSource::getPointCloud(
 
         case 4:
         {
-            /*
-             * Cuerpo 5 -> 800 mm
-             */
-            cloud.push_back(
-                {1.5f, 0.0f, 0.80f}
+            addSimulatedTassel(
+                1.5f,
+                0.0f,
+                0.80f,
+                95,
+                85
             );
 
-            /*
-             * Cuerpo 6 -> 900 mm
-             */
-            cloud.push_back(
-                {2.5f, 0.0f, 0.90f}
+            addSimulatedTassel(
+                2.5f,
+                0.0f,
+                0.90f,
+                174,
+                67
             );
 
             break;

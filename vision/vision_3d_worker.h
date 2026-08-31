@@ -15,6 +15,7 @@
 #include "vision/point_cloud_source.h"
 #include "vision/vision_3d_processor.h"
 #include "vision/vision_height_source.h"
+#include <mutex>
 
 
 class Vision3DWorker
@@ -136,6 +137,11 @@ public:
         std::size_t camera
     ) const;
 
+    bool getLatestPointCloud(
+        std::size_t camera,
+        Vision3DProcessor::PointCloud& cloud
+    ) const;
+
         PointCloudSource::CameraOrientation
     getCameraOrientation(
         std::size_t camera
@@ -199,6 +205,28 @@ private:
         std::unique_ptr<PointCloudSource>,
         CAMERA_COUNT
     > pointCloudSources {};
+
+    /*
+    * Última nube válida recibida
+    * de cada cámara 3D frontal.
+    *
+    * Se usa para asociar detecciones RGB
+    * con posiciones físicas XYZ.
+    */
+    std::array<
+        Vision3DProcessor::PointCloud,
+        CAMERA_COUNT
+    > latestPointClouds {};
+
+
+    std::array<
+        bool,
+        CAMERA_COUNT
+    > latestPointCloudValid {};
+
+
+    mutable std::mutex
+        latestPointCloudMutex;
 
 
     /*

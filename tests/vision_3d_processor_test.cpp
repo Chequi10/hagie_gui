@@ -1643,6 +1643,435 @@ int main()
         );
     }
 
+    std::cout
+        << std::endl
+        << "========================================"
+        << std::endl
+        << "TEST 14 - POSICION 3D DE DETECCION RGB"
+        << std::endl
+        << "========================================"
+        << std::endl;
+
+
+    Vision3DProcessor processorDetection3D;
+
+
+    /*
+    * Geometría de cámara.
+    *
+    * La desplazamos +300 mm hacia adelante
+    * en el eje longitudinal Y.
+    */
+    Vision3DProcessor::CameraGeometry detectionGeometry;
+
+    detectionGeometry.position_x_mm =
+        0.0f;
+
+    detectionGeometry.position_y_mm =
+        300.0f;
+
+    detectionGeometry.position_z_mm =
+        0.0f;
+
+
+    /*
+    * Nube con puntos asociados a píxeles.
+    *
+    * La detección RGB ocupará:
+    *
+    * x = 100 ... 139
+    * y = 50  ... 89
+    *
+    * Estos tres puntos deben entrar.
+    */
+    Vision3DProcessor::PointCloud detectionCloud;
+
+
+    Vision3DProcessor::Point3D detectionPoint1;
+
+    detectionPoint1.x = -1.50f;
+    detectionPoint1.y = 2.00f;
+    detectionPoint1.z = 1.20f;
+    detectionPoint1.image_x = 110;
+    detectionPoint1.image_y = 60;
+    detectionPoint1.image_coordinates_valid = true;
+
+    detectionCloud.push_back(
+        detectionPoint1
+    );
+
+
+    Vision3DProcessor::Point3D detectionPoint2;
+
+    detectionPoint2.x = -1.48f;
+    detectionPoint2.y = 2.10f;
+    detectionPoint2.z = 1.25f;
+    detectionPoint2.image_x = 120;
+    detectionPoint2.image_y = 70;
+    detectionPoint2.image_coordinates_valid = true;
+
+    detectionCloud.push_back(
+        detectionPoint2
+    );
+
+
+    Vision3DProcessor::Point3D detectionPoint3;
+
+    detectionPoint3.x = -1.52f;
+    detectionPoint3.y = 2.20f;
+    detectionPoint3.z = 1.30f;
+    detectionPoint3.image_x = 130;
+    detectionPoint3.image_y = 80;
+    detectionPoint3.image_coordinates_valid = true;
+
+    detectionCloud.push_back(
+        detectionPoint3
+    );
+
+
+    /*
+    * Punto fuera del bounding box.
+    *
+    * No debe participar en el cálculo.
+    */
+    Vision3DProcessor::Point3D outsideDetectionPoint;
+
+    outsideDetectionPoint.x = 4.0f;
+    outsideDetectionPoint.y = 8.0f;
+    outsideDetectionPoint.z = 4.0f;
+    outsideDetectionPoint.image_x = 250;
+    outsideDetectionPoint.image_y = 150;
+    outsideDetectionPoint.image_coordinates_valid = true;
+
+    detectionCloud.push_back(
+        outsideDetectionPoint
+    );
+
+
+    /*
+    * Obtener posición física de la panoja.
+    */
+    Vision3DProcessor::Point3D detectionPosition;
+
+    bool detectionPositionValid =
+        processorDetection3D.getDetectionPosition3D(
+            detectionCloud,
+            100,
+            50,
+            40,
+            40,
+            detectionGeometry,
+            detectionPosition
+        );
+
+
+    if (detectionPositionValid)
+    {
+        std::cout
+            << "Posicion X: "
+            << detectionPosition.x
+            << " m"
+            << std::endl;
+
+        std::cout
+            << "Posicion Y: "
+            << detectionPosition.y
+            << " m"
+            << std::endl;
+
+        std::cout
+            << "Posicion Z: "
+            << detectionPosition.z
+            << " m"
+            << std::endl;
+
+        std::cout
+            << "Pixel representativo: "
+            << detectionPosition.image_x
+            << ", "
+            << detectionPosition.image_y
+            << std::endl;
+    }
+    else
+    {
+        std::cout
+            << "POSICION 3D NO VALIDA"
+            << std::endl;
+    }
+
+
+    /*
+    * Valores esperados:
+    *
+    * Medianas locales:
+    *
+    * X = -1.50 m
+    * Y =  2.10 m
+    * Z =  1.25 m
+    *
+    * La cámara está +300 mm en Y:
+    *
+    * Y máquina = 2.40 m
+    */
+    bool detectionTestOk =
+        detectionPositionValid &&
+        std::fabs(
+            detectionPosition.x - (-1.50f)
+        ) < 0.001f &&
+        std::fabs(
+            detectionPosition.y - 2.40f
+        ) < 0.001f &&
+        std::fabs(
+            detectionPosition.z - 1.25f
+        ) < 0.001f &&
+        detectionPosition.image_x == 120 &&
+        detectionPosition.image_y == 70;
+
+
+    std::cout
+        << (
+            detectionTestOk
+                ? "TEST POSICION 3D OK"
+                : "TEST POSICION 3D ERROR"
+        )
+        << std::endl;
+
+            /*
+     * ========================================================
+     * TEST 15 - ASIGNACION DE CUERPO POR REGION 3D
+     * ========================================================
+     */
+
+    Vision3DProcessor regionProcessor;
+
+
+    Vision3DProcessor::CameraConfig regionCameraConfig =
+        regionProcessor.getCameraConfig(
+            0
+        );
+
+
+    regionCameraConfig.enabled =
+        true;
+
+    regionCameraConfig.body_enabled.fill(
+        false
+    );
+
+    /*
+     * Cámara 0 habilitada para C1 y C2.
+     */
+    regionCameraConfig.body_enabled[0] =
+        true;
+
+    regionCameraConfig.body_enabled[1] =
+        true;
+
+
+    regionProcessor.setCameraConfig(
+        0,
+        regionCameraConfig
+    );
+
+
+    /*
+     * Regiones equivalentes a las que
+     * configurás desde REGIONES 3D.
+     */
+    Vision3DProcessor::BodyRegion body1Region;
+
+    body1Region.min_x =
+        -3.0f;
+
+    body1Region.max_x =
+        -2.0f;
+
+    body1Region.min_y =
+        -10.0f;
+
+    body1Region.max_y =
+        10.0f;
+
+    body1Region.min_z =
+        0.0f;
+
+    body1Region.max_z =
+        5.0f;
+
+
+    Vision3DProcessor::BodyRegion body2Region;
+
+    body2Region.min_x =
+        -2.0f;
+
+    body2Region.max_x =
+        -1.0f;
+
+    body2Region.min_y =
+        -10.0f;
+
+    body2Region.max_y =
+        10.0f;
+
+    body2Region.min_z =
+        0.0f;
+
+    body2Region.max_z =
+        5.0f;
+
+
+    regionProcessor.setBodyRegion(
+        0,
+        body1Region
+    );
+
+    regionProcessor.setBodyRegion(
+        1,
+        body2Region
+    );
+
+
+    /*
+     * Punto dentro de C2.
+     */
+    Vision3DProcessor::Point3D pointInBody2;
+
+    pointInBody2.x =
+        -1.50f;
+
+    pointInBody2.y =
+        2.00f;
+
+    pointInBody2.z =
+        1.50f;
+
+
+    std::size_t detectedBody =
+        999;
+
+
+    const bool foundBody2 =
+        regionProcessor.findBodyForPosition(
+            0,
+            pointInBody2,
+            detectedBody
+        );
+
+
+    std::cout
+        << "TEST 15 - REGION 3D"
+        << std::endl;
+
+    std::cout
+        << "Dentro de C2: "
+        << foundBody2
+        << " | body_index: "
+        << detectedBody
+        << std::endl;
+
+
+    if (!foundBody2 ||
+        detectedBody != 1)
+    {
+        std::cerr
+            << "ERROR: no asigno correctamente C2"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+     * Punto fuera de C1 y C2.
+     */
+    Vision3DProcessor::Point3D pointOutside;
+
+    pointOutside.x =
+        1.50f;
+
+    pointOutside.y =
+        2.00f;
+
+    pointOutside.z =
+        1.50f;
+
+
+    detectedBody =
+        999;
+
+
+    const bool foundOutside =
+        regionProcessor.findBodyForPosition(
+            0,
+            pointOutside,
+            detectedBody
+        );
+
+
+    std::cout
+        << "Fuera de regiones: "
+        << foundOutside
+        << std::endl;
+
+
+    if (foundOutside)
+    {
+        std::cerr
+            << "ERROR: acepto un punto fuera "
+            << "de las regiones"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+     * Punto físicamente dentro de C2,
+     * pero C2 deshabilitado para cámara 0.
+     */
+    regionCameraConfig.body_enabled[1] =
+        false;
+
+
+    regionProcessor.setCameraConfig(
+        0,
+        regionCameraConfig
+    );
+
+
+    detectedBody =
+        999;
+
+
+    const bool foundDisabledBody =
+        regionProcessor.findBodyForPosition(
+            0,
+            pointInBody2,
+            detectedBody
+        );
+
+
+    std::cout
+        << "C2 deshabilitado para camara: "
+        << foundDisabledBody
+        << std::endl;
+
+
+    if (foundDisabledBody)
+    {
+        std::cerr
+            << "ERROR: acepto un cuerpo "
+            << "deshabilitado para la camara"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST REGION 3D OK"
+        << std::endl;
+
 
     return 0;
 }

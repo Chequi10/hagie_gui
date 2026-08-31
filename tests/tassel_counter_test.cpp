@@ -6,6 +6,7 @@
 static TasselDetector::Detection makeDetection(
     int x,
     int y,
+    std::size_t bodyIndex = 0,
     int width = 30,
     int height = 50)
 {
@@ -16,6 +17,9 @@ static TasselDetector::Detection makeDetection(
 
     detection.y =
         y;
+
+    detection.body_index =
+        bodyIndex;
 
     detection.width =
         width;
@@ -229,9 +233,205 @@ int main()
     }
 
 
+    /*
+    * ========================================================
+    * CUERPOS FÍSICOS DISTINTOS
+    * ========================================================
+    *
+    * Dos detecciones prácticamente en la misma posición
+    * de imagen, pero pertenecientes a cuerpos diferentes,
+    * deben mantenerse como panojas distintas.
+    */
+
+    TasselCounter bodyCounter;
+
+
+    TasselDetector::Result bodyResult;
+
+    bodyResult.valid =
+        true;
+
+    bodyResult.camera_index =
+        1;
+
+    bodyResult.timestamp_ms =
+        3000;
+
+    bodyResult.detections =
+    {
+        makeDetection(
+            200,
+            120,
+            1
+        ),
+
+        makeDetection(
+            205,
+            123,
+            2
+        )
+    };
+
+
+    bodyCounter.processDetections(
+        bodyResult
+    );
+
+
+    const TasselCounter::State bodyState =
+        bodyCounter.getState();
+
+
+    std::cout
+        << "Panojas en cuerpos distintos: "
+        << bodyState.front_count
+        << std::endl;
+
+
+    if (bodyState.front_count != 2)
+    {
+        std::cerr
+            << "ERROR: se mezclaron panojas de cuerpos distintos"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST CUERPOS OK"
+        << std::endl;
+
     std::cout
         << "TEST OK"
         << std::endl;
+
+
+        /*
+     * ========================================================
+     * TEST DEDUPLICACION 3D ENTRE CAMARAS FRONTALES
+     * ========================================================
+     */
+
+    counter.reset();
+
+
+    TasselDetector::Result frontCamera0;
+
+    frontCamera0.valid =
+        true;
+
+    frontCamera0.camera_index =
+        0;
+
+    frontCamera0.timestamp_ms =
+        1000;
+
+
+    TasselDetector::Detection detectionCam0 =
+        makeDetection(
+            250,
+            100,
+            1
+        );
+
+    detectionCam0.position_x =
+        -1.50f;
+
+    detectionCam0.position_y =
+        2.40f;
+
+    detectionCam0.position_z =
+        1.80f;
+
+    detectionCam0.position_3d_valid =
+        true;
+
+
+    frontCamera0.detections.push_back(
+        detectionCam0
+    );
+
+
+    counter.processDetections(
+        frontCamera0
+    );
+
+
+    /*
+     * La cámara frontal 1 ve la MISMA panoja,
+     * pero en una posición de píxel totalmente
+     * diferente.
+     *
+     * La posición física 3D es prácticamente
+     * la misma.
+     */
+    TasselDetector::Result frontCamera1;
+
+    frontCamera1.valid =
+        true;
+
+    frontCamera1.camera_index =
+        1;
+
+    frontCamera1.timestamp_ms =
+        1050;
+
+
+    TasselDetector::Detection detectionCam1 =
+        makeDetection(
+            40,
+            120,
+            1
+        );
+
+    detectionCam1.position_x =
+        -1.47f;
+
+    detectionCam1.position_y =
+        2.36f;
+
+    detectionCam1.position_z =
+        1.82f;
+
+    detectionCam1.position_3d_valid =
+        true;
+
+
+    frontCamera1.detections.push_back(
+        detectionCam1
+    );
+
+
+    counter.processDetections(
+        frontCamera1
+    );
+
+
+    TasselCounter::State state3D =
+        counter.getState();
+
+
+    std::cout
+        << "Conteo frontal con solapamiento 3D: "
+        << state3D.front_count
+        << std::endl;
+
+
+    if (state3D.front_count != 1)
+    {
+        std::cerr
+            << "ERROR: la misma panoja fue contada "
+            << "dos veces entre camaras"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST DEDUPLICACION 3D OK"
+        << std::endl;    
 
     return 0;
 }

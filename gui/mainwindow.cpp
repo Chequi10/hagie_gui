@@ -1561,8 +1561,144 @@ void MainWindow::updateCameraPage()
         aiProcessedFrame =
             true;
 
-
+        
+        /*
+         * =====================================================
+         * ASOCIACION RGB -> POSICION 3D
+         * =====================================================
+         *
+         * Solo las cámaras frontales 0..4
+         * disponen de nube de puntos 3D.
+         */
                 /*
+         * =====================================================
+         * ASOCIACION RGB -> POSICION 3D
+         * Y FILTRO POR REGION 3D CONFIGURADA
+         * =====================================================
+         *
+         * Solo las cámaras frontales 0..4
+         * disponen de nube de puntos 3D.
+         *
+         * Una detección frontal solamente se acepta si:
+         *
+         * 1) puede obtenerse su posición XYZ,
+         * 2) cae dentro de una REGIÓN 3D configurada,
+         * 3) la cámara está habilitada para ese cuerpo.
+         */
+        if (camera < Vision3DWorker::CAMERA_COUNT)
+        {
+            std::vector<
+                TasselDetector::Detection
+            > validDetections;
+
+
+            if (vision3DWorker != nullptr &&
+                vision3DProcessor != nullptr)
+            {
+                Vision3DProcessor::PointCloud cloud3D;
+
+
+                if (vision3DWorker->getLatestPointCloud(
+                        camera,
+                        cloud3D
+                    ))
+                {
+                    Vision3DProcessor::CameraConfig cameraConfig =
+                        vision3DProcessor->getCameraConfig(
+                            camera
+                        );
+
+
+                    for (TasselDetector::Detection detection :
+                         cameraResult.detections)
+                    {
+                        Vision3DProcessor::Point3D position3D;
+
+
+                        /*
+                         * Obtener posición física XYZ
+                         * correspondiente al bounding box
+                         * detectado en RGB.
+                         */
+                        if (!vision3DProcessor->getDetectionPosition3D(
+                                cloud3D,
+                                detection.x,
+                                detection.y,
+                                detection.width,
+                                detection.height,
+                                cameraConfig.geometry,
+                                position3D
+                            ))
+                        {
+                            continue;
+                        }
+
+
+                        /*
+                         * Determinar en qué cuerpo cae
+                         * utilizando exactamente las regiones
+                         * configuradas desde REGIONES 3D.
+                         */
+                        std::size_t detectedBody =
+                            0;
+
+
+                        if (!vision3DProcessor->findBodyForPosition(
+                                camera,
+                                position3D,
+                                detectedBody
+                            ))
+                        {
+                            /*
+                             * Está fuera de todas las regiones
+                             * válidas para esta cámara.
+                             *
+                             * No entra al TasselCounter.
+                             */
+                            continue;
+                        }
+
+
+                        /*
+                         * Detección válida.
+                         */
+                        detection.position_x =
+                            position3D.x;
+
+                        detection.position_y =
+                            position3D.y;
+
+                        detection.position_z =
+                            position3D.z;
+
+                        detection.position_3d_valid =
+                            true;
+
+                        detection.body_index =
+                            detectedBody;
+
+
+                        validDetections.push_back(
+                            detection
+                        );
+                    }
+                }
+            }
+
+
+            /*
+             * Reemplazamos las detecciones originales
+             * por las que realmente pertenecen a una
+             * región 3D válida.
+             *
+             * Si no hubo nube 3D válida, queda vacío
+             * y no se cuentan panojas frontales.
+             */
+            cameraResult.detections =
+                std::move(validDetections);
+        }
+
+         /*
          * =====================================================
          * TRACKING DE PANOJAS ÚNICAS
          * =====================================================

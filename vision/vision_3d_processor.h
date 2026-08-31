@@ -32,9 +32,43 @@ public:
      */
     struct Point3D
     {
+        /*
+        * Coordenadas físicas 3D.
+        *
+        * Sistema Hagie:
+        *
+        * X = lateral
+        * Y = longitudinal
+        * Z = vertical
+        */
         float x = 0.0f;
         float y = 0.0f;
         float z = 0.0f;
+
+
+        /*
+        * ========================================================
+        * PÍXEL DE ORIGEN
+        * ========================================================
+        *
+        * Posición del píxel de la imagen de profundidad
+        * que originó este punto 3D.
+        *
+        * Esto permitirá relacionar posteriormente:
+        *
+        * detección RGB de una panoja
+        *          ↓
+        * píxel de imagen
+        *          ↓
+        * posición física X,Y,Z
+        *
+        * Las fuentes que no tengan correspondencia
+        * píxel-3D simplemente dejarán valid=false.
+        */
+        int image_x = -1;
+        int image_y = -1;
+
+        bool image_coordinates_valid = false;
     };
 
 
@@ -279,6 +313,21 @@ public:
     ) const;
 
 
+    /*
+     * Determina a qué cuerpo pertenece una posición
+     * física 3D utilizando las regiones configuradas
+     * en la GUI.
+     *
+     * También verifica que la cámara esté habilitada
+     * para atender ese cuerpo.
+     */
+    bool findBodyForPosition(
+        std::size_t camera,
+        const Point3D& position,
+        std::size_t& body
+    ) const;
+
+
     // ========================================================
     // PROCESAMIENTO DE NUBE
     // ========================================================
@@ -294,11 +343,24 @@ public:
         const PointCloud& cloud
     ) const;
 
+
     VisionHeightSource::VisionResult
     processPointCloud(
         std::size_t camera,
         const PointCloud& cloud
     ) const;
+
+    bool getDetectionPosition3D(
+        const PointCloud& cloud,
+        int imageX,
+        int imageY,
+        int imageWidth,
+        int imageHeight,
+        const CameraGeometry& geometry,
+        Point3D& position
+    ) const;
+
+
 
     void setTemporalFilterConfig(
         const TemporalFilterConfig& config

@@ -231,6 +231,50 @@ bool ZedGmslPointCloudSource::getPointCloud(
     cloud.clear();
 
 
+        /*
+     * Agrega una panoja simulada con:
+     *
+     * - posición física XYZ
+     * - posición correspondiente en la imagen RGB
+     *
+     * Así simulamos la asociación RGB + profundidad
+     * que entregará la ZED real.
+     */
+    auto addSimulatedTassel =
+        [&cloud](
+            float x,
+            float y,
+            float z,
+            int imageX,
+            int imageY)
+        {
+            Vision3DProcessor::Point3D point;
+
+            point.x =
+                x;
+
+            point.y =
+                y;
+
+            point.z =
+                z;
+
+            point.image_x =
+                imageX;
+
+            point.image_y =
+                imageY;
+
+            point.image_coordinates_valid =
+                true;
+
+
+            cloud.push_back(
+                point
+            );
+        };
+
+
     if (!running.load())
     {
         return false;
@@ -396,6 +440,20 @@ bool ZedGmslPointCloudSource::getPointCloud(
 
             convertedPoint.z =
                 point.z;
+
+
+            /*
+            * Guardamos también el píxel exacto
+            * de la imagen ZED que produjo este punto.
+            */
+            convertedPoint.image_x =
+                x;
+
+            convertedPoint.image_y =
+                y;
+
+            convertedPoint.image_coordinates_valid =
+                true;
 
 
             cloud.push_back(
