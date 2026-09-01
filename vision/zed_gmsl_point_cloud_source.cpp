@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <chrono>
 
 
 ZedGmslPointCloudSource::ZedGmslPointCloudSource(
@@ -11,7 +12,10 @@ ZedGmslPointCloudSource::ZedGmslPointCloudSource(
     uint32_t serialNumber)
     :
     cameraIndex(cameraIndex),
-    serialNumber(serialNumber)
+    serialNumber(serialNumber),
+    sharedRgbFrame(
+        std::make_shared<SharedRgbFrame>()
+    )
 {
 }
 
@@ -302,9 +306,58 @@ bool ZedGmslPointCloudSource::getPointCloud(
 
 
     /*
-     * ========================================================
-     * OBTENER NUBE 3D
-     * ========================================================
+    * ========================================================
+    * TIMESTAMP DE LA CAPTURA
+    * ========================================================
+    *
+    * Este timestamp corresponde al grab() común
+    * del cual obtenemos:
+    *
+    * - imagen RGB;
+    * - nube XYZ.
+    *
+    * Por lo tanto ambas representan exactamente
+    * el mismo instante de adquisición.
+    */
+    const std::uint64_t captureTimestampMs =
+        static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()
+            ).count()
+        );
+
+
+    /*
+    * ========================================================
+    * OBTENER IMAGEN RGB
+    * ========================================================
+    */
+    sl::ERROR_CODE imageResult =
+        camera.retrieveImage(
+            zedRgbImage,
+            sl::VIEW::LEFT,
+            sl::MEM::CPU
+        );
+
+
+    if (imageResult != sl::ERROR_CODE::SUCCESS)
+    {
+        return false;
+    }
+    /*
+    * ========================================================
+    * GUARDAR RGB SINCRONIZADO
+    * ========================================================
+    */
+
+
+    /*
+    * ========================================================
+    * OBTENER NUBE 3D
+    * ========================================================
      *
      * XYZ:
      *
@@ -321,6 +374,96 @@ bool ZedGmslPointCloudSource::getPointCloud(
     {
         return false;
     }
+
+        RgbFrameSource::Frame rgbFrame;
+
+
+    rgbFrame.width =
+        static_cast<std::size_t>(
+            zedRgbImage.getWidth()
+        );
+
+    rgbFrame.height =
+        static_cast<std::size_t>(
+            zedRgbImage.getHeight()
+        );
+
+
+    constexpr std::size_t RGB_CHANNELS =
+        3;
+
+
+    rgbFrame.data.resize(
+        rgbFrame.width *
+        rgbFrame.height *
+        RGB_CHANNELS
+    );
+
+
+    /*
+    * La imagen ZED se obtiene con 4 componentes
+    * por píxel.
+    *
+    * Para el resto de Hagie guardamos solamente
+    * tres componentes RGB.
+    */
+    for (std::size_t y = 0;
+        y < rgbFrame.height;
+        ++y)
+    {
+        for (std::size_t x = 0;
+            x < rgbFrame.width;
+            ++x)
+        {
+            sl::uchar4 pixel;
+
+
+            if (zedRgbImage.getValue(
+                    static_cast<int>(x),
+                    static_cast<int>(y),
+                    &pixel
+                ) != sl::ERROR_CODE::SUCCESS)
+            {
+                continue;
+            }
+
+
+            const std::size_t offset =
+                (
+                    y * rgbFrame.width +
+                    x
+                ) * RGB_CHANNELS;
+
+
+            rgbFrame.data[offset + 0] =
+                pixel[2];
+
+            rgbFrame.data[offset + 1] =
+                pixel[1];
+
+            rgbFrame.data[offset + 2] =
+                pixel[0];
+        }
+    }
+
+
+    rgbFrame.timestamp_ms =
+        captureTimestampMs;
+
+    rgbFrame.valid =
+        true;
+
+
+    /*
+    * Publicar solamente cuando el frame
+    * está completamente construido.
+    */
+    std::lock_guard<std::mutex> lock(
+        sharedRgbFrame->mutex
+    );
+
+    sharedRgbFrame->frame =
+        std::move(rgbFrame);
 
 
     /*
@@ -483,6 +626,45 @@ bool ZedGmslPointCloudSource::getPointCloud(
     return false;
 
 #endif
+}
+
+bool ZedGmslPointCloudSource::getLatestRgbFrame(
+    RgbFrameSource::Frame& frame) const
+{
+    if (sharedRgbFrame == nullptr)
+    {
+        frame =
+            RgbFrameSource::Frame {};
+
+        return false;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        sharedRgbFrame->mutex
+    );
+
+
+    if (!sharedRgbFrame->frame.valid)
+    {
+        frame =
+            RgbFrameSource::Frame {};
+
+        return false;
+    }
+
+
+    frame =
+        sharedRgbFrame->frame;
+
+
+    return true;
+}
+
+ZedGmslPointCloudSource::SharedRgbFramePtr
+ZedGmslPointCloudSource::getSharedRgbFrame() const
+{
+    return sharedRgbFrame;
 }
 
 std::vector<uint32_t>

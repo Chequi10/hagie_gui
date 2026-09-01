@@ -41,6 +41,7 @@
 
 #include "vision/simulated_point_cloud_source.h"
 #include "vision/zed_gmsl_point_cloud_source.h"
+#include "vision/zed_gmsl_rgb_frame_source.h"
 
 
 
@@ -4758,6 +4759,41 @@ QWidget *MainWindow::createConfigurationPage()
 
 
                 /*
+                * Restaurar RGB simulado de las
+                * cinco cámaras frontales.
+                */
+                for (std::size_t camera = 0;
+                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    ++camera)
+                {
+                    rgbCameraWorker.clearFrameSource(
+                        camera
+                    );
+
+
+                    auto rgbSource =
+                        std::make_unique<
+                            SimulatedRgbFrameSource
+                        >(
+                            camera
+                        );
+
+
+                    if (!rgbCameraWorker.setFrameSource(
+                            camera,
+                            std::move(rgbSource)
+                        ))
+                    {
+                        qWarning(
+                            "No se pudo restaurar RGB simulado "
+                            "de la cámara %zu",
+                            camera + 1
+                        );
+                    }
+                }
+
+
+                /*
                 * Instalar las cinco fuentes simuladas.
                 */
                 for (std::size_t camera = 0;
@@ -4896,6 +4932,18 @@ QWidget *MainWindow::createConfigurationPage()
                 */
                 vision3DWorker->stop();
 
+                
+
+
+                for (std::size_t camera = 0;
+                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    ++camera)
+                {
+                    rgbCameraWorker.clearFrameSource(
+                        camera
+                    );
+                }
+
 
                 /*
                 * Detectar las ZED físicas disponibles.
@@ -5000,6 +5048,34 @@ QWidget *MainWindow::createConfigurationPage()
                         );
 
 
+                    auto sharedRgbFrame =
+                        source->getSharedRgbFrame();
+
+
+                    auto rgbSource =
+                        std::make_unique<
+                            ZedGmslRgbFrameSource
+                        >(
+                            camera,
+                            sharedRgbFrame
+                        );
+
+
+                    if (!rgbCameraWorker.setFrameSource(
+                            camera,
+                            std::move(rgbSource)
+                        ))
+                    {
+                        qWarning(
+                            "No se pudo instalar RGB ZED Camera %zu - Serial %u",
+                            camera + 1,
+                            serial
+                        );
+
+                        continue;
+                    }
+
+
                     if (!vision3DWorker->setPointCloudSource(
                             camera,
                             std::move(source)
@@ -5009,6 +5085,10 @@ QWidget *MainWindow::createConfigurationPage()
                             "No se pudo instalar ZED Camera %zu - Serial %u",
                             camera + 1,
                             serial
+                        );
+
+                        rgbCameraWorker.clearFrameSource(
+                            camera
                         );
 
                         continue;

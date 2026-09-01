@@ -6,6 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <mutex>
+#include <memory>
+#include "vision/rgb_frame_source.h"
 
 #include "vision/point_cloud_source.h"
 
@@ -50,6 +53,19 @@ public:
      * física de cámaras no dependa del orden
      * detectado por Linux / ZED Link.
      */
+
+    struct SharedRgbFrame
+    {
+        mutable std::mutex mutex;
+
+        RgbFrameSource::Frame frame;
+    };
+
+
+    using SharedRgbFramePtr =
+        std::shared_ptr<SharedRgbFrame>;
+
+
     ZedGmslPointCloudSource(
         std::size_t cameraIndex,
         uint32_t serialNumber
@@ -87,6 +103,12 @@ public:
         CameraOrientation& orientation
     ) override;
 
+    bool getLatestRgbFrame(
+        RgbFrameSource::Frame& frame
+    ) const;
+
+    SharedRgbFramePtr getSharedRgbFrame() const;
+
 
     std::size_t getCameraIndex() const override;
 
@@ -102,6 +124,7 @@ private:
 
     std::atomic<bool> running {false};
 
+    SharedRgbFramePtr sharedRgbFrame;
 
     /*
      * ========================================================
@@ -125,6 +148,8 @@ private:
         sl::Camera camera;
 
         sl::Mat zedPointCloud;
+
+        sl::Mat zedRgbImage;
 
         sl::RuntimeParameters runtimeParameters;
 

@@ -68,6 +68,8 @@ add_executable(
     ai/tassel_counter.h
     ai/tassel_verifier.cpp
     ai/tassel_verifier.h
+    vision/zed_gmsl_rgb_frame_source.cpp
+    vision/zed_gmsl_rgb_frame_source.h
 )
 
 
