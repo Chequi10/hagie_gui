@@ -543,17 +543,50 @@ bool Vision3DProcessor::getDetectionPosition3D(
     }
 
 
+        /*
+     * ========================================================
+     * REGION CENTRAL DE LA DETECCION
+     * ========================================================
+     *
+     * No utilizamos todo el bounding box.
+     *
+     * Los bordes suelen contener fondo, hojas
+     * u objetos vecinos que pueden falsear
+     * la profundidad de la panoja.
+     *
+     * Conservamos aproximadamente el 60 %
+     * central de la detección.
+     */
+    constexpr float DETECTION_CENTRAL_RATIO =
+        0.60f;
+
+
+    const int marginX =
+        static_cast<int>(
+            imageWidth *
+            (1.0f - DETECTION_CENTRAL_RATIO) *
+            0.5f
+        );
+
+    const int marginY =
+        static_cast<int>(
+            imageHeight *
+            (1.0f - DETECTION_CENTRAL_RATIO) *
+            0.5f
+        );
+
+
     const int minX =
-        imageX;
+        imageX + marginX;
 
     const int maxX =
-        imageX + imageWidth;
+        imageX + imageWidth - marginX;
 
     const int minY =
-        imageY;
+        imageY + marginY;
 
     const int maxY =
-        imageY + imageHeight;
+        imageY + imageHeight - marginY;
 
 
     std::vector<float> positionsX;

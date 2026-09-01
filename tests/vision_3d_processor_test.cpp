@@ -2241,6 +2241,200 @@ int main()
         << "TEST GEOMETRIA POR CAMARA OK"
         << std::endl;    
 
+        /*
+     * ========================================================
+     * TEST 17 - RECHAZO DE FONDO EN BORDES
+     * ========================================================
+     *
+     * Verifica que los puntos ubicados cerca del borde
+     * del bounding box no participen en el cálculo 3D.
+     *
+     * Bounding box:
+     *
+     * x = 100 ... 139
+     * y =  50 ... 89
+     *
+     * Con el 60 % central, aproximadamente usamos:
+     *
+     * x = 108 ... 131
+     * y =  58 ... 81
+     */
+    Vision3DProcessor backgroundFilterProcessor;
+
+
+    Vision3DProcessor::PointCloud backgroundFilterCloud;
+
+
+    /*
+     * Tres puntos reales de la panoja,
+     * ubicados en la zona central.
+     */
+    Vision3DProcessor::Point3D centerPoint1;
+
+    centerPoint1.x =
+        -1.50f;
+
+    centerPoint1.y =
+        2.00f;
+
+    centerPoint1.z =
+        1.00f;
+
+    centerPoint1.image_x =
+        115;
+
+    centerPoint1.image_y =
+        65;
+
+    centerPoint1.image_coordinates_valid =
+        true;
+
+
+    Vision3DProcessor::Point3D centerPoint2 =
+        centerPoint1;
+
+    centerPoint2.z =
+        1.10f;
+
+    centerPoint2.image_x =
+        120;
+
+    centerPoint2.image_y =
+        70;
+
+
+    Vision3DProcessor::Point3D centerPoint3 =
+        centerPoint1;
+
+    centerPoint3.z =
+        1.20f;
+
+    centerPoint3.image_x =
+        125;
+
+    centerPoint3.image_y =
+        75;
+
+
+    backgroundFilterCloud.push_back(
+        centerPoint1
+    );
+
+    backgroundFilterCloud.push_back(
+        centerPoint2
+    );
+
+    backgroundFilterCloud.push_back(
+        centerPoint3
+    );
+
+
+    /*
+     * Punto falso de fondo.
+     *
+     * Está DENTRO del bounding box original,
+     * pero cerca del borde.
+     *
+     * Con el filtro central debe ser descartado.
+     */
+    Vision3DProcessor::Point3D backgroundPoint;
+
+    backgroundPoint.x =
+        5.0f;
+
+    backgroundPoint.y =
+        8.0f;
+
+    backgroundPoint.z =
+        10.0f;
+
+    backgroundPoint.image_x =
+        102;
+
+    backgroundPoint.image_y =
+        52;
+
+    backgroundPoint.image_coordinates_valid =
+        true;
+
+
+    backgroundFilterCloud.push_back(
+        backgroundPoint
+    );
+
+
+    Vision3DProcessor::CameraGeometry
+        backgroundGeometry;
+
+
+    Vision3DProcessor::Point3D
+        backgroundFilteredPosition;
+
+
+    const bool backgroundFilterValid =
+        backgroundFilterProcessor.getDetectionPosition3D(
+            backgroundFilterCloud,
+            100,
+            50,
+            40,
+            40,
+            backgroundGeometry,
+            backgroundFilteredPosition
+        );
+
+
+    std::cout
+        << "TEST 17 - RECHAZO DE FONDO EN BORDES"
+        << std::endl;
+
+    std::cout
+        << "Z obtenida: "
+        << backgroundFilteredPosition.z
+        << " m"
+        << std::endl;
+
+
+    if (!backgroundFilterValid)
+    {
+        std::cerr
+            << "ERROR: no obtuvo posicion 3D"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    /*
+     * Los tres puntos centrales tienen:
+     *
+     * 1.00
+     * 1.10
+     * 1.20
+     *
+     * La mediana esperada es 1.10 m.
+     *
+     * Si entrara el punto falso Z=10 m,
+     * el resultado dejaría de representar
+     * correctamente la panoja.
+     */
+    if (std::fabs(
+            backgroundFilteredPosition.z -
+            1.10f
+        ) > 0.01f)
+    {
+        std::cerr
+            << "ERROR: un punto de fondo "
+            << "afecto la posicion 3D"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST FILTRO DE FONDO OK"
+        << std::endl;
+
 
     return 0;
 }
