@@ -79,6 +79,10 @@ add_executable(
 
     ai/tensorrt_tassel_detector.cpp
     ai/tensorrt_tassel_detector.h
+    ai/tensorrt_compat.h
+
+    ai/yolo_inference_worker.cpp
+    ai/yolo_inference_worker.h
 )
 
 

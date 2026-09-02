@@ -53,14 +53,17 @@ MainWindow::MainWindow(
     Vision3DProcessor *vision3DProcessor,
     Vision3DWorker *vision3DWorker,
     QWidget *parent)
-    : QMainWindow(parent),
+   : QMainWindow(parent),
     state(hagieState),
     stm32Worker(stm32Worker),
-    heightTargetController(heightTargetController),
     visionHeightSource(visionHeightSource),
+    heightTargetController(heightTargetController),
     vision3DProcessor(vision3DProcessor),
     vision3DWorker(vision3DWorker),
-    centralStack(nullptr)
+    yoloInferenceWorker(
+    rgbCameraWorker,
+    vision3DWorker
+)
 {
     setWindowTitle(
         "Hagie Control"
@@ -984,6 +987,7 @@ void MainWindow::updateTestPage()
 
 MainWindow::~MainWindow()
 {
+     yoloInferenceWorker.stop();
 }
 
 
@@ -1511,81 +1515,217 @@ void MainWindow::updateCameraPage()
     bool aiProcessedFrame =
         false;
 
+    const bool realYoloMode =
+        configVisionSourceCombo != nullptr &&
+        configVisionSourceCombo->currentIndex() == 2;
+
 
     for (std::size_t camera = 0;
         camera < RGB_CAMERA_COUNT;
         ++camera)
+    
     {
-        RgbFrameSource::Frame cameraFrame;
-
-        if (!rgbCameraWorker.getFrame(
-                camera,
-                cameraFrame
-            ))
-        {
-            continue;
-        }
-
-
-        if (!cameraFrame.valid ||
-            cameraFrame.width == 0 ||
-            cameraFrame.height == 0 ||
-            cameraFrame.data.empty())
-        {
-            continue;
-        }
-
-
-        if (cameraFrame.timestamp_ms >
-            latestTimestampMs)
-        {
-            latestTimestampMs =
-                cameraFrame.timestamp_ms;
-        }
-
-
         TasselDetector::Result cameraResult;
 
-        if (!tasselDetector.processFrame(
-                camera,
-                cameraFrame,
-                cameraResult
-            ))
-        {
-            continue;
-        }
+        Vision3DProcessor::PointCloud cloud3D;
+
+        std::uint64_t cloudTimestampMs =
+            0;
+
+        bool cloud3DValid =
+            false;
+
 
         /*
-        * El detector procesó correctamente
-        * al menos un frame RGB en este ciclo.
+        * =====================================================
+        * OBTENCIÓN DEL RESULTADO DE IA
+        * =====================================================
+        *
+        * SIMULACIÓN:
+        * TasselDetector continúa ejecutándose directamente.
+        *
+        * MODO REAL:
+        * La GUI solamente consume resultados ya procesados
+        * por YoloInferenceWorker.
+        */
+        if (realYoloMode)
+        {
+            YoloInferenceWorker::Result yoloResult;
+
+
+            if (!yoloInferenceWorker.getLatestResult(
+                    camera,
+                    yoloResult
+                ))
+            {
+                continue;
+            }
+
+
+            if (!yoloResult.detectionResult.valid)
+            {
+                continue;
+            }
+
+
+            /*
+            * Nunca consumir dos veces el mismo
+            * resultado producido por YOLO.
+            */
+            if (yoloResult.detectionResult.timestamp_ms ==
+                lastConsumedYoloTimestamp[camera])
+            {
+                continue;
+            }
+
+
+            cameraResult =
+                std::move(
+                    yoloResult.detectionResult
+                );
+
+
+            /*
+            * Para las cinco cámaras frontales,
+            * YoloInferenceWorker conserva la nube
+            * correspondiente exactamente al mismo
+            * frame RGB utilizado por TensorRT.
+            */
+            if (camera < Vision3DWorker::CAMERA_COUNT)
+            {
+                if (!yoloResult.pointCloudValid)
+                {
+                    continue;
+                }
+
+
+                if (yoloResult.pointCloudTimestampMs !=
+                    cameraResult.timestamp_ms)
+                {
+                    continue;
+                }
+
+
+                cloud3D =
+                    std::move(
+                        yoloResult.pointCloud
+                    );
+
+                cloudTimestampMs =
+                    yoloResult.pointCloudTimestampMs;
+
+                cloud3DValid =
+                    true;
+            }
+
+
+            lastConsumedYoloTimestamp[camera] =
+                cameraResult.timestamp_ms;
+        }
+        else
+        {
+            /*
+            * =================================================
+            * DETECTOR SIMULADO
+            * =================================================
+            */
+            RgbFrameSource::Frame cameraFrame;
+
+
+            if (!rgbCameraWorker.getFrame(
+                    camera,
+                    cameraFrame
+                ))
+            {
+                continue;
+            }
+
+
+            if (!cameraFrame.valid ||
+                cameraFrame.width == 0 ||
+                cameraFrame.height == 0 ||
+                cameraFrame.data.empty())
+            {
+                continue;
+            }
+
+
+            if (!tasselDetector.processFrame(
+                    camera,
+                    cameraFrame,
+                    cameraResult
+                ))
+            {
+                continue;
+            }
+
+
+            /*
+            * En simulación RGB y nube provienen de
+            * fuentes independientes.
+            *
+            * Conservamos la tolerancia temporal
+            * que ya utilizábamos.
+            */
+            if (camera < Vision3DWorker::CAMERA_COUNT &&
+                vision3DWorker != nullptr)
+            {
+                if (vision3DWorker->getLatestPointCloud(
+                        camera,
+                        cloud3D,
+                        cloudTimestampMs
+                    ))
+                {
+                    constexpr std::uint64_t
+                        MAX_RGB_CLOUD_DELTA_MS =
+                            150;
+
+
+                    const std::uint64_t timeDeltaMs =
+                        (cameraResult.timestamp_ms >
+                        cloudTimestampMs)
+                        ?
+                        (cameraResult.timestamp_ms -
+                        cloudTimestampMs)
+                        :
+                        (cloudTimestampMs -
+                        cameraResult.timestamp_ms);
+
+
+                    if (timeDeltaMs <=
+                        MAX_RGB_CLOUD_DELTA_MS)
+                    {
+                        cloud3DValid =
+                            true;
+                    }
+                }
+            }
+        }
+
+
+        /*
+        * El detector produjo un resultado válido.
         */
         aiProcessedFrame =
             true;
 
-        
+
+        if (cameraResult.timestamp_ms >
+            latestTimestampMs)
+        {
+            latestTimestampMs =
+                cameraResult.timestamp_ms;
+        }
+
+
         /*
-         * =====================================================
-         * ASOCIACION RGB -> POSICION 3D
-         * =====================================================
-         *
-         * Solo las cámaras frontales 0..4
-         * disponen de nube de puntos 3D.
-         */
-                /*
-         * =====================================================
-         * ASOCIACION RGB -> POSICION 3D
-         * Y FILTRO POR REGION 3D CONFIGURADA
-         * =====================================================
-         *
-         * Solo las cámaras frontales 0..4
-         * disponen de nube de puntos 3D.
-         *
-         * Una detección frontal solamente se acepta si:
-         *
-         * 1) puede obtenerse su posición XYZ,
-         * 2) cae dentro de una REGIÓN 3D configurada,
-         * 3) la cámara está habilitada para ese cuerpo.
-         */
+        * =====================================================
+        * ASOCIACIÓN RGB -> POSICIÓN 3D
+        * =====================================================
+        *
+        * Solo las cámaras frontales 0..4
+        * disponen de nube de puntos.
+        */
         if (camera < Vision3DWorker::CAMERA_COUNT)
         {
             std::vector<
@@ -1593,167 +1733,81 @@ void MainWindow::updateCameraPage()
             > validDetections;
 
 
-            if (vision3DWorker != nullptr &&
+            if (cloud3DValid &&
                 vision3DProcessor != nullptr)
             {
-                Vision3DProcessor::PointCloud cloud3D;
-
-                std::uint64_t cloudTimestampMs =
-                    0;
-
-
-                if (vision3DWorker->getLatestPointCloud(
-                        camera,
-                        cloud3D,
-                        cloudTimestampMs
-                    ))
-                {
-
-                    /*
-                    * =================================================
-                    * VALIDACION TEMPORAL RGB <-> NUBE 3D
-                    * =================================================
-                    *
-                    * Evita asociar una detección RGB con una nube
-                    * demasiado vieja.
-                    */
-                    constexpr std::uint64_t
-                        MAX_RGB_CLOUD_DELTA_MS =
-                            150;
-
-
-                    const std::uint64_t timeDeltaMs =
-                        (cameraFrame.timestamp_ms >
-                        cloudTimestampMs)
-                        ?
-                        (cameraFrame.timestamp_ms -
-                        cloudTimestampMs)
-                        :
-                        (cloudTimestampMs -
-                        cameraFrame.timestamp_ms);
-
-
-                    /*
-                    * En cámaras ZED reales RGB y XYZ deben
-                    * provenir exactamente del mismo grab().
-                    *
-                    * En simulación mantenemos una tolerancia
-                    * temporal porque las fuentes RGB y 3D
-                    * son independientes.
-                    */
-                    const bool realZedMode =
-                        configVisionSourceCombo != nullptr &&
-                        configVisionSourceCombo->currentIndex() == 2;
-
-
-                    if (realZedMode)
-                    {
-                        if (timeDeltaMs != 0)
-                        {
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        if (timeDeltaMs >
-                            MAX_RGB_CLOUD_DELTA_MS)
-                        {
-                            continue;
-                        }
-                    }
-                    Vision3DProcessor::CameraConfig cameraConfig =
+                Vision3DProcessor::CameraConfig
+                    cameraConfig =
                         vision3DProcessor->getCameraConfig(
                             camera
                         );
 
 
-                    for (TasselDetector::Detection detection :
-                         cameraResult.detections)
+                for (TasselDetector::Detection detection :
+                    cameraResult.detections)
+                {
+                    Vision3DProcessor::Point3D position3D;
+
+
+                    if (!vision3DProcessor->getDetectionPosition3D(
+                            cloud3D,
+                            detection.x,
+                            detection.y,
+                            detection.width,
+                            detection.height,
+                            cameraConfig.geometry,
+                            position3D
+                        ))
                     {
-                        Vision3DProcessor::Point3D position3D;
-
-
-                        /*
-                         * Obtener posición física XYZ
-                         * correspondiente al bounding box
-                         * detectado en RGB.
-                         */
-                        if (!vision3DProcessor->getDetectionPosition3D(
-                                cloud3D,
-                                detection.x,
-                                detection.y,
-                                detection.width,
-                                detection.height,
-                                cameraConfig.geometry,
-                                position3D
-                            ))
-                        {
-                            continue;
-                        }
-
-
-                        /*
-                         * Determinar en qué cuerpo cae
-                         * utilizando exactamente las regiones
-                         * configuradas desde REGIONES 3D.
-                         */
-                        std::size_t detectedBody =
-                            0;
-
-
-                        if (!vision3DProcessor->findBodyForPosition(
-                                camera,
-                                position3D,
-                                detectedBody
-                            ))
-                        {
-                            /*
-                             * Está fuera de todas las regiones
-                             * válidas para esta cámara.
-                             *
-                             * No entra al TasselCounter.
-                             */
-                            continue;
-                        }
-
-
-                        /*
-                         * Detección válida.
-                         */
-                        detection.position_x =
-                            position3D.x;
-
-                        detection.position_y =
-                            position3D.y;
-
-                        detection.position_z =
-                            position3D.z;
-
-                        detection.position_3d_valid =
-                            true;
-
-                        detection.body_index =
-                            detectedBody;
-
-
-                        validDetections.push_back(
-                            detection
-                        );
+                        continue;
                     }
+
+
+                    std::size_t detectedBody =
+                        0;
+
+
+                    if (!vision3DProcessor->findBodyForPosition(
+                            camera,
+                            position3D,
+                            detectedBody
+                        ))
+                    {
+                        continue;
+                    }
+
+
+                    detection.position_x =
+                        position3D.x;
+
+                    detection.position_y =
+                        position3D.y;
+
+                    detection.position_z =
+                        position3D.z;
+
+                    detection.position_3d_valid =
+                        true;
+
+                    detection.body_index =
+                        detectedBody;
+
+
+                    validDetections.push_back(
+                        detection
+                    );
                 }
             }
 
 
             /*
-             * Reemplazamos las detecciones originales
-             * por las que realmente pertenecen a una
-             * región 3D válida.
-             *
-             * Si no hubo nube 3D válida, queda vacío
-             * y no se cuentan panojas frontales.
-             */
+            * Una detección frontal sin nube 3D válida
+            * no entra al contador.
+            */
             cameraResult.detections =
-                std::move(validDetections);
+                std::move(
+                    validDetections
+                );
         }
 
          /*
@@ -1927,11 +1981,66 @@ void MainWindow::updateCameraPage()
 
     TasselDetector::Result detectionResult;
 
-    if (tasselDetector.processFrame(
-            selectedRgbCamera,
-            frame,
-            detectionResult
-        ))
+    bool detectionResultValid =
+        false;
+
+
+    /*
+    * ========================================================
+    * RESULTADO PARA VISUALIZACIÓN
+    * ========================================================
+    *
+    * En simulación ejecutamos el detector simulado.
+    *
+    * En modo real reutilizamos exclusivamente el resultado
+    * producido por YoloInferenceWorker.
+    *
+    * La GUI nunca ejecuta TensorRT.
+    */
+    if (realYoloMode)
+    {
+        YoloInferenceWorker::Result yoloDisplayResult;
+
+
+        if (yoloInferenceWorker.getLatestResult(
+                selectedRgbCamera,
+                yoloDisplayResult
+            ))
+        {
+            /*
+            * Solo dibujamos bounding boxes cuando el resultado
+            * corresponde exactamente al frame que estamos
+            * mostrando.
+            *
+            * Esto evita dibujar cajas viejas sobre una imagen
+            * RGB más nueva.
+            */
+            if (yoloDisplayResult.detectionResult.valid &&
+                yoloDisplayResult.detectionResult.timestamp_ms ==
+                    frame.timestamp_ms)
+            {
+                detectionResult =
+                    std::move(
+                        yoloDisplayResult.detectionResult
+                    );
+
+                detectionResultValid =
+                    true;
+            }
+        }
+    }
+    else
+    {
+        detectionResultValid =
+            tasselDetector.processFrame(
+                selectedRgbCamera,
+                frame,
+                detectionResult
+            );
+    }
+
+
+    if (detectionResultValid)
     {
         QPainter painter(
             &displayImage
@@ -1950,7 +2059,7 @@ void MainWindow::updateCameraPage()
 
 
         for (const auto& detection :
-             detectionResult.detections)
+            detectionResult.detections)
         {
             painter.drawRect(
                 detection.x,
@@ -1999,6 +2108,7 @@ void MainWindow::updateCameraPage()
                 counterState.rear_count
             )
         );
+
 
         painter.drawText(
             10,
@@ -4660,6 +4770,16 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this](int index)
         {
+            /*
+            * Detener inferencia antes de reemplazar
+            * cualquier fuente RGB.
+            */
+            yoloInferenceWorker.stop();
+
+            lastConsumedYoloTimestamp.fill(
+                0
+            );
+
             tasselCounter.reset();
             tasselVerifier.reset();
             
@@ -4953,8 +5073,17 @@ QWidget *MainWindow::createConfigurationPage()
                 
 
 
+                /*
+                * Al entrar en modo REAL eliminamos
+                * todas las fuentes RGB anteriores.
+                *
+                * Esto evita mezclar:
+                *
+                * - frontales ZED reales
+                * - traseras simuladas
+                */
                 for (std::size_t camera = 0;
-                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    camera < RgbCameraWorker::CAMERA_COUNT;
                     ++camera)
                 {
                     rgbCameraWorker.clearFrameSource(

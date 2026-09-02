@@ -11,18 +11,13 @@
 #include <QCheckBox>
 #include <vector>
 #include <QPlainTextEdit>
-
-
+#include "ai/yolo_inference_worker.h"
 #include "core/hagie_state.h"
-
 #include "vision/vision_3d_processor.h"
-#include "vision/rgb_camera_worker.h"
-
 #include "vision/rgb_camera_worker.h"
 #include "vision/simulated_rgb_frame_source.h"
 #include "ai/tassel_detector.h"
 #include "ai/tassel_counter.h"
-
 #include "ai/tassel_verifier.h"
 
 
@@ -601,6 +596,13 @@ private:
     // ========================================================
 
     RgbCameraWorker rgbCameraWorker;
+
+    YoloInferenceWorker yoloInferenceWorker;
+
+    std::array<
+        std::uint64_t,
+        RgbCameraWorker::CAMERA_COUNT
+    > lastConsumedYoloTimestamp {};
 
     QLabel *mainCameraLabel =
         nullptr;

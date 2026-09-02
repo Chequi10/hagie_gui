@@ -17,6 +17,10 @@ bool RgbCameraWorker::setFrameSource(
     std::size_t cameraIndex,
     std::unique_ptr<RgbFrameSource> source)
 {
+    std::lock_guard<std::mutex> lock(
+    mutex
+    );
+    
     if (cameraIndex >= CAMERA_COUNT ||
         source == nullptr)
     {
@@ -41,6 +45,11 @@ bool RgbCameraWorker::setFrameSource(
 void RgbCameraWorker::clearFrameSource(
     std::size_t cameraIndex)
 {
+    std::lock_guard<std::mutex> lock(
+    mutex
+    );
+    
+    
     if (cameraIndex >= CAMERA_COUNT)
     {
         return;
@@ -58,6 +67,10 @@ void RgbCameraWorker::clearFrameSource(
 
 bool RgbCameraWorker::start()
 {
+    std::lock_guard<std::mutex> lock(
+    mutex
+    );
+    
     if (running)
     {
         return true;

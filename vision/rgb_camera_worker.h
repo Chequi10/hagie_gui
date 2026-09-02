@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 
 #include "vision/rgb_frame_source.h"
 
@@ -52,4 +53,5 @@ private:
         std::unique_ptr<RgbFrameSource>,
         CAMERA_COUNT
     > sources;
+    mutable std::mutex mutex;
 };

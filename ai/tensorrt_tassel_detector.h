@@ -6,13 +6,18 @@
 #include "vision/rgb_frame_source.h"
 
 
+#ifdef HAGIE_ENABLE_TENSORRT
+#include <NvInfer.h>
+#endif
+
+
 class TensorRtTasselDetector
 {
 public:
 
-    TensorRtTasselDetector() = default;
+    TensorRtTasselDetector();
 
-    ~TensorRtTasselDetector() = default;
+    ~TensorRtTasselDetector();
 
 
     bool initialize(
@@ -34,4 +39,33 @@ private:
 
     bool initialized =
         false;
+
+
+#ifdef HAGIE_ENABLE_TENSORRT
+
+    class Logger :
+        public nvinfer1::ILogger
+    {
+    public:
+
+        void log(
+            Severity severity,
+            const char* message
+        ) noexcept override;
+    };
+
+
+    Logger logger;
+
+
+    nvinfer1::IRuntime* runtime =
+        nullptr;
+
+    nvinfer1::ICudaEngine* engine =
+        nullptr;
+
+    nvinfer1::IExecutionContext* context =
+        nullptr;
+
+#endif
 };
