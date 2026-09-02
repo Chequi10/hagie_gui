@@ -20,6 +20,12 @@ option(
     OFF
 )
 
+option(
+    HAGIE_ENABLE_TENSORRT
+    "Enable TensorRT support"
+    OFF
+)
+
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
@@ -70,6 +76,9 @@ add_executable(
     ai/tassel_verifier.h
     vision/zed_gmsl_rgb_frame_source.cpp
     vision/zed_gmsl_rgb_frame_source.h
+
+    ai/tensorrt_tassel_detector.cpp
+    ai/tensorrt_tassel_detector.h
 )
 
 
@@ -135,6 +144,71 @@ else()
 
 endif()
 
+
+# ============================================================
+# TENSORRT
+# ============================================================
+
+if(HAGIE_ENABLE_TENSORRT)
+
+    message(
+        STATUS
+        "TensorRT support ENABLED"
+    )
+
+    find_path(
+        TENSORRT_INCLUDE_DIR
+        NvInfer.h
+        PATHS
+        /usr/include
+        /usr/include/aarch64-linux-gnu
+        /usr/local/include
+    )
+
+    find_library(
+        TENSORRT_LIBRARY
+        nvinfer
+        PATHS
+        /usr/lib
+        /usr/lib/aarch64-linux-gnu
+        /usr/local/lib
+    )
+
+    if(NOT TENSORRT_INCLUDE_DIR OR
+       NOT TENSORRT_LIBRARY)
+        message(
+            FATAL_ERROR
+            "TensorRT not found"
+        )
+    endif()
+
+    target_compile_definitions(
+        hagie_gui
+        PRIVATE
+        HAGIE_ENABLE_TENSORRT
+    )
+
+    target_include_directories(
+        hagie_gui
+        PRIVATE
+        ${TENSORRT_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+        hagie_gui
+        PRIVATE
+        ${TENSORRT_LIBRARY}
+    )
+
+else()
+
+    message(
+        STATUS
+        "TensorRT support DISABLED"
+    )
+
+endif()
+
 # ============================================================
 # TEST VISION 3D PROCESSOR
 # ============================================================
@@ -153,6 +227,7 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
 
 
 # ============================================================

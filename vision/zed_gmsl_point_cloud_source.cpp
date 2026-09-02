@@ -484,6 +484,18 @@ bool ZedGmslPointCloudSource::getPointCloud(
     const int height =
         zedPointCloud.getHeight();
 
+    /*
+    * RGB y XYZ deben compartir exactamente
+    * el mismo sistema de coordenadas de imagen.
+    */
+    if (static_cast<std::size_t>(width) !=
+            rgbFrame.width ||
+        static_cast<std::size_t>(height) !=
+            rgbFrame.height)
+    {
+        return false;
+    }
+
 
     /*
      * Reservar memoria aproximada.
