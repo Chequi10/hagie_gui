@@ -455,18 +455,7 @@ bool ZedGmslPointCloudSource::getPointCloud(
         true;
 
 
-    /*
-    * Publicar solamente cuando el frame
-    * está completamente construido.
-    */
-    std::lock_guard<std::mutex> lock(
-        sharedRgbFrame->mutex
-    );
-
-    sharedRgbFrame->frame =
-        std::move(rgbFrame);
-
-
+    
     /*
      * ========================================================
      * CONVERTIR A FORMATO GENÉRICO
@@ -617,7 +606,21 @@ bool ZedGmslPointCloudSource::getPointCloud(
 
     lastPointCloudTimestampMs =
         captureTimestampMs;
-        
+
+    /*
+    * Publicar solamente cuando el frame
+    * está completamente construido.
+    */
+    std::lock_guard<std::mutex> lock(
+        sharedRgbFrame->mutex
+    );
+
+    sharedRgbFrame->frame =
+        std::move(rgbFrame);
+
+
+
+
     return true;
 
 #else

@@ -1633,18 +1633,33 @@ void MainWindow::updateCameraPage()
                         cameraFrame.timestamp_ms);
 
 
-                    if (timeDeltaMs >
-                        MAX_RGB_CLOUD_DELTA_MS)
+                    /*
+                    * En cámaras ZED reales RGB y XYZ deben
+                    * provenir exactamente del mismo grab().
+                    *
+                    * En simulación mantenemos una tolerancia
+                    * temporal porque las fuentes RGB y 3D
+                    * son independientes.
+                    */
+                    const bool realZedMode =
+                        configVisionSourceCombo != nullptr &&
+                        configVisionSourceCombo->currentIndex() == 2;
+
+
+                    if (realZedMode)
                     {
-                        /*
-                        * La nube no corresponde temporalmente
-                        * con este frame RGB.
-                        *
-                        * Al quedar validDetections vacío,
-                        * estas detecciones frontales no
-                        * entrarán al contador.
-                        */
-                        continue;
+                        if (timeDeltaMs != 0)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (timeDeltaMs >
+                            MAX_RGB_CLOUD_DELTA_MS)
+                        {
+                            continue;
+                        }
                     }
                     Vision3DProcessor::CameraConfig cameraConfig =
                         vision3DProcessor->getCameraConfig(
