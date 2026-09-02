@@ -521,21 +521,34 @@ bool Vision3DWorker::processCamera(
     }
 
 
-        /*
-     * Timestamp monotónico asociado a esta nube.
-     *
-     * Debe usar la misma base temporal que los
-     * frames RGB para poder comparar antigüedad.
-     */
-    const std::uint64_t cloudTimestampMs =
-        static_cast<std::uint64_t>(
-            std::chrono::duration_cast<
-                std::chrono::milliseconds
-            >(
-                std::chrono::steady_clock::now()
-                    .time_since_epoch()
-            ).count()
-        );
+    /*
+    * Timestamp asociado a esta nube.
+    *
+    * Si la fuente dispone de un timestamp propio
+    * de adquisición, utilizarlo.
+    *
+    * En las ZED será exactamente el mismo timestamp
+    * del grab() utilizado para obtener RGB y XYZ.
+    *
+    * Las demás fuentes utilizan como respaldo
+    * el reloj monotónico del worker.
+    */
+    std::uint64_t cloudTimestampMs = 0;
+
+    if (!source->getLastPointCloudTimestampMs(
+            cloudTimestampMs
+        ))
+    {
+        cloudTimestampMs =
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds
+                >(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
+            );
+    }
 
     /*
      * Guardar una copia de la nube más reciente.

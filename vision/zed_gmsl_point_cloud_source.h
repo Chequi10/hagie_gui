@@ -13,6 +13,7 @@
 #include "vision/point_cloud_source.h"
 
 
+
 /*
  * ============================================================
  * ZED SDK
@@ -99,6 +100,10 @@ public:
         Vision3DProcessor::PointCloud& cloud
     ) override;
 
+    bool getLastPointCloudTimestampMs(
+        std::uint64_t& timestampMs
+    ) const override;
+
     bool getCameraOrientation(
         CameraOrientation& orientation
     ) override;
@@ -125,6 +130,8 @@ private:
     std::atomic<bool> running {false};
 
     SharedRgbFramePtr sharedRgbFrame;
+
+    std::uint64_t lastPointCloudTimestampMs = 0;
 
     /*
      * ========================================================

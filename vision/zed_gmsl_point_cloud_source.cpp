@@ -329,6 +329,7 @@ bool ZedGmslPointCloudSource::getPointCloud(
             ).count()
         );
 
+    
 
     /*
     * ========================================================
@@ -614,7 +615,9 @@ bool ZedGmslPointCloudSource::getPointCloud(
         return false;
     }
 
-
+    lastPointCloudTimestampMs =
+        captureTimestampMs;
+        
     return true;
 
 #else
@@ -626,6 +629,25 @@ bool ZedGmslPointCloudSource::getPointCloud(
     return false;
 
 #endif
+}
+
+bool ZedGmslPointCloudSource::
+getLastPointCloudTimestampMs(
+    std::uint64_t& timestampMs
+) const
+{
+    if (lastPointCloudTimestampMs == 0)
+    {
+        timestampMs = 0;
+
+        return false;
+    }
+
+
+    timestampMs =
+        lastPointCloudTimestampMs;
+
+    return true;
 }
 
 bool ZedGmslPointCloudSource::getLatestRgbFrame(

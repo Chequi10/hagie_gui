@@ -4645,6 +4645,9 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this](int index)
         {
+            tasselCounter.reset();
+            tasselVerifier.reset();
+            
             if (visionHeightSource == nullptr)
             {
                 return;
@@ -4760,10 +4763,10 @@ QWidget *MainWindow::createConfigurationPage()
 
                 /*
                 * Restaurar RGB simulado de las
-                * cinco cámaras frontales.
+                * siete cámaras físicas.
                 */
                 for (std::size_t camera = 0;
-                    camera < Vision3DProcessor::CAMERA_COUNT;
+                    camera < RgbCameraWorker::CAMERA_COUNT;
                     ++camera)
                 {
                     rgbCameraWorker.clearFrameSource(

@@ -2,6 +2,7 @@
 #define POINT_CLOUD_SOURCE_H
 
 #include <cstddef>
+#include <cstdint>
 
 #include "vision/vision_3d_processor.h"
 
@@ -67,6 +68,30 @@ public:
     virtual bool getPointCloud(
         Vision3DProcessor::PointCloud& cloud
     ) = 0;
+
+
+        /*
+     * ========================================================
+     * TIMESTAMP DE ADQUISICIÓN OPCIONAL
+     * ========================================================
+     *
+     * Permite que una fuente entregue el instante real
+     * asociado a la nube obtenida.
+     *
+     * Es especialmente importante cuando RGB y XYZ
+     * provienen del mismo grab() de una cámara.
+     *
+     * Las fuentes que no tengan timestamp propio pueden
+     * dejar la implementación por defecto.
+     */
+    virtual bool getLastPointCloudTimestampMs(
+        std::uint64_t& timestampMs
+    ) const
+    {
+        timestampMs = 0;
+
+        return false;
+    }
 
         /*
      * ========================================================
