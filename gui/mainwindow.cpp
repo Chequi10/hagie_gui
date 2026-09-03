@@ -17,6 +17,10 @@
 #include <QPainter>
 #include <QPen>
 
+#include <QLineEdit>
+#include <QFileInfo>
+
+
 #include "ai/tassel_detector.h"
 #include "stm32/stm32_worker.h"
 #include "core/height_target_controller.h"
@@ -5034,6 +5038,65 @@ QWidget *MainWindow::createConfigurationPage()
             */
             if (index == 2)
             {
+                
+                                /*
+                 * ========================================================
+                 * VALIDAR CONFIGURACIÓN TENSORRT
+                 * ========================================================
+                 */
+                const QString enginePath =
+                    configYoloEngineEdit
+                        ->text()
+                        .trimmed();
+
+
+                bool tensorRtConfigValid =
+                    true;
+
+
+                if (enginePath.isEmpty())
+                {
+                    qWarning(
+                        "TensorRT: no se configuró ningún engine"
+                    );
+
+                    addLogMessage(
+                        "TensorRT: no se configuró ningún engine"
+                    );
+
+                    tensorRtConfigValid =
+                        false;
+                }
+                else if (!QFileInfo::exists(
+                             enginePath
+                         ))
+                {
+                    qWarning(
+                        "TensorRT: el engine no existe: %s",
+                        qPrintable(enginePath)
+                    );
+
+                    addLogMessage(
+                        QString(
+                            "TensorRT: el engine no existe: %1"
+                        ).arg(
+                            enginePath
+                        )
+                    );
+
+                    tensorRtConfigValid =
+                        false;
+                }
+                else
+                {
+                    addLogMessage(
+                        QString(
+                            "TensorRT: engine encontrado: %1"
+                        ).arg(
+                            enginePath
+                        )
+                    );
+                }
                 /*
                 * Invalidar cualquier IMU Hagie simulada
                 * al entrar en modo de cámaras reales.
@@ -5272,12 +5335,83 @@ QWidget *MainWindow::createConfigurationPage()
                             "Vision3DWorker iniciado con %zu cámara(s)",
                             usableCameraCount
                         );
+
+
+                        /*
+                        * ========================================================
+                        * INICIAR DETECTOR YOLO TENSORRT
+                        * ========================================================
+                        */
+                                                if (tensorRtConfigValid)
+                        {
+                            const int formatValue =
+                                configYoloFormatCombo
+                                    ->currentData()
+                                    .toInt();
+
+
+                            const auto outputFormat =
+                                static_cast<
+                                    TensorRtTasselDetector::
+                                        ModelOutputFormat
+                                >(
+                                    formatValue
+                                );
+
+
+                            const QByteArray enginePathUtf8 =
+                                enginePath.toUtf8();
+
+
+                            if (!yoloInferenceWorker.initialize(
+                                    enginePathUtf8.constData(),
+                                    outputFormat
+                                ))
+                            {
+                                qWarning(
+                                    "TensorRT: no se pudo inicializar "
+                                    "el detector de panojas"
+                                );
+
+                                addLogMessage(
+                                    "TensorRT: no se pudo inicializar "
+                                    "el detector de panojas"
+                                );
+                            }
+                            else if (!yoloInferenceWorker.start())
+                            {
+                                qWarning(
+                                    "TensorRT: no se pudo iniciar "
+                                    "YoloInferenceWorker"
+                                );
+
+                                addLogMessage(
+                                    "TensorRT: no se pudo iniciar "
+                                    "YoloInferenceWorker"
+                                );
+                            }
+                            else
+                            {
+                                qInfo(
+                                    "TensorRT: detector de panojas iniciado"
+                                );
+
+                                addLogMessage(
+                                    "TensorRT: detector de panojas iniciado"
+                                );
+                            }
+                        }
                     }
                 }
                 else
+                
                 {
                     qWarning(
                         "No hay cámaras ZED habilitadas y disponibles"
+                    );
+
+                    addLogMessage(
+                        "Visión 3D: no hay cámaras ZED habilitadas y disponibles"
                     );
                 }
 
@@ -5299,6 +5433,143 @@ QWidget *MainWindow::createConfigurationPage()
 
     generalPageLayout->addWidget(
         visionSourceFrame
+    );
+
+        /*
+     * ========================================================
+     * DETECTOR DE PANOJAS - TENSORRT
+     * ========================================================
+     */
+    QFrame *yoloConfigFrame =
+        new QFrame();
+
+    yoloConfigFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+
+    QVBoxLayout *yoloConfigLayout =
+        new QVBoxLayout(
+            yoloConfigFrame
+        );
+
+
+    QLabel *yoloConfigTitle =
+        new QLabel(
+            "DETECTOR DE PANOJAS"
+        );
+
+    yoloConfigTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    yoloConfigTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    yoloConfigLayout->addWidget(
+        yoloConfigTitle
+    );
+
+
+    /*
+     * Formato de salida YOLO.
+     */
+    QHBoxLayout *yoloFormatLayout =
+        new QHBoxLayout();
+
+    QLabel *yoloFormatLabel =
+        new QLabel(
+            "Formato del modelo:"
+        );
+
+    configYoloFormatCombo =
+        new QComboBox();
+
+    configYoloFormatCombo->addItem(
+        "AUTO",
+        static_cast<int>(
+            TensorRtTasselDetector::
+                ModelOutputFormat::Auto
+        )
+    );
+
+    configYoloFormatCombo->addItem(
+        "YOLO MODERNO RAW",
+        static_cast<int>(
+            TensorRtTasselDetector::
+                ModelOutputFormat::ModernRaw
+        )
+    );
+
+    configYoloFormatCombo->addItem(
+        "YOLOv5 RAW",
+        static_cast<int>(
+            TensorRtTasselDetector::
+                ModelOutputFormat::YoloV5Raw
+        )
+    );
+
+    configYoloFormatCombo->addItem(
+        "END-TO-END NMS",
+        static_cast<int>(
+            TensorRtTasselDetector::
+                ModelOutputFormat::EndToEndNms
+        )
+    );
+
+
+    yoloFormatLayout->addWidget(
+        yoloFormatLabel
+    );
+
+    yoloFormatLayout->addWidget(
+        configYoloFormatCombo
+    );
+
+    yoloFormatLayout->addStretch();
+
+    yoloConfigLayout->addLayout(
+        yoloFormatLayout
+    );
+
+
+    /*
+     * Ruta del engine TensorRT.
+     */
+    QHBoxLayout *yoloEngineLayout =
+        new QHBoxLayout();
+
+    QLabel *yoloEngineLabel =
+        new QLabel(
+            "Engine TensorRT:"
+        );
+
+    configYoloEngineEdit =
+        new QLineEdit();
+
+    configYoloEngineEdit->setPlaceholderText(
+        "/ruta/al/modelo.engine"
+    );
+
+
+    yoloEngineLayout->addWidget(
+        yoloEngineLabel
+    );
+
+    yoloEngineLayout->addWidget(
+        configYoloEngineEdit,
+        1
+    );
+
+    yoloConfigLayout->addLayout(
+        yoloEngineLayout
+    );
+
+
+    generalPageLayout->addWidget(
+        yoloConfigFrame
     );
 
     generalPageLayout->addStretch();
@@ -7912,6 +8183,19 @@ void MainWindow::saveConfiguration()
             .toInt()
     );
 
+        settings.setValue(
+        "yolo_output_format",
+        configYoloFormatCombo
+            ->currentData()
+            .toInt()
+    );
+
+    settings.setValue(
+        "yolo_engine_path",
+        configYoloEngineEdit
+            ->text()
+    );
+
     settings.endGroup();
 
 
@@ -8250,6 +8534,22 @@ void MainWindow::loadConfiguration()
             0
         ).toInt();
 
+        int yoloOutputFormat =
+        settings.value(
+            "yolo_output_format",
+            static_cast<int>(
+                TensorRtTasselDetector::
+                    ModelOutputFormat::Auto
+            )
+        ).toInt();
+
+
+    QString yoloEnginePath =
+        settings.value(
+            "yolo_engine_path",
+            ""
+        ).toString();    
+
     settings.endGroup();
 
 
@@ -8266,6 +8566,26 @@ void MainWindow::loadConfiguration()
                 visionSourceIndex
             );
     }
+
+        int yoloFormatIndex =
+        configYoloFormatCombo
+            ->findData(
+                yoloOutputFormat
+            );
+
+
+    if (yoloFormatIndex >= 0)
+    {
+        configYoloFormatCombo
+            ->setCurrentIndex(
+                yoloFormatIndex
+            );
+    }
+
+
+    configYoloEngineEdit->setText(
+        yoloEnginePath
+    );
 
     /*
     * ========================================================

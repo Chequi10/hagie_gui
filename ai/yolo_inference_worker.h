@@ -44,7 +44,9 @@ public:
 
 
     bool initialize(
-        const char* enginePath
+        const char* enginePath,
+        TensorRtTasselDetector::ModelOutputFormat outputFormat =
+            TensorRtTasselDetector::ModelOutputFormat::Auto
     );
 
 

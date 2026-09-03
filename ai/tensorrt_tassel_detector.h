@@ -21,9 +21,19 @@ public:
 
     ~TensorRtTasselDetector();
 
+        enum class ModelOutputFormat
+    {
+        Auto,
+        ModernRaw,
+        YoloV5Raw,
+        EndToEndNms
+    };
+
 
     bool initialize(
-        const char* enginePath
+        const char* enginePath,
+        ModelOutputFormat outputFormat =
+            ModelOutputFormat::Auto
     );
 
 
@@ -90,14 +100,52 @@ private:
             0;
     };
 
+    struct RawDetection
+    {
+        float x1 = 0.0f;
+        float y1 = 0.0f;
+        float x2 = 0.0f;
+        float y2 = 0.0f;
+        float confidence = 0.0f;
+        int classId = -1;
+    };
+
+
+    enum class OutputLayout
+    {
+        Unknown,
+        RawYolo,
+        EndToEndNms
+    };
+
     bool preprocessRgbFrame(
         const RgbFrameSource::Frame& frame,
         std::vector<float>& output,
         PreprocessInfo& info
     ) const;
 
+    bool decodeOutputs(
+    const PreprocessInfo& preprocessInfo,
+    std::vector<RawDetection>& detections
+        ) const;
 
-    bool initialized =
+
+        static float intersectionOverUnion(
+            const RawDetection& a,
+            const RawDetection& b
+        );
+
+
+        static void nonMaximumSuppression(
+            std::vector<RawDetection>& detections,
+            float iouThreshold
+        );
+
+
+        ModelOutputFormat outputFormat =
+        ModelOutputFormat::Auto;
+    
+        bool initialized =
         false;
 
 

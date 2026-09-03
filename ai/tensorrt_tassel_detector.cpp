@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #ifdef HAGIE_ENABLE_TENSORRT
 
@@ -474,6 +475,737 @@ bool TensorRtTasselDetector::preprocessRgbFrame(
     return true;
 }
 
+float TensorRtTasselDetector::intersectionOverUnion(
+    const RawDetection& a,
+    const RawDetection& b)
+{
+    const float intersectionX1 =
+        std::max(a.x1, b.x1);
+
+    const float intersectionY1 =
+        std::max(a.y1, b.y1);
+
+    const float intersectionX2 =
+        std::min(a.x2, b.x2);
+
+    const float intersectionY2 =
+        std::min(a.y2, b.y2);
+
+
+    const float intersectionWidth =
+        std::max(
+            0.0f,
+            intersectionX2 - intersectionX1
+        );
+
+    const float intersectionHeight =
+        std::max(
+            0.0f,
+            intersectionY2 - intersectionY1
+        );
+
+
+    const float intersectionArea =
+        intersectionWidth *
+        intersectionHeight;
+
+
+    const float areaA =
+        std::max(0.0f, a.x2 - a.x1) *
+        std::max(0.0f, a.y2 - a.y1);
+
+    const float areaB =
+        std::max(0.0f, b.x2 - b.x1) *
+        std::max(0.0f, b.y2 - b.y1);
+
+
+    const float unionArea =
+        areaA +
+        areaB -
+        intersectionArea;
+
+
+    if (unionArea <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+
+    return
+        intersectionArea /
+        unionArea;
+}
+
+
+void TensorRtTasselDetector::nonMaximumSuppression(
+    std::vector<RawDetection>& detections,
+    float iouThreshold)
+{
+    std::sort(
+        detections.begin(),
+        detections.end(),
+        [](
+            const RawDetection& a,
+            const RawDetection& b)
+        {
+            return
+                a.confidence >
+                b.confidence;
+        }
+    );
+
+
+    std::vector<RawDetection> filtered;
+
+    filtered.reserve(
+        detections.size()
+    );
+
+
+    for (const RawDetection& candidate :
+         detections)
+    {
+        bool suppress =
+            false;
+
+
+        for (const RawDetection& accepted :
+             filtered)
+        {
+            /*
+             * No suprimir detecciones de clases diferentes.
+             */
+            if (candidate.classId !=
+                accepted.classId)
+            {
+                continue;
+            }
+
+
+            if (intersectionOverUnion(
+                    candidate,
+                    accepted
+                ) >
+                iouThreshold)
+            {
+                suppress =
+                    true;
+
+                break;
+            }
+        }
+
+
+        if (!suppress)
+        {
+            filtered.push_back(
+                candidate
+            );
+        }
+    }
+
+
+    detections =
+        std::move(filtered);
+}
+
+
+bool TensorRtTasselDetector::decodeOutputs(
+    const PreprocessInfo& preprocessInfo,
+    std::vector<RawDetection>& detections) const
+{
+    detections.clear();
+
+
+#ifndef HAGIE_ENABLE_TENSORRT
+
+    (void)preprocessInfo;
+
+    return false;
+
+#else
+
+    if (outputTensorIndices.empty())
+    {
+        return false;
+    }
+
+
+    /*
+     * Por ahora procesamos solamente el caso
+     * de un único tensor de salida RAW.
+     *
+     * Más adelante agregaremos los engines
+     * con NMS integrado y múltiples outputs.
+     */
+    if (outputTensorIndices.size() != 1)
+    {
+        std::cerr
+            << "[TensorRT] Multiple output tensors detected. "
+            << "Decoder not implemented yet."
+            << std::endl;
+
+        return false;
+    }
+
+
+    const std::size_t outputIndex =
+        outputTensorIndices[0];
+
+
+    if (outputIndex >= tensors.size() ||
+        outputIndex >= hostOutputBuffers.size())
+    {
+        return false;
+    }
+
+
+    const TensorInfo& output =
+        tensors[outputIndex];
+
+    const std::vector<unsigned char>& hostBuffer =
+        hostOutputBuffers[outputIndex];
+
+
+    /*
+     * Esperamos inicialmente:
+     *
+     * [1, attributes, detections]
+     *
+     * o
+     *
+     * [1, detections, attributes]
+     */
+    if (output.dimensions.size() != 3 ||
+        output.dimensions[0] != 1)
+    {
+        std::cerr
+            << "[TensorRT] Unsupported raw output dimensions"
+            << std::endl;
+
+        return false;
+    }
+
+
+    const int dimension1 =
+        output.dimensions[1];
+
+    const int dimension2 =
+        output.dimensions[2];
+
+
+    if (dimension1 <= 0 ||
+        dimension2 <= 0)
+    {
+        return false;
+    }
+
+
+    bool attributesFirst =
+        false;
+
+    int attributeCount =
+        0;
+
+    int detectionCount =
+        0;
+
+
+    /*
+     * Ejemplo moderno:
+     *
+     * [1, 5, 8400]
+     *
+     * frente a:
+     *
+     * [1, 8400, 5]
+     */
+    if (dimension1 < dimension2)
+    {
+        attributesFirst =
+            true;
+
+        attributeCount =
+            dimension1;
+
+        detectionCount =
+            dimension2;
+    }
+    else
+    {
+        attributesFirst =
+            false;
+
+        detectionCount =
+            dimension1;
+
+        attributeCount =
+            dimension2;
+    }
+
+
+    std::cout
+        << "[TensorRT] Raw YOLO output: detections="
+        << detectionCount
+        << " attributes="
+        << attributeCount
+        << " layout="
+        << (attributesFirst
+                ? "1xAxN"
+                : "1xNxA")
+        << std::endl;
+
+
+        /*
+     * ========================================================
+     * DETERMINAR FORMATO DE SALIDA
+     * ========================================================
+     *
+     * Detector de una sola clase:
+     *
+     * ModernRaw:
+     *   cx, cy, w, h, classScore
+     *   => 5 atributos
+     *
+     * YoloV5Raw:
+     *   cx, cy, w, h, objectness, classScore
+     *   => 6 atributos
+     *
+     * Con Auto solamente aceptamos los casos
+     * que podemos identificar sin ambigüedad.
+     */
+
+    ModelOutputFormat activeFormat =
+        outputFormat;
+
+
+    if (activeFormat ==
+        ModelOutputFormat::Auto)
+    {
+        if (attributeCount == 5)
+        {
+            activeFormat =
+                ModelOutputFormat::ModernRaw;
+        }
+        else if (attributeCount == 6)
+        {
+            std::cerr
+                << "[TensorRT] AUTO cannot safely determine "
+                << "the meaning of a 6-attribute output. "
+                << "Select YoloV5Raw or EndToEndNms explicitly."
+                << std::endl;
+
+            return false;
+        }
+        else
+        {
+            std::cerr
+                << "[TensorRT] AUTO does not recognize output with "
+                << attributeCount
+                << " attributes"
+                << std::endl;
+
+            return false;
+        }
+    }
+
+
+    if (activeFormat ==
+        ModelOutputFormat::ModernRaw)
+    {
+        if (attributeCount != 5)
+        {
+            std::cerr
+                << "[TensorRT] ModernRaw expects 5 attributes, found "
+                << attributeCount
+                << std::endl;
+
+            return false;
+        }
+    }
+    else if (activeFormat ==
+             ModelOutputFormat::YoloV5Raw)
+    {
+        if (attributeCount != 6)
+        {
+            std::cerr
+                << "[TensorRT] YoloV5Raw expects 6 attributes, found "
+                << attributeCount
+                << std::endl;
+
+            return false;
+        }
+    }
+    else if (activeFormat ==
+             ModelOutputFormat::EndToEndNms)
+    {
+        std::cerr
+            << "[TensorRT] EndToEndNms decoder not implemented yet"
+            << std::endl;
+
+        return false;
+    }
+
+    /*
+     * ========================================================
+     * LECTOR GENERICO FP32 / FP16
+     * ========================================================
+     */
+
+    auto readValue =
+        [&output, &hostBuffer](
+            std::size_t elementIndex,
+            float& value) -> bool
+    {
+        if (elementIndex >=
+            output.elementCount)
+        {
+            return false;
+        }
+
+
+        if (output.dataType == "FP32")
+        {
+            const std::size_t byteOffset =
+                elementIndex *
+                sizeof(float);
+
+
+            if (byteOffset + sizeof(float) >
+                hostBuffer.size())
+            {
+                return false;
+            }
+
+
+            float temporary =
+                0.0f;
+
+
+            std::memcpy(
+                &temporary,
+                hostBuffer.data() + byteOffset,
+                sizeof(float)
+            );
+
+
+            value =
+                temporary;
+
+            return true;
+        }
+
+
+        if (output.dataType == "FP16")
+        {
+            const std::size_t byteOffset =
+                elementIndex *
+                sizeof(__half);
+
+
+            if (byteOffset + sizeof(__half) >
+                hostBuffer.size())
+            {
+                return false;
+            }
+
+
+            __half temporary;
+
+
+            std::memcpy(
+                &temporary,
+                hostBuffer.data() + byteOffset,
+                sizeof(__half)
+            );
+
+
+            value =
+                __half2float(
+                    temporary
+                );
+
+            return true;
+        }
+
+
+        return false;
+    };
+
+
+    auto tensorValue =
+        [&](
+            int detectionIndex,
+            int attributeIndex,
+            float& value) -> bool
+    {
+        std::size_t elementIndex =
+            0;
+
+
+        if (attributesFirst)
+        {
+            elementIndex =
+                static_cast<std::size_t>(
+                    attributeIndex
+                ) *
+                static_cast<std::size_t>(
+                    detectionCount
+                ) +
+                static_cast<std::size_t>(
+                    detectionIndex
+                );
+        }
+        else
+        {
+            elementIndex =
+                static_cast<std::size_t>(
+                    detectionIndex
+                ) *
+                static_cast<std::size_t>(
+                    attributeCount
+                ) +
+                static_cast<std::size_t>(
+                    attributeIndex
+                );
+        }
+
+
+        return readValue(
+            elementIndex,
+            value
+        );
+    };
+
+
+    /*
+     * ========================================================
+     * DECODIFICAR CAJAS
+     * ========================================================
+     */
+
+    constexpr float confidenceThreshold =
+        0.25f;
+
+
+    for (int detectionIndex = 0;
+         detectionIndex < detectionCount;
+         ++detectionIndex)
+    {
+                float centerX =
+            0.0f;
+
+        float centerY =
+            0.0f;
+
+        float width =
+            0.0f;
+
+        float height =
+            0.0f;
+
+        float confidence =
+            0.0f;
+
+        float objectness =
+            1.0f;
+
+        float classScore =
+            0.0f;
+
+
+                if (!tensorValue(
+                detectionIndex,
+                0,
+                centerX
+            ) ||
+            !tensorValue(
+                detectionIndex,
+                1,
+                centerY
+            ) ||
+            !tensorValue(
+                detectionIndex,
+                2,
+                width
+            ) ||
+            !tensorValue(
+                detectionIndex,
+                3,
+                height
+            ))
+        {
+            return false;
+        }
+
+
+        if (activeFormat ==
+            ModelOutputFormat::ModernRaw)
+        {
+            if (!tensorValue(
+                    detectionIndex,
+                    4,
+                    classScore
+                ))
+            {
+                return false;
+            }
+
+
+            confidence =
+                classScore;
+        }
+        else if (activeFormat ==
+                 ModelOutputFormat::YoloV5Raw)
+        {
+            if (!tensorValue(
+                    detectionIndex,
+                    4,
+                    objectness
+                ) ||
+                !tensorValue(
+                    detectionIndex,
+                    5,
+                    classScore
+                ))
+            {
+                return false;
+            }
+
+
+            confidence =
+                objectness *
+                classScore;
+        }
+
+
+        if (confidence <
+            confidenceThreshold)
+        {
+            continue;
+        }
+
+
+        float x1 =
+            centerX -
+            width * 0.5f;
+
+        float y1 =
+            centerY -
+            height * 0.5f;
+
+        float x2 =
+            centerX +
+            width * 0.5f;
+
+        float y2 =
+            centerY +
+            height * 0.5f;
+
+
+        /*
+         * Sacar el letterbox y regresar
+         * a coordenadas de la imagen original.
+         */
+
+        x1 =
+            (x1 - preprocessInfo.padX) /
+            preprocessInfo.scale;
+
+        y1 =
+            (y1 - preprocessInfo.padY) /
+            preprocessInfo.scale;
+
+        x2 =
+            (x2 - preprocessInfo.padX) /
+            preprocessInfo.scale;
+
+        y2 =
+            (y2 - preprocessInfo.padY) /
+            preprocessInfo.scale;
+
+
+        x1 =
+            std::clamp(
+                x1,
+                0.0f,
+                static_cast<float>(
+                    preprocessInfo.originalWidth
+                )
+            );
+
+        y1 =
+            std::clamp(
+                y1,
+                0.0f,
+                static_cast<float>(
+                    preprocessInfo.originalHeight
+                )
+            );
+
+        x2 =
+            std::clamp(
+                x2,
+                0.0f,
+                static_cast<float>(
+                    preprocessInfo.originalWidth
+                )
+            );
+
+        y2 =
+            std::clamp(
+                y2,
+                0.0f,
+                static_cast<float>(
+                    preprocessInfo.originalHeight
+                )
+            );
+
+
+        if (x2 <= x1 ||
+            y2 <= y1)
+        {
+            continue;
+        }
+
+
+        RawDetection detection;
+
+        detection.x1 =
+            x1;
+
+        detection.y1 =
+            y1;
+
+        detection.x2 =
+            x2;
+
+        detection.y2 =
+            y2;
+
+        detection.confidence =
+            confidence;
+
+        detection.classId =
+            0;
+
+
+        detections.push_back(
+            detection
+        );
+    }
+
+
+    nonMaximumSuppression(
+        detections,
+        0.45f
+    );
+
+
+    return true;
+
+#endif
+}
 
 TensorRtTasselDetector::~TensorRtTasselDetector()
 
@@ -1321,8 +2053,12 @@ void TensorRtTasselDetector::releaseTensorRtResources()
 
 
 bool TensorRtTasselDetector::initialize(
-    const char* enginePath)
+    const char* enginePath,
+    ModelOutputFormat requestedOutputFormat)
     {
+
+    outputFormat =
+        requestedOutputFormat;
     #ifdef HAGIE_ENABLE_TENSORRT
 
         releaseTensorRtResources();
@@ -2129,7 +2865,89 @@ bool TensorRtTasselDetector::processFrame(
             return false;
         }
     }
+
+        std::vector<RawDetection> rawDetections;
+
+
+    if (!decodeOutputs(
+            preprocessInfo,
+            rawDetections
+        ))
+    {
+        return false;
+    }
+
+
+    result.detections.clear();
+
+    result.detections.reserve(
+        rawDetections.size()
+    );
+
+
+    for (const RawDetection& raw :
+         rawDetections)
+    {
+        TasselDetector::Detection detection;
+
+
+        detection.confidence =
+            raw.confidence;
+
+
+        detection.x =
+            static_cast<int>(
+                std::round(
+                    raw.x1
+                )
+            );
+
+
+        detection.y =
+            static_cast<int>(
+                std::round(
+                    raw.y1
+                )
+            );
+
+
+        detection.width =
+            static_cast<int>(
+                std::round(
+                    raw.x2 -
+                    raw.x1
+                )
+            );
+
+
+        detection.height =
+            static_cast<int>(
+                std::round(
+                    raw.y2 -
+                    raw.y1
+                )
+            );
+
+
+        /*
+         * body_index y posición 3D se completan
+         * posteriormente en el pipeline Hagie.
+         */
+
+        detection.body_index =
+            0;
+
+        detection.position_3d_valid =
+            false;
+
+
+        result.detections.push_back(
+            detection
+        );
+    }
 #endif
+
+
 
 
 

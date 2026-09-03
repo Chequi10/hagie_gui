@@ -24,10 +24,12 @@ YoloInferenceWorker::~YoloInferenceWorker()
 
 
 bool YoloInferenceWorker::initialize(
-    const char* enginePath)
+    const char* enginePath,
+    TensorRtTasselDetector::ModelOutputFormat outputFormat)
 {
     return detector.initialize(
-        enginePath
+        enginePath,
+        outputFormat
     );
 }
 

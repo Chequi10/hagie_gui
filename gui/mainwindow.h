@@ -19,6 +19,7 @@
 #include "ai/tassel_detector.h"
 #include "ai/tassel_counter.h"
 #include "ai/tassel_verifier.h"
+#include <QLineEdit>
 
 
 class QStackedWidget;
@@ -542,6 +543,12 @@ private:
     * SIMULACIÓN / CÁMARAS 3D
     */
     QComboBox *configVisionSourceCombo = nullptr;
+
+    QComboBox *configYoloFormatCombo =
+        nullptr;
+
+    QLineEdit *configYoloEngineEdit =
+        nullptr;
 
 
     // ========================================================
