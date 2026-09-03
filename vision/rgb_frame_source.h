@@ -11,6 +11,20 @@ public:
 
     struct Frame
     {
+        /*
+        * Formato de imagen utilizado por Hagie:
+        *
+        * RGB888 intercalado:
+        *
+        * data = R G B R G B R G B ...
+        *
+        * 3 bytes por pixel.
+        *
+        * El tamaño válido debe ser:
+        *
+        * width * height * 3
+        */
+                
         std::size_t width = 0;
 
         std::size_t height = 0;

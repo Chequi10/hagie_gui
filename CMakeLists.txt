@@ -68,14 +68,16 @@ add_executable(
     vision/rgb_frame_source.h
     vision/simulated_rgb_frame_source.cpp
     vision/simulated_rgb_frame_source.h
+
+    vision/zed_gmsl_rgb_frame_source.cpp
+    vision/zed_gmsl_rgb_frame_source.h
+
     ai/tassel_detector.cpp
     ai/tassel_detector.h
     ai/tassel_counter.cpp
     ai/tassel_counter.h
     ai/tassel_verifier.cpp
     ai/tassel_verifier.h
-    vision/zed_gmsl_rgb_frame_source.cpp
-    vision/zed_gmsl_rgb_frame_source.h
 
     ai/tensorrt_tassel_detector.cpp
     ai/tensorrt_tassel_detector.h
@@ -101,6 +103,34 @@ target_link_libraries(
 
 
 # ============================================================
+# CUDA
+# ============================================================
+#
+# CUDA puede ser necesaria por:
+#
+# - ZED SDK
+# - TensorRT
+#
+# Por eso se busca una sola vez si cualquiera
+# de las dos funciones está habilitada.
+#
+
+if(HAGIE_ENABLE_ZED_SDK OR
+   HAGIE_ENABLE_TENSORRT)
+
+    message(
+        STATUS
+        "CUDA support REQUIRED"
+    )
+
+    find_package(
+        CUDA REQUIRED
+    )
+
+endif()
+
+
+# ============================================================
 # ZED SDK
 # ============================================================
 
@@ -113,10 +143,6 @@ if(HAGIE_ENABLE_ZED_SDK)
 
     find_package(
         ZED REQUIRED
-    )
-
-    find_package(
-        CUDA REQUIRED
     )
 
     target_compile_definitions(
@@ -180,10 +206,12 @@ if(HAGIE_ENABLE_TENSORRT)
 
     if(NOT TENSORRT_INCLUDE_DIR OR
        NOT TENSORRT_LIBRARY)
+
         message(
             FATAL_ERROR
             "TensorRT not found"
         )
+
     endif()
 
     target_compile_definitions(
@@ -196,12 +224,14 @@ if(HAGIE_ENABLE_TENSORRT)
         hagie_gui
         PRIVATE
         ${TENSORRT_INCLUDE_DIR}
+        ${CUDA_INCLUDE_DIRS}
     )
 
     target_link_libraries(
         hagie_gui
         PRIVATE
         ${TENSORRT_LIBRARY}
+        ${CUDA_LIBRARIES}
     )
 
 else()
@@ -212,6 +242,7 @@ else()
     )
 
 endif()
+
 
 # ============================================================
 # TEST VISION 3D PROCESSOR
@@ -231,7 +262,6 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
 
 
 # ============================================================
@@ -257,6 +287,8 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+
 # ============================================================
 # TEST RGB CAMERA WORKER
 # ============================================================
@@ -276,6 +308,8 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+
 # ============================================================
 # TEST TASSEL DETECTOR
 # ============================================================
@@ -297,6 +331,7 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+
 # ============================================================
 # TEST TASSEL COUNTER
 # ============================================================
@@ -315,6 +350,8 @@ target_include_directories(
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+
 # ============================================================
 # TEST TASSEL VERIFIER
 # ============================================================
