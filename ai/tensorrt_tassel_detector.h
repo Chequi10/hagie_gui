@@ -9,7 +9,10 @@
 
 
 #ifdef HAGIE_ENABLE_TENSORRT
+
 #include <NvInfer.h>
+#include <cuda_runtime.h>
+
 #endif
 
 
@@ -178,7 +181,14 @@ private:
 
 
     std::vector<std::size_t>
-        outputTensorIndices;
+    outputTensorIndices;
+
+    #if NV_TENSORRT_MAJOR >= 10
+
+    cudaStream_t cudaStream =
+        nullptr;
+
+#endif
 
 
 #ifdef HAGIE_ENABLE_TENSORRT

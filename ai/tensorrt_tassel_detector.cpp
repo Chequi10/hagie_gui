@@ -2166,6 +2166,21 @@ void TensorRtTasselDetector::releaseCudaBuffers()
 
 void TensorRtTasselDetector::releaseTensorRtResources()
 {
+    #if NV_TENSORRT_MAJOR >= 10
+
+        if (cudaStream != nullptr)
+        {
+            cudaStreamDestroy(
+                cudaStream
+            );
+
+            cudaStream =
+                nullptr;
+        }
+
+    #endif
+    
+    
     releaseCudaBuffers();
 
 
@@ -2657,6 +2672,27 @@ bool TensorRtTasselDetector::initialize(
         return false;
     }
 
+    #if NV_TENSORRT_MAJOR >= 10
+
+    const cudaError_t streamError =
+        cudaStreamCreate(
+            &cudaStream
+        );
+
+    if (streamError != cudaSuccess)
+    {
+        std::cerr
+            << "[TensorRT] Cannot create CUDA stream: "
+            << cudaGetErrorString(streamError)
+            << std::endl;
+
+        releaseTensorRtResources();
+
+        return false;
+    }
+
+    #endif
+
 
     initialized =
         true;
@@ -2864,21 +2900,10 @@ bool TensorRtTasselDetector::processFrame(
     }
 
 
-    cudaStream_t stream =
-        nullptr;
-
-
-    const cudaError_t streamError =
-        cudaStreamCreate(
-            &stream
-        );
-
-
-    if (streamError != cudaSuccess)
+        if (cudaStream == nullptr)
     {
         std::cerr
-            << "[TensorRT] cudaStreamCreate failed: "
-            << cudaGetErrorString(streamError)
+            << "[TensorRT] CUDA stream is not initialized"
             << std::endl;
 
         return false;
@@ -2887,7 +2912,7 @@ bool TensorRtTasselDetector::processFrame(
 
     const bool inferenceOk =
         context->enqueueV3(
-            stream
+            cudaStream
         );
 
 
@@ -2897,23 +2922,14 @@ bool TensorRtTasselDetector::processFrame(
             << "[TensorRT] enqueueV3 failed"
             << std::endl;
 
-        cudaStreamDestroy(
-            stream
-        );
-
         return false;
     }
 
 
     const cudaError_t syncError =
         cudaStreamSynchronize(
-            stream
+            cudaStream
         );
-
-
-    cudaStreamDestroy(
-        stream
-    );
 
 
     if (syncError != cudaSuccess)
