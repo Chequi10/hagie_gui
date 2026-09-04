@@ -25,8 +25,18 @@ YoloInferenceWorker::~YoloInferenceWorker()
 
 bool YoloInferenceWorker::initialize(
     const char* enginePath,
-    TensorRtTasselDetector::ModelOutputFormat outputFormat)
+    TensorRtTasselDetector::ModelOutputFormat outputFormat,
+    float confidenceThreshold,
+    float nmsThreshold)
 {
+    detector.setConfidenceThreshold(
+        confidenceThreshold
+    );
+
+    detector.setNmsThreshold(
+        nmsThreshold
+    );
+
     return detector.initialize(
         enginePath,
         outputFormat

@@ -550,6 +550,12 @@ private:
     QLineEdit *configYoloEngineEdit =
         nullptr;
 
+    QDoubleSpinBox *configYoloConfidenceSpin =
+        nullptr;
+
+    QDoubleSpinBox *configYoloNmsSpin =
+        nullptr;  
+
 
     // ========================================================
     // CONTROL AUTO DE PRUEBA

@@ -5364,9 +5364,15 @@ QWidget *MainWindow::createConfigurationPage()
 
 
                             if (!yoloInferenceWorker.initialize(
-                                    enginePathUtf8.constData(),
-                                    outputFormat
-                                ))
+                                enginePathUtf8.constData(),
+                                outputFormat,
+                                static_cast<float>(
+                                    configYoloConfidenceSpin->value()
+                                ),
+                                static_cast<float>(
+                                    configYoloNmsSpin->value()
+                                )
+                            ))
                             {
                                 qWarning(
                                     "TensorRT: no se pudo inicializar "
@@ -5565,6 +5571,99 @@ QWidget *MainWindow::createConfigurationPage()
 
     yoloConfigLayout->addLayout(
         yoloEngineLayout
+    );
+
+        /*
+     * Confianza mínima.
+     */
+    QHBoxLayout *yoloConfidenceLayout =
+        new QHBoxLayout();
+
+    QLabel *yoloConfidenceLabel =
+        new QLabel(
+            "Confianza mínima:"
+        );
+
+    configYoloConfidenceSpin =
+        new QDoubleSpinBox();
+
+    configYoloConfidenceSpin->setRange(
+        0.0,
+        1.0
+    );
+
+    configYoloConfidenceSpin->setDecimals(
+        2
+    );
+
+    configYoloConfidenceSpin->setSingleStep(
+        0.05
+    );
+
+    configYoloConfidenceSpin->setValue(
+        0.25
+    );
+
+
+    yoloConfidenceLayout->addWidget(
+        yoloConfidenceLabel
+    );
+
+    yoloConfidenceLayout->addWidget(
+        configYoloConfidenceSpin
+    );
+
+    yoloConfidenceLayout->addStretch();
+
+    yoloConfigLayout->addLayout(
+        yoloConfidenceLayout
+    );
+
+
+    /*
+     * Umbral IoU para NMS.
+     */
+    QHBoxLayout *yoloNmsLayout =
+        new QHBoxLayout();
+
+    QLabel *yoloNmsLabel =
+        new QLabel(
+            "NMS IoU:"
+        );
+
+    configYoloNmsSpin =
+        new QDoubleSpinBox();
+
+    configYoloNmsSpin->setRange(
+        0.0,
+        1.0
+    );
+
+    configYoloNmsSpin->setDecimals(
+        2
+    );
+
+    configYoloNmsSpin->setSingleStep(
+        0.05
+    );
+
+    configYoloNmsSpin->setValue(
+        0.45
+    );
+
+
+    yoloNmsLayout->addWidget(
+        yoloNmsLabel
+    );
+
+    yoloNmsLayout->addWidget(
+        configYoloNmsSpin
+    );
+
+    yoloNmsLayout->addStretch();
+
+    yoloConfigLayout->addLayout(
+        yoloNmsLayout
     );
 
 
@@ -8196,6 +8295,18 @@ void MainWindow::saveConfiguration()
             ->text()
     );
 
+        settings.setValue(
+        "yolo_confidence_threshold",
+        configYoloConfidenceSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "yolo_nms_threshold",
+        configYoloNmsSpin
+            ->value()
+    );
+
     settings.endGroup();
 
 
@@ -8548,7 +8659,20 @@ void MainWindow::loadConfiguration()
         settings.value(
             "yolo_engine_path",
             ""
-        ).toString();    
+        ).toString();  
+        
+        
+    double yoloConfidenceThreshold =
+        settings.value(
+            "yolo_confidence_threshold",
+            0.25
+        ).toDouble();
+
+    double yoloNmsThreshold =
+        settings.value(
+            "yolo_nms_threshold",
+            0.45
+        ).toDouble();    
 
     settings.endGroup();
 
@@ -8585,6 +8709,14 @@ void MainWindow::loadConfiguration()
 
     configYoloEngineEdit->setText(
         yoloEnginePath
+    );
+
+    configYoloConfidenceSpin->setValue(
+        yoloConfidenceThreshold
+    );
+
+    configYoloNmsSpin->setValue(
+        yoloNmsThreshold
     );
 
     /*

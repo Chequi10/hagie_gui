@@ -610,6 +610,29 @@ void TensorRtTasselDetector::nonMaximumSuppression(
 }
 
 
+void TensorRtTasselDetector::setConfidenceThreshold(
+    float threshold)
+{
+    confidenceThreshold =
+        std::clamp(
+            threshold,
+            0.0f,
+            1.0f
+        );
+}
+
+
+void TensorRtTasselDetector::setNmsThreshold(
+    float threshold)
+{
+    nmsThreshold =
+        std::clamp(
+            threshold,
+            0.0f,
+            1.0f
+        );
+}
+
 bool TensorRtTasselDetector::decodeOutputs(
     const PreprocessInfo& preprocessInfo,
     std::vector<RawDetection>& detections) const
@@ -756,67 +779,88 @@ bool TensorRtTasselDetector::decodeOutputs(
         << std::endl;
 
 
-        /*
-     * ========================================================
-     * DETERMINAR FORMATO DE SALIDA
-     * ========================================================
-     *
-     * Detector de una sola clase:
-     *
-     * ModernRaw:
-     *   cx, cy, w, h, classScore
-     *   => 5 atributos
-     *
-     * YoloV5Raw:
-     *   cx, cy, w, h, objectness, classScore
-     *   => 6 atributos
-     *
-     * Con Auto solamente aceptamos los casos
-     * que podemos identificar sin ambigüedad.
-     */
+     /*
+ * ========================================================
+ * DETERMINAR FORMATO DE SALIDA
+ * ========================================================
+ *
+ * ModernRaw:
+ *
+ *   cx, cy, w, h,
+ *   class_0, class_1, ... class_N
+ *
+ * YoloV5Raw:
+ *
+ *   cx, cy, w, h,
+ *   objectness,
+ *   class_0, class_1, ... class_N
+ *
+ * AUTO solamente selecciona automáticamente
+ * un formato cuando no existe ambigüedad.
+ */
 
     ModelOutputFormat activeFormat =
         outputFormat;
 
 
     if (activeFormat ==
-        ModelOutputFormat::Auto)
+    ModelOutputFormat::Auto)
+{
+    /*
+     * AUTO solamente resuelve formatos
+     * que son inequívocos.
+     *
+     * 5 atributos:
+     *
+     * cx, cy, w, h, classScore
+     *
+     * corresponde a ModernRaw
+     * con una sola clase.
+     *
+     * Con 6 o más atributos no podemos
+     * distinguir de manera segura entre:
+     *
+     * - ModernRaw multiclase
+     * - YOLOv5Raw
+     * - EndToEndNms
+     */
+    if (attributeCount == 5)
     {
-        if (attributeCount == 5)
-        {
-            activeFormat =
-                ModelOutputFormat::ModernRaw;
-        }
-        else if (attributeCount == 6)
-        {
-            std::cerr
-                << "[TensorRT] AUTO cannot safely determine "
-                << "the meaning of a 6-attribute output. "
-                << "Select YoloV5Raw or EndToEndNms explicitly."
-                << std::endl;
-
-            return false;
-        }
-        else
-        {
-            std::cerr
-                << "[TensorRT] AUTO does not recognize output with "
-                << attributeCount
-                << " attributes"
-                << std::endl;
-
-            return false;
-        }
+        activeFormat =
+            ModelOutputFormat::ModernRaw;
     }
+    else
+    {
+        std::cerr
+            << "[TensorRT] AUTO cannot safely determine "
+            << "the output format with "
+            << attributeCount
+            << " attributes. "
+            << "Select the YOLO output format explicitly."
+            << std::endl;
+
+        return false;
+    }
+}
 
 
     if (activeFormat ==
         ModelOutputFormat::ModernRaw)
     {
-        if (attributeCount != 5)
+        /*
+        * YOLO moderno:
+        *
+        * cx, cy, w, h,
+        * class_0, class_1, ... class_N
+        *
+        * Mínimo:
+        * 4 coordenadas + 1 clase = 5 atributos.
+        */
+        if (attributeCount < 5)
         {
             std::cerr
-                << "[TensorRT] ModernRaw expects 5 attributes, found "
+                << "[TensorRT] ModernRaw requires at least "
+                << "5 attributes, found "
                 << attributeCount
                 << std::endl;
 
@@ -824,12 +868,23 @@ bool TensorRtTasselDetector::decodeOutputs(
         }
     }
     else if (activeFormat ==
-             ModelOutputFormat::YoloV5Raw)
+            ModelOutputFormat::YoloV5Raw)
     {
-        if (attributeCount != 6)
+        /*
+        * YOLOv5:
+        *
+        * cx, cy, w, h,
+        * objectness,
+        * class_0, class_1, ... class_N
+        *
+        * Mínimo:
+        * 5 valores + 1 clase = 6 atributos.
+        */
+        if (attributeCount < 6)
         {
             std::cerr
-                << "[TensorRT] YoloV5Raw expects 6 attributes, found "
+                << "[TensorRT] YoloV5Raw requires at least "
+                << "6 attributes, found "
                 << attributeCount
                 << std::endl;
 
@@ -984,8 +1039,7 @@ bool TensorRtTasselDetector::decodeOutputs(
      * ========================================================
      */
 
-    constexpr float confidenceThreshold =
-        0.25f;
+    
 
 
     for (int detectionIndex = 0;
@@ -1010,8 +1064,7 @@ bool TensorRtTasselDetector::decodeOutputs(
         float objectness =
             1.0f;
 
-        float classScore =
-            0.0f;
+       
 
 
                 if (!tensorValue(
@@ -1039,43 +1092,114 @@ bool TensorRtTasselDetector::decodeOutputs(
         }
 
 
+                int bestClassId =
+            -1;
+
+        float bestClassScore =
+            -1.0f;
+
+
         if (activeFormat ==
             ModelOutputFormat::ModernRaw)
         {
+            /*
+             * YOLO moderno:
+             *
+             * 0 = cx
+             * 1 = cy
+             * 2 = w
+             * 3 = h
+             * 4... = scores de clases
+             */
+            for (int attributeIndex = 4;
+                 attributeIndex < attributeCount;
+                 ++attributeIndex)
+            {
+                float score =
+                    0.0f;
+
+
+                if (!tensorValue(
+                        detectionIndex,
+                        attributeIndex,
+                        score
+                    ))
+                {
+                    return false;
+                }
+
+
+                if (score >
+                    bestClassScore)
+                {
+                    bestClassScore =
+                        score;
+
+                    bestClassId =
+                        attributeIndex - 4;
+                }
+            }
+
+
+            confidence =
+                bestClassScore;
+        }
+        else if (activeFormat ==
+                 ModelOutputFormat::YoloV5Raw)
+        {
+            /*
+             * YOLOv5:
+             *
+             * 0 = cx
+             * 1 = cy
+             * 2 = w
+             * 3 = h
+             * 4 = objectness
+             * 5... = scores de clases
+             */
             if (!tensorValue(
                     detectionIndex,
                     4,
-                    classScore
+                    objectness
                 ))
             {
                 return false;
             }
 
 
-            confidence =
-                classScore;
-        }
-        else if (activeFormat ==
-                 ModelOutputFormat::YoloV5Raw)
-        {
-            if (!tensorValue(
-                    detectionIndex,
-                    4,
-                    objectness
-                ) ||
-                !tensorValue(
-                    detectionIndex,
-                    5,
-                    classScore
-                ))
+            for (int attributeIndex = 5;
+                 attributeIndex < attributeCount;
+                 ++attributeIndex)
             {
-                return false;
+                float score =
+                    0.0f;
+
+
+                if (!tensorValue(
+                        detectionIndex,
+                        attributeIndex,
+                        score
+                    ))
+                {
+                    return false;
+                }
+
+
+                if (score >
+                    bestClassScore)
+                {
+                    bestClassScore =
+                        score;
+
+                    bestClassId =
+                        attributeIndex - 5;
+                }
             }
 
 
             confidence =
                 objectness *
-                classScore;
+                bestClassScore;
         }
 
 
@@ -1187,7 +1311,7 @@ bool TensorRtTasselDetector::decodeOutputs(
             confidence;
 
         detection.classId =
-            0;
+            bestClassId;
 
 
         detections.push_back(
@@ -1198,7 +1322,7 @@ bool TensorRtTasselDetector::decodeOutputs(
 
     nonMaximumSuppression(
         detections,
-        0.45f
+        nmsThreshold
     );
 
 
@@ -1492,45 +1616,100 @@ bool TensorRtTasselDetector::resolveInputDimensions()
         input.dimensions[3];
 
 
-    /*
+        /*
      * ========================================================
      * DIMENSIONES DINAMICAS
      * ========================================================
      *
-     * Si el engine permite dimensiones dinámicas,
-     * utilizamos inicialmente 640 x 640.
+     * Si alguna dimensión es dinámica, utilizamos
+     * el tamaño OPT del perfil de optimización 0
+     * almacenado dentro del propio engine.
      *
-     * Esto NO ata Hagie a YOLO26.
-     *
-     * Más adelante este tamaño podrá venir de
-     * configuración.
+     * De esta forma Hagie no impone 640 x 640.
      */
 
-    if (batch <= 0)
+    const bool dynamicInput =
+        batch <= 0 ||
+        channels <= 0 ||
+        height <= 0 ||
+        width <= 0;
+
+
+    if (dynamicInput)
     {
+        if (engine == nullptr)
+        {
+            return false;
+        }
+
+
+        if (engine->getNbOptimizationProfiles() <= 0)
+        {
+            std::cerr
+                << "[TensorRT] Dynamic input but engine "
+                << "has no optimization profile"
+                << std::endl;
+
+            return false;
+        }
+
+
+        const nvinfer1::Dims profileDims =
+            engine->getProfileShape(
+                input.name.c_str(),
+                0,
+                nvinfer1::OptProfileSelector::kOPT
+            );
+
+
+        if (profileDims.nbDims != 4)
+        {
+            std::cerr
+                << "[TensorRT] Invalid OPT profile dimensions "
+                << "for input tensor "
+                << input.name
+                << std::endl;
+
+            return false;
+        }
+
+
         batch =
-            1;
-    }
+            profileDims.d[0];
 
-
-    if (channels <= 0)
-    {
         channels =
-            3;
-    }
+            profileDims.d[1];
 
-
-    if (height <= 0)
-    {
         height =
-            640;
-    }
+            profileDims.d[2];
 
-
-    if (width <= 0)
-    {
         width =
-            640;
+            profileDims.d[3];
+
+
+        if (batch <= 0 ||
+            channels <= 0 ||
+            height <= 0 ||
+            width <= 0)
+        {
+            std::cerr
+                << "[TensorRT] Invalid dynamic input OPT shape"
+                << std::endl;
+
+            return false;
+        }
+
+
+        std::cout
+            << "[TensorRT] Dynamic input resolved from OPT profile: "
+            << batch
+            << " x "
+            << channels
+            << " x "
+            << height
+            << " x "
+            << width
+            << std::endl;
     }
 
 

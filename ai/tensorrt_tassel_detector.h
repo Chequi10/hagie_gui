@@ -36,6 +36,14 @@ public:
             ModelOutputFormat::Auto
     );
 
+        void setConfidenceThreshold(
+        float threshold
+    );
+
+    void setNmsThreshold(
+        float threshold
+    );
+
 
     bool isInitialized() const;
 
@@ -147,6 +155,12 @@ private:
     
         bool initialized =
         false;
+
+    float confidenceThreshold =
+        0.25f;
+
+    float nmsThreshold =
+        0.45f;
 
 
     int inputTensorIndex =

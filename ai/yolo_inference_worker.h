@@ -46,7 +46,9 @@ public:
     bool initialize(
         const char* enginePath,
         TensorRtTasselDetector::ModelOutputFormat outputFormat =
-            TensorRtTasselDetector::ModelOutputFormat::Auto
+            TensorRtTasselDetector::ModelOutputFormat::Auto,
+        float confidenceThreshold = 0.25f,
+        float nmsThreshold = 0.45f
     );
 
 
