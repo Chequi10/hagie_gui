@@ -72,6 +72,9 @@ add_executable(
     vision/zed_gmsl_rgb_frame_source.cpp
     vision/zed_gmsl_rgb_frame_source.h
 
+    vision/zed_gmsl_rgb_only_frame_source.cpp
+    vision/zed_gmsl_rgb_only_frame_source.h
+
     ai/tassel_detector.cpp
     ai/tassel_detector.h
     ai/tassel_counter.cpp

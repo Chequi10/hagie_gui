@@ -46,6 +46,8 @@
 #include "vision/simulated_point_cloud_source.h"
 #include "vision/zed_gmsl_point_cloud_source.h"
 #include "vision/zed_gmsl_rgb_frame_source.h"
+#include "vision/zed_gmsl_rgb_only_frame_source.h"
+
 
 
 
@@ -5703,7 +5705,117 @@ QWidget *MainWindow::createConfigurationPage()
                     );
                 }
 
+                                /*
+                * ========================================================
+                * CÁMARAS TRASERAS RGB
+                * ========================================================
+                *
+                * rearRgbCameraSerialNumbers[0] -> Cámara física 6
+                * rearRgbCameraSerialNumbers[1] -> Cámara física 7
+                *
+                * Se utilizan solamente para RGB.
+                * No generan nube de puntos.
+                */
+                for (std::size_t rearCamera = 0;
+                    rearCamera < rearRgbCameraSerialNumbers.size();
+                    ++rearCamera)
+                {
+                    /*
+                    * Índice lógico dentro de las siete cámaras:
+                    *
+                    * 5 -> Cámara 6
+                    * 6 -> Cámara 7
+                    */
+                    const std::size_t camera =
+                        Vision3DProcessor::CAMERA_COUNT +
+                        rearCamera;
 
+
+                    const uint32_t serial =
+                        rearRgbCameraSerialNumbers[
+                            rearCamera
+                        ];
+
+
+                    /*
+                    * Cámara trasera sin serial configurado.
+                    */
+                    if (serial == 0)
+                    {
+                        qWarning(
+                            "Camera %zu trasera RGB sin serial ZED configurado",
+                            camera + 1
+                        );
+
+                        continue;
+                    }
+
+
+                    /*
+                    * Verificar que la ZED esté físicamente presente.
+                    */
+                    bool physicallyDetected =
+                        false;
+
+
+                    for (uint32_t detectedSerial :
+                        detectedSerials)
+                    {
+                        if (detectedSerial == serial)
+                        {
+                            physicallyDetected =
+                                true;
+
+                            break;
+                        }
+                    }
+
+
+                    if (!physicallyDetected)
+                    {
+                        qWarning(
+                            "Camera %zu trasera RGB NO ENCONTRADA - Serial %u",
+                            camera + 1,
+                            serial
+                        );
+
+                        continue;
+                    }
+
+
+                    /*
+                    * Abrir la ZED trasera solamente como fuente RGB.
+                    */
+                    auto rgbSource =
+                        std::make_unique<
+                            ZedGmslRgbOnlyFrameSource
+                        >(
+                            camera,
+                            serial
+                        );
+
+
+                    if (!rgbCameraWorker.setFrameSource(
+                            camera,
+                            std::move(rgbSource)
+                        ))
+                    {
+                        qWarning(
+                            "No se pudo instalar RGB ZED trasera Camera %zu - Serial %u",
+                            camera + 1,
+                            serial
+                        );
+
+                        continue;
+                    }
+
+
+                    qInfo(
+                        "Camera %zu trasera RGB lista - Serial %u",
+                        camera + 1,
+                        serial
+                    );
+                }        
                 /*
                 * Arrancar si existe al menos
                 * una cámara utilizable.
