@@ -4214,6 +4214,11 @@ void MainWindow::refreshZedCameraDetection()
         configVisionDetectedSerialCombo->clear();
     }
 
+    if (configRearRgbDetectedSerialCombo != nullptr)
+    {
+        configRearRgbDetectedSerialCombo->clear();
+    }
+
 
     /*
      * ========================================================
@@ -4295,6 +4300,21 @@ void MainWindow::refreshZedCameraDetection()
             }
         }
 
+            if (!alreadyAssigned)
+        {
+            for (std::size_t camera = 0;
+                camera < rearRgbCameraSerialNumbers.size();
+                ++camera)
+            {
+                if (rearRgbCameraSerialNumbers[camera] ==
+                    detectedSerial)
+                {
+                    alreadyAssigned = true;
+                    break;
+                }
+            }
+        }
+
 
         if (!alreadyAssigned)
         {
@@ -4307,6 +4327,20 @@ void MainWindow::refreshZedCameraDetection()
             if (configVisionDetectedSerialCombo != nullptr)
             {
                 configVisionDetectedSerialCombo->addItem(
+                    QString::number(
+                        detectedSerial
+                    ),
+                    QVariant::fromValue(
+                        static_cast<qulonglong>(
+                            detectedSerial
+                        )
+                    )
+                );
+            }
+
+            if (configRearRgbDetectedSerialCombo != nullptr)
+            {
+                configRearRgbDetectedSerialCombo->addItem(
                     QString::number(
                         detectedSerial
                     ),
@@ -4344,6 +4378,20 @@ void MainWindow::refreshZedCameraDetection()
     if (configVisionAssignDetectedButton != nullptr)
     {
         configVisionAssignDetectedButton->setEnabled(
+            hasNewCameras
+        );
+    }
+
+    if (configRearRgbDetectedSerialCombo != nullptr)
+    {
+        configRearRgbDetectedSerialCombo->setEnabled(
+            hasNewCameras
+        );
+    }
+
+    if (configRearRgbAssignDetectedButton != nullptr)
+    {
+        configRearRgbAssignDetectedButton->setEnabled(
             hasNewCameras
         );
     }
@@ -4408,7 +4456,56 @@ void MainWindow::refreshZedCameraDetection()
         }
     }
 
-    
+        if (configRearRgbCameraStatusLabel != nullptr)
+    {
+        const uint32_t rearSelectedSerial =
+            rearRgbCameraSerialNumbers[
+                currentRearRgbCamera
+            ];
+
+        if (rearSelectedSerial == 0)
+        {
+            configRearRgbCameraStatusLabel->setText(
+                "Estado ZED: SIN CÁMARA ASIGNADA"
+            );
+        }
+        else
+        {
+            bool rearSelectedDetected = false;
+
+            for (uint32_t detectedSerial :
+                 detectedSerials)
+            {
+                if (detectedSerial ==
+                    rearSelectedSerial)
+                {
+                    rearSelectedDetected = true;
+                    break;
+                }
+            }
+
+            if (rearSelectedDetected)
+            {
+                configRearRgbCameraStatusLabel->setText(
+                    QString(
+                        "Estado ZED: DETECTADA - Serial %1"
+                    ).arg(
+                        rearSelectedSerial
+                    )
+                );
+            }
+            else
+            {
+                configRearRgbCameraStatusLabel->setText(
+                    QString(
+                        "Estado ZED: NO ENCONTRADA - Serial %1"
+                    ).arg(
+                        rearSelectedSerial
+                    )
+                );
+            }
+        }
+    }
 
 
     qInfo(
@@ -4546,7 +4643,272 @@ QWidget *MainWindow::createConfigurationPage()
         new QVBoxLayout(
             camerasPage
         );
+        QWidget *rearRgbCamerasPage =
+        new QWidget();
 
+    QVBoxLayout *rearRgbCamerasPageLayout =
+        new QVBoxLayout(
+            rearRgbCamerasPage
+        );
+
+    QLabel *rearRgbCamerasTitle =
+        new QLabel(
+            "CONFIGURACIÓN DE CÁMARAS TRASERAS RGB"
+        );
+
+    rearRgbCamerasTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    rearRgbCamerasTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    rearRgbCamerasPageLayout->addWidget(
+        rearRgbCamerasTitle
+    );
+
+        QHBoxLayout *rearRgbCameraSelectorLayout =
+        new QHBoxLayout();
+
+    QLabel *rearRgbCameraSelectorLabel =
+        new QLabel(
+            "Cámara:"
+        );
+
+    configRearRgbCameraCombo =
+        new QComboBox();
+
+    configRearRgbCameraCombo->addItem(
+        "CÁMARA 6",
+        5
+    );
+
+    configRearRgbCameraCombo->addItem(
+        "CÁMARA 7",
+        6
+    );
+
+    connect(
+        configRearRgbCameraCombo,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this](int index)
+        {
+            if (index < 0)
+            {
+                return;
+            }
+
+            if (currentRearRgbCamera >=
+                rearRgbCameraSerialNumbers.size())
+            {
+                return;
+            }
+
+            rearRgbCameraSerialNumbers[
+                currentRearRgbCamera
+            ] =
+                static_cast<uint32_t>(
+                    configRearRgbCameraSerial->value()
+                );
+
+            currentRearRgbCamera =
+                static_cast<std::size_t>(
+                    index
+                );
+
+            if (currentRearRgbCamera >=
+                rearRgbCameraSerialNumbers.size())
+            {
+                return;
+            }
+
+            configRearRgbCameraSerial->setValue(
+                static_cast<int>(
+                    rearRgbCameraSerialNumbers[
+                        currentRearRgbCamera
+                    ]
+                )
+            );
+            refreshZedCameraDetection();
+        }
+    );
+
+    rearRgbCameraSelectorLayout->addWidget(
+        rearRgbCameraSelectorLabel
+    );
+
+    rearRgbCameraSelectorLayout->addWidget(
+        configRearRgbCameraCombo
+    );
+
+    rearRgbCameraSelectorLayout->addStretch();
+
+    rearRgbCamerasPageLayout->addLayout(
+        rearRgbCameraSelectorLayout
+    );
+
+        QHBoxLayout *rearRgbCameraSerialLayout =
+        new QHBoxLayout();
+
+    QLabel *rearRgbCameraSerialLabel =
+        new QLabel(
+            "Serial ZED:"
+        );
+
+    configRearRgbCameraSerial =
+        new QSpinBox();
+
+    configRearRgbCameraSerial ->setRange(
+        0,
+        999999999
+    );
+
+    configRearRgbCameraSerial->setSpecialValueText(
+        "NO CONFIGURADO"
+    );
+
+    rearRgbCameraSerialLayout->addWidget(
+        rearRgbCameraSerialLabel
+    );
+
+    rearRgbCameraSerialLayout->addWidget(
+        configRearRgbCameraSerial
+    );
+
+    rearRgbCameraSerialLayout->addStretch();
+
+    rearRgbCamerasPageLayout->addLayout(
+        rearRgbCameraSerialLayout
+    );
+
+    configRearRgbCameraStatusLabel =
+    new QLabel(
+        "Estado ZED: NO DETECTADA"
+    );
+
+    configRearRgbCameraStatusLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    rearRgbCamerasPageLayout->addWidget(
+       configRearRgbCameraStatusLabel
+    );
+
+    configRearRgbDetectButton =
+        new QPushButton(
+            "DETECTAR CÁMARAS ZED"
+        );
+
+    rearRgbCamerasPageLayout->addWidget(
+        configRearRgbDetectButton
+    );
+
+    connect(
+        configRearRgbDetectButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            refreshZedCameraDetection();
+        }
+    );
+
+        QHBoxLayout *rearRgbDetectedSerialLayout =
+        new QHBoxLayout();
+
+    QLabel *rearRgbDetectedSerialLabel =
+        new QLabel(
+            "ZED nueva detectada:"
+        );
+
+    configRearRgbDetectedSerialCombo =
+        new QComboBox();
+
+    configRearRgbDetectedSerialCombo ->setEnabled(
+        false
+    );
+
+    rearRgbDetectedSerialLayout->addWidget(
+        rearRgbDetectedSerialLabel
+    );
+
+    rearRgbDetectedSerialLayout->addWidget(
+        configRearRgbDetectedSerialCombo
+    );
+
+    rearRgbDetectedSerialLayout->addStretch();
+
+    rearRgbCamerasPageLayout->addLayout(
+        rearRgbDetectedSerialLayout
+    );
+
+    configRearRgbAssignDetectedButton =
+        new QPushButton(
+            "ASIGNAR A CÁMARA SELECCIONADA"
+        );
+
+    configRearRgbAssignDetectedButton->setEnabled(
+        false
+    );
+
+    rearRgbCamerasPageLayout->addWidget(
+        configRearRgbAssignDetectedButton
+    );
+
+    connect(
+        configRearRgbAssignDetectedButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            if (configRearRgbDetectedSerialCombo == nullptr)
+            {
+                return;
+            }
+
+            if (configRearRgbDetectedSerialCombo->count() == 0)
+            {
+                return;
+            }
+
+            if (currentRearRgbCamera >=
+                rearRgbCameraSerialNumbers.size())
+            {
+                return;
+            }
+
+            const QVariant serialData =
+                configRearRgbDetectedSerialCombo->currentData();
+
+            const uint32_t selectedSerial =
+                static_cast<uint32_t>(
+                    serialData.toULongLong()
+                );
+
+            rearRgbCameraSerialNumbers[
+                currentRearRgbCamera
+            ] =
+                selectedSerial;
+
+            if (configRearRgbCameraSerial != nullptr)
+            {
+                configRearRgbCameraSerial->setValue(
+                    static_cast<int>(
+                        selectedSerial
+                    )
+                );
+            }
+
+            refreshZedCameraDetection();
+        }
+    );
+
+    rearRgbCamerasPageLayout->addStretch();    
 
     QWidget *regionsPage =
         new QWidget();
@@ -4581,6 +4943,10 @@ QWidget *MainWindow::createConfigurationPage()
     );
 
     configurationStack->addWidget(
+        rearRgbCamerasPage
+    );
+
+    configurationStack->addWidget(
         regionsPage
     );
 
@@ -4603,6 +4969,11 @@ QWidget *MainWindow::createConfigurationPage()
             "CÁMARAS 3D"
         );
 
+    QPushButton *rearRgbCamerasButton =
+    new QPushButton(
+        "CÁMARAS TRASERAS RGB"
+        );    
+
     QPushButton *regionsButton =
         new QPushButton(
             "REGIONES 3D"
@@ -4617,6 +4988,7 @@ QWidget *MainWindow::createConfigurationPage()
     generalButton->setMinimumHeight(50);
     bodiesButton->setMinimumHeight(50);
     camerasButton->setMinimumHeight(50);
+    rearRgbCamerasButton->setMinimumHeight(50);
     regionsButton->setMinimumHeight(50);
     controlButton->setMinimumHeight(50);
 
@@ -4631,6 +5003,10 @@ QWidget *MainWindow::createConfigurationPage()
 
     configurationMenuLayout->addWidget(
         camerasButton
+    );
+
+    configurationMenuLayout->addWidget(
+        rearRgbCamerasButton
     );
 
     configurationMenuLayout->addWidget(
@@ -4680,7 +5056,7 @@ QWidget *MainWindow::createConfigurationPage()
     );
 
     connect(
-        regionsButton,
+        rearRgbCamerasButton,
         &QPushButton::clicked,
         this,
         [configurationStack]()
@@ -4692,13 +5068,25 @@ QWidget *MainWindow::createConfigurationPage()
     );
 
     connect(
-        controlButton,
+        regionsButton,
         &QPushButton::clicked,
         this,
         [configurationStack]()
         {
             configurationStack->setCurrentIndex(
                 4
+            );
+        }
+    );
+
+    connect(
+        controlButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                5
             );
         }
     );
@@ -8429,6 +8817,30 @@ void MainWindow::saveConfiguration()
 
         settings.endGroup();
     }
+        /*
+     * ========================================================
+     * Cámaras traseras RGB
+     * ========================================================
+     */
+    for (std::size_t camera = 0;
+         camera < rearRgbCameraSerialNumbers.size();
+         ++camera)
+    {
+        QString group =
+            QString("RearRgbCamera%1")
+                .arg(camera + 6);
+
+        settings.beginGroup(group);
+
+        settings.setValue(
+            "serial_number",
+            static_cast<qulonglong>(
+                rearRgbCameraSerialNumbers[camera]
+            )
+        );
+
+        settings.endGroup();
+    }
 
     /*
      * Forzar escritura en disco.
@@ -8853,6 +9265,31 @@ void MainWindow::loadConfiguration()
         settings.endGroup();
     }
 
+        /*
+     * ========================================================
+     * Cámaras traseras RGB
+     * ========================================================
+     */
+    for (std::size_t camera = 0;
+         camera < rearRgbCameraSerialNumbers.size();
+         ++camera)
+    {
+        QString group =
+            QString("RearRgbCamera%1")
+                .arg(camera + 6);
+
+        settings.beginGroup(group);
+
+        rearRgbCameraSerialNumbers[camera] =
+            static_cast<uint32_t>(
+                settings.value(
+                    "serial_number",
+                    0
+                ).toULongLong()
+            );
+
+        settings.endGroup();
+    }
 
     /*
     * ========================================================
@@ -8895,6 +9332,34 @@ void MainWindow::loadConfiguration()
             );
         }
     }
+        if (configRearRgbCameraCombo != nullptr &&
+        configRearRgbCameraSerial != nullptr)
+    {
+        int currentRearCamera =
+            configRearRgbCameraCombo
+                ->currentIndex();
+
+        if (currentRearCamera >= 0 &&
+            static_cast<std::size_t>(
+                currentRearCamera
+            ) <
+                rearRgbCameraSerialNumbers.size())
+        {
+            currentRearRgbCamera =
+                static_cast<std::size_t>(
+                    currentRearCamera
+                );
+
+            configRearRgbCameraSerial->setValue(
+                static_cast<int>(
+                    rearRgbCameraSerialNumbers[
+                        currentRearRgbCamera
+                    ]
+                )
+            );
+        }
+    }
+
 }
 void MainWindow::syncConfigurationToWorker()
 {

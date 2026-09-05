@@ -368,6 +368,36 @@ private:
     QSpinBox *configVisionCameraSerial =
         nullptr;
 
+        // ========================================================
+    // CONFIGURACION CAMARAS TRASERAS RGB
+    // ========================================================
+
+    QComboBox *configRearRgbCameraCombo =
+        nullptr;
+
+    QSpinBox *configRearRgbCameraSerial =
+        nullptr;
+
+    QLabel *configRearRgbCameraStatusLabel =
+        nullptr;
+
+    QPushButton *configRearRgbDetectButton =
+        nullptr;
+
+    QComboBox *configRearRgbDetectedSerialCombo =
+        nullptr;
+
+    QPushButton *configRearRgbAssignDetectedButton =
+        nullptr;
+
+    std::array<
+        uint32_t,
+        2
+    > rearRgbCameraSerialNumbers {};
+
+    std::size_t currentRearRgbCamera =
+        0;
+
 
     /*
     * Seriales ZED detectados físicamente.
