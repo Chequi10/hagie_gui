@@ -1816,6 +1816,38 @@ void MainWindow::updateCameraPage()
                 );
         }
 
+        else
+        {
+            /*
+            * =====================================================
+            * ASIGNACIÓN DE CUERPO PARA CÁMARAS TRASERAS
+            * =====================================================
+            *
+            * Las cámaras 5 y 6 no utilizan nube 3D.
+            *
+            * El cuerpo se determina por la posición horizontal
+            * del centro del bounding box dentro de la imagen.
+            *
+            * CAM 5 -> cuerpos 0,1,2
+            * CAM 6 -> cuerpos 3,4,5
+            */
+            for (auto& detection :
+                cameraResult.detections)
+            {
+                const int centerX =
+                    detection.x +
+                    detection.width / 2;
+
+
+                detection.body_index =
+                    TasselDetector::bodyFromImagePosition(
+                        camera,
+                        centerX,
+                        cameraResult.image_width
+                    );
+            }
+        }
+
          /*
          * =====================================================
          * TRACKING DE PANOJAS ÚNICAS

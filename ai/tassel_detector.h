@@ -63,6 +63,12 @@ public:
         std::uint64_t timestamp_ms =
             0;
 
+        std::size_t image_width =
+            0;
+
+        std::size_t image_height =
+            0;
+
         std::vector<Detection> detections;
 
         bool valid =

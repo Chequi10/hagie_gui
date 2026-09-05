@@ -2742,6 +2742,12 @@ bool TensorRtTasselDetector::processFrame(
     result.timestamp_ms =
         frame.timestamp_ms;
 
+    result.image_width =
+        frame.width;
+
+    result.image_height =
+        frame.height;
+
     std::vector<float> inputData;
 
     PreprocessInfo preprocessInfo;
