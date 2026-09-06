@@ -4848,11 +4848,23 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this]()
         {
+            if (configRearRgbCameraSerial != nullptr &&
+                currentRearRgbCamera <
+                    rearRgbCameraSerialNumbers.size())
+            {
+                rearRgbCameraSerialNumbers[
+                    currentRearRgbCamera
+                ] =
+                    static_cast<uint32_t>(
+                        configRearRgbCameraSerial->value()
+                    );
+            }
+
             refreshZedCameraDetection();
         }
     );
 
-        QHBoxLayout *rearRgbDetectedSerialLayout =
+    QHBoxLayout *rearRgbDetectedSerialLayout =
         new QHBoxLayout();
 
     QLabel *rearRgbDetectedSerialLabel =
@@ -8680,6 +8692,27 @@ void MainWindow::saveConfiguration()
         "hagie_config.ini",
         QSettings::IniFormat
     );
+
+        /*
+     * ========================================================
+     * Guardar el valor actualmente visible de cámara trasera
+     * ========================================================
+     *
+     * El selector guarda el serial al cambiar de Cámara 6/7,
+     * pero el usuario también puede editar el serial y pulsar
+     * GUARDAR sin cambiar de cámara.
+     */
+    if (configRearRgbCameraSerial != nullptr &&
+        currentRearRgbCamera <
+            rearRgbCameraSerialNumbers.size())
+    {
+        rearRgbCameraSerialNumbers[
+            currentRearRgbCamera
+        ] =
+            static_cast<uint32_t>(
+                configRearRgbCameraSerial->value()
+            );
+    }
 
     /*
      * ========================================================
