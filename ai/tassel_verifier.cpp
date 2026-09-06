@@ -9,6 +9,17 @@ void TasselVerifier::reset()
         State {};
 }
 
+void TasselVerifier::setVerificationWindow(
+    std::uint64_t minDelayMsValue,
+    std::uint64_t maxDelayMsValue)
+{
+    minDelayMs =
+        minDelayMsValue;
+
+    maxDelayMs =
+        maxDelayMsValue;
+}
+
 
 void TasselVerifier::processFrontDetections(
     const TasselDetector::Result& result)
@@ -157,7 +168,7 @@ void TasselVerifier::processRearDetections(
              * Todavía no pudo llegar físicamente
              * desde la cámara frontal a la trasera.
              */
-            if (age < MIN_DELAY_MS)
+            if (age < minDelayMs)
             {
                 continue;
             }
@@ -166,7 +177,7 @@ void TasselVerifier::processRearDetections(
             /*
              * Ya salió de la ventana válida.
              */
-            if (age > MAX_DELAY_MS)
+            if (age > maxDelayMs)
             {
                 continue;
             }
@@ -220,7 +231,7 @@ void TasselVerifier::update(
             it->timestamp_ms;
 
 
-        if (age <= MAX_DELAY_MS)
+        if (age <= maxDelayMs)
         {
             ++it;
 

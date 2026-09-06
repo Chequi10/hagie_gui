@@ -4975,6 +4975,241 @@ QWidget *MainWindow::createConfigurationPage()
             controlPage
         );
 
+        QWidget *tasselVerificationPage =
+        new QWidget();
+
+    QVBoxLayout *tasselVerificationPageLayout =
+        new QVBoxLayout(
+            tasselVerificationPage
+        );
+
+
+    QLabel *tasselVerificationTitle =
+        new QLabel(
+            "VERIFICACIÓN DE PANOJAS"
+        );
+
+    tasselVerificationTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    tasselVerificationTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    tasselVerificationPageLayout->addWidget(
+        tasselVerificationTitle
+    );
+
+
+    /*
+     * Velocidad estimada.
+     */
+    QHBoxLayout *tasselSpeedLayout =
+        new QHBoxLayout();
+
+    QLabel *tasselSpeedLabel =
+        new QLabel(
+            "Velocidad de trabajo estimada (km/h):"
+        );
+
+    configTasselSpeedSpin =
+        new QDoubleSpinBox();
+
+    configTasselSpeedSpin->setRange(
+        0.1,
+        30.0
+    );
+
+    configTasselSpeedSpin->setDecimals(
+        1
+    );
+
+    configTasselSpeedSpin->setSingleStep(
+        0.5
+    );
+
+    configTasselSpeedSpin->setValue(
+        6.0
+    );
+
+    tasselSpeedLayout->addWidget(
+        tasselSpeedLabel
+    );
+
+    tasselSpeedLayout->addWidget(
+        configTasselSpeedSpin
+    );
+
+    tasselSpeedLayout->addStretch();
+
+    tasselVerificationPageLayout->addLayout(
+        tasselSpeedLayout
+    );
+
+
+    /*
+     * Distancia entre cámaras delanteras y traseras.
+     */
+    QHBoxLayout *tasselDistanceLayout =
+        new QHBoxLayout();
+
+    QLabel *tasselDistanceLabel =
+        new QLabel(
+            "Distancia cámaras delanteras / traseras (mm):"
+        );
+
+    configTasselCameraDistanceSpin =
+        new QSpinBox();
+
+    configTasselCameraDistanceSpin->setRange(
+        100,
+        20000
+    );
+
+    configTasselCameraDistanceSpin->setSingleStep(
+        100
+    );
+
+    configTasselCameraDistanceSpin->setValue(
+        3000
+    );
+
+    tasselDistanceLayout->addWidget(
+        tasselDistanceLabel
+    );
+
+    tasselDistanceLayout->addWidget(
+        configTasselCameraDistanceSpin
+    );
+
+    tasselDistanceLayout->addStretch();
+
+    tasselVerificationPageLayout->addLayout(
+        tasselDistanceLayout
+    );
+
+
+    /*
+     * Tolerancia temporal.
+     */
+    QHBoxLayout *tasselToleranceLayout =
+        new QHBoxLayout();
+
+    QLabel *tasselToleranceLabel =
+        new QLabel(
+            "Tolerancia temporal (%):"
+        );
+
+    configTasselTimingToleranceSpin =
+        new QDoubleSpinBox();
+
+    configTasselTimingToleranceSpin->setRange(
+        0.0,
+        100.0
+    );
+
+    configTasselTimingToleranceSpin->setDecimals(
+        1
+    );
+
+    configTasselTimingToleranceSpin->setSingleStep(
+        5.0
+    );
+
+    configTasselTimingToleranceSpin->setValue(
+        30.0
+    );
+
+    tasselToleranceLayout->addWidget(
+        tasselToleranceLabel
+    );
+
+    tasselToleranceLayout->addWidget(
+        configTasselTimingToleranceSpin
+    );
+
+    tasselToleranceLayout->addStretch();
+
+    tasselVerificationPageLayout->addLayout(
+        tasselToleranceLayout
+    );
+
+
+    /*
+     * Valores calculados.
+     */
+    configTasselExpectedTimeLabel =
+        new QLabel(
+            "Tiempo estimado hasta cámara trasera: --- ms"
+        );
+
+    configTasselVerificationWindowLabel =
+        new QLabel(
+            "Ventana de verificación: --- ms"
+        );
+
+    configTasselExpectedTimeLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    configTasselVerificationWindowLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    tasselVerificationPageLayout->addSpacing(
+        20
+    );
+
+    tasselVerificationPageLayout->addWidget(
+        configTasselExpectedTimeLabel
+    );
+
+    tasselVerificationPageLayout->addWidget(
+        configTasselVerificationWindowLabel
+    );
+
+        connect(
+        configTasselSpeedSpin,
+        QOverload<double>::of(
+            &QDoubleSpinBox::valueChanged
+        ),
+        this,
+        [this](double)
+        {
+            updateTasselVerificationTiming();
+        }
+    );
+
+    connect(
+        configTasselCameraDistanceSpin,
+        QOverload<int>::of(
+            &QSpinBox::valueChanged
+        ),
+        this,
+        [this](int)
+        {
+            updateTasselVerificationTiming();
+        }
+    );
+
+    connect(
+        configTasselTimingToleranceSpin,
+        QOverload<double>::of(
+            &QDoubleSpinBox::valueChanged
+        ),
+        this,
+        [this](double)
+        {
+            updateTasselVerificationTiming();
+        }
+    );
+
+    updateTasselVerificationTiming();
+
+    tasselVerificationPageLayout->addStretch();    
+
 
     configurationStack->addWidget(
         generalPage
@@ -4998,6 +5233,10 @@ QWidget *MainWindow::createConfigurationPage()
 
     configurationStack->addWidget(
         controlPage
+    );
+
+        configurationStack->addWidget(
+        tasselVerificationPage
     );
 
     QPushButton *generalButton =
@@ -5030,6 +5269,11 @@ QWidget *MainWindow::createConfigurationPage()
             "CONTROL / SEGURIDAD"
         );
 
+    QPushButton *tasselVerificationButton =
+        new QPushButton(
+            "VERIFICACIÓN PANOJAS"
+        );
+
 
     generalButton->setMinimumHeight(50);
     bodiesButton->setMinimumHeight(50);
@@ -5037,6 +5281,9 @@ QWidget *MainWindow::createConfigurationPage()
     rearRgbCamerasButton->setMinimumHeight(50);
     regionsButton->setMinimumHeight(50);
     controlButton->setMinimumHeight(50);
+        tasselVerificationButton->setMinimumHeight(
+        50
+    );
 
 
     configurationMenuLayout->addWidget(
@@ -5061,6 +5308,10 @@ QWidget *MainWindow::createConfigurationPage()
 
     configurationMenuLayout->addWidget(
         controlButton
+    );
+
+    configurationMenuLayout->addWidget(
+        tasselVerificationButton
     );
 
     configurationMenuLayout->addStretch();
@@ -5137,6 +5388,18 @@ QWidget *MainWindow::createConfigurationPage()
         }
     );
 
+        connect(
+        tasselVerificationButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                6
+            );
+        }
+    );
+
 
     configurationContentLayout->addWidget(
         configurationMenuFrame
@@ -5155,7 +5418,310 @@ QWidget *MainWindow::createConfigurationPage()
 
 
 
-        
+         /*
+     * ========================================================
+     * PARÁMETROS GENERALES DE CÁMARAS Y PROCESAMIENTO
+     * ========================================================
+     */
+    QFrame *cameraGeneralConfigFrame =
+        new QFrame();
+
+    cameraGeneralConfigFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QVBoxLayout *cameraGeneralConfigLayout =
+        new QVBoxLayout(
+            cameraGeneralConfigFrame
+        );
+
+
+    QLabel *cameraGeneralConfigTitle =
+        new QLabel(
+            "PARÁMETROS GENERALES DE CÁMARAS Y PROCESAMIENTO"
+        );
+
+    cameraGeneralConfigTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    cameraGeneralConfigTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    cameraGeneralConfigLayout->addWidget(
+        cameraGeneralConfigTitle
+    );
+
+
+    /*
+     * FPS cámaras.
+     */
+    QHBoxLayout *cameraFpsLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraFpsLabel =
+        new QLabel(
+            "FPS cámaras:"
+        );
+
+    configCameraFpsCombo =
+        new QComboBox();
+
+    configCameraFpsCombo->addItem(
+        "15",
+        15
+    );
+
+    configCameraFpsCombo->addItem(
+        "30",
+        30
+    );
+
+    configCameraFpsCombo->addItem(
+        "60",
+        60
+    );
+
+    cameraFpsLayout->addWidget(
+        cameraFpsLabel
+    );
+
+    cameraFpsLayout->addWidget(
+        configCameraFpsCombo
+    );
+
+    cameraFpsLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        cameraFpsLayout
+    );
+
+
+    /*
+     * Resolución RGB.
+     */
+    QHBoxLayout *cameraResolutionLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraResolutionLabel =
+        new QLabel(
+            "Resolución RGB:"
+        );
+
+    configCameraResolutionCombo =
+        new QComboBox();
+
+    configCameraResolutionCombo->addItem(
+        "HD720",
+        "HD720"
+    );
+
+    configCameraResolutionCombo->addItem(
+        "HD1080",
+        "HD1080"
+    );
+
+    cameraResolutionLayout->addWidget(
+        cameraResolutionLabel
+    );
+
+    cameraResolutionLayout->addWidget(
+        configCameraResolutionCombo
+    );
+
+    cameraResolutionLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        cameraResolutionLayout
+    );
+
+
+    /*
+     * Timeout de cámara.
+     */
+    QHBoxLayout *cameraTimeoutLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraTimeoutLabel =
+        new QLabel(
+            "Timeout cámara (ms):"
+        );
+
+    configCameraTimeoutSpin =
+        new QSpinBox();
+
+    configCameraTimeoutSpin->setRange(
+        100,
+        10000
+    );
+
+    configCameraTimeoutSpin->setSingleStep(
+        100
+    );
+
+    configCameraTimeoutSpin->setValue(
+        1000
+    );
+
+    cameraTimeoutLayout->addWidget(
+        cameraTimeoutLabel
+    );
+
+    cameraTimeoutLayout->addWidget(
+        configCameraTimeoutSpin
+    );
+
+    cameraTimeoutLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        cameraTimeoutLayout
+    );
+
+
+    /*
+     * Reconexión automática.
+     */
+    configCameraAutoReconnectCheck =
+        new QCheckBox(
+            "Reconexión automática de cámaras"
+        );
+
+    configCameraAutoReconnectCheck->setChecked(
+        true
+    );
+
+    cameraGeneralConfigLayout->addWidget(
+        configCameraAutoReconnectCheck
+    );
+
+
+    /*
+     * Intervalo de reconexión.
+     */
+    QHBoxLayout *cameraReconnectIntervalLayout =
+        new QHBoxLayout();
+
+    QLabel *cameraReconnectIntervalLabel =
+        new QLabel(
+            "Intervalo reconexión (ms):"
+        );
+
+    configCameraReconnectIntervalSpin =
+        new QSpinBox();
+
+    configCameraReconnectIntervalSpin->setRange(
+        500,
+        30000
+    );
+
+    configCameraReconnectIntervalSpin->setSingleStep(
+        500
+    );
+
+    configCameraReconnectIntervalSpin->setValue(
+        2000
+    );
+
+    cameraReconnectIntervalLayout->addWidget(
+        cameraReconnectIntervalLabel
+    );
+
+    cameraReconnectIntervalLayout->addWidget(
+        configCameraReconnectIntervalSpin
+    );
+
+    cameraReconnectIntervalLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        cameraReconnectIntervalLayout
+    );
+
+
+    /*
+     * Procesar IA cada N frames.
+     */
+    QHBoxLayout *aiFrameIntervalLayout =
+        new QHBoxLayout();
+
+    QLabel *aiFrameIntervalLabel =
+        new QLabel(
+            "Procesar IA cada N frames:"
+        );
+
+    configAiFrameIntervalSpin =
+        new QSpinBox();
+
+    configAiFrameIntervalSpin->setRange(
+        1,
+        30
+    );
+
+    configAiFrameIntervalSpin->setValue(
+        1
+    );
+
+    aiFrameIntervalLayout->addWidget(
+        aiFrameIntervalLabel
+    );
+
+    aiFrameIntervalLayout->addWidget(
+        configAiFrameIntervalSpin
+    );
+
+    aiFrameIntervalLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        aiFrameIntervalLayout
+    );
+
+
+    /*
+     * Timeout de datos 3D.
+     */
+    QHBoxLayout *visionDataTimeoutLayout =
+        new QHBoxLayout();
+
+    QLabel *visionDataTimeoutLabel =
+        new QLabel(
+            "Timeout datos 3D (ms):"
+        );
+
+    configVisionDataTimeoutSpin =
+        new QSpinBox();
+
+    configVisionDataTimeoutSpin->setRange(
+        100,
+        10000
+    );
+
+    configVisionDataTimeoutSpin->setSingleStep(
+        100
+    );
+
+    configVisionDataTimeoutSpin->setValue(
+        500
+    );
+
+    visionDataTimeoutLayout->addWidget(
+        visionDataTimeoutLabel
+    );
+
+    visionDataTimeoutLayout->addWidget(
+        configVisionDataTimeoutSpin
+    );
+
+    visionDataTimeoutLayout->addStretch();
+
+    cameraGeneralConfigLayout->addLayout(
+        visionDataTimeoutLayout
+    );
+
+
+    generalPageLayout->addWidget(
+        cameraGeneralConfigFrame
+    );   
    
 
     /*
@@ -8684,7 +9250,95 @@ void MainWindow::applyVisionBodyRegions()
         );
     }
 }
+void MainWindow::updateTasselVerificationTiming()
+{
+    if (configTasselSpeedSpin == nullptr ||
+        configTasselCameraDistanceSpin == nullptr ||
+        configTasselTimingToleranceSpin == nullptr ||
+        configTasselExpectedTimeLabel == nullptr ||
+        configTasselVerificationWindowLabel == nullptr)
+    {
+        return;
+    }
 
+    const double speedKmh =
+        configTasselSpeedSpin->value();
+
+    const double distanceMm =
+        static_cast<double>(
+            configTasselCameraDistanceSpin->value()
+        );
+
+    const double tolerancePercent =
+        configTasselTimingToleranceSpin->value();
+
+    if (speedKmh <= 0.0)
+    {
+        configTasselExpectedTimeLabel->setText(
+            "Tiempo estimado hasta cámara trasera: --- ms"
+        );
+
+        configTasselVerificationWindowLabel->setText(
+            "Ventana de verificación: --- ms"
+        );
+
+        return;
+    }
+
+    /*
+     * km/h -> mm/ms
+     *
+     * 1 km/h = 1000000 mm / 3600000 ms
+     *        = 1 / 3.6 mm/ms
+     */
+    const double speedMmPerMs =
+        speedKmh / 3.6;
+
+    const double expectedTimeMs =
+        distanceMm /
+        speedMmPerMs;
+
+    const double toleranceFactor =
+        tolerancePercent /
+        100.0;
+
+    const double minDelayMs =
+        expectedTimeMs *
+        (1.0 - toleranceFactor);
+
+    const double maxDelayMs =
+        expectedTimeMs *
+        (1.0 + toleranceFactor);
+
+    tasselVerifier.setVerificationWindow(
+        static_cast<std::uint64_t>(
+            qRound(minDelayMs)
+        ),
+        static_cast<std::uint64_t>(
+            qRound(maxDelayMs)
+        )
+    );    
+
+    configTasselExpectedTimeLabel->setText(
+        QString(
+            "Tiempo estimado hasta cámara trasera: %1 ms"
+        ).arg(
+            qRound(expectedTimeMs)
+        )
+    );
+
+    configTasselVerificationWindowLabel->setText(
+        QString(
+            "Ventana de verificación: %1 - %2 ms"
+        )
+        .arg(
+            qRound(minDelayMs)
+        )
+        .arg(
+            qRound(maxDelayMs)
+        )
+    );
+}
 
 void MainWindow::saveConfiguration()
 {
@@ -8829,7 +9483,108 @@ void MainWindow::saveConfiguration()
 
     settings.endGroup();
 
-    
+        /*
+     * ========================================================
+     * Parámetros generales de cámaras y procesamiento
+     * ========================================================
+     */
+    settings.beginGroup(
+        "CameraProcessing"
+    );
+
+    settings.setValue(
+        "camera_fps",
+        configCameraFpsCombo
+            ->currentData()
+            .toInt()
+    );
+
+    settings.setValue(
+        "rgb_resolution",
+        configCameraResolutionCombo
+            ->currentData()
+            .toString()
+    );
+
+    settings.setValue(
+        "camera_timeout_ms",
+        configCameraTimeoutSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "camera_auto_reconnect",
+        configCameraAutoReconnectCheck
+            ->isChecked()
+    );
+
+    settings.setValue(
+        "camera_reconnect_interval_ms",
+        configCameraReconnectIntervalSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "ai_frame_interval",
+        configAiFrameIntervalSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "vision_data_timeout_ms",
+        configVisionDataTimeoutSpin
+            ->value()
+    );
+
+    settings.endGroup();
+
+        settings.setValue(
+        "vision_data_timeout_ms",
+        configVisionDataTimeoutSpin
+            ->value()
+    );
+
+    settings.endGroup();
+
+
+    /*
+     * ========================================================
+     * Verificación de panojas
+     * ========================================================
+     */
+    settings.beginGroup(
+        "TasselVerification"
+    );
+
+    settings.setValue(
+        "estimated_speed_kmh",
+        configTasselSpeedSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "camera_distance_mm",
+        configTasselCameraDistanceSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "timing_tolerance_percent",
+        configTasselTimingToleranceSpin
+            ->value()
+    );
+
+    settings.endGroup();
+
+
+    /*
+    * ========================================================
+    * Fuente de visión 3D
+    * ========================================================
+    */
+    settings.beginGroup(
+        "Vision"
+    );
 
     /*
     * ========================================================
@@ -9218,6 +9973,146 @@ void MainWindow::loadConfiguration()
     );
 
     settings.endGroup();
+
+        /*
+     * ========================================================
+     * Parámetros generales de cámaras y procesamiento
+     * ========================================================
+     */
+    settings.beginGroup(
+        "CameraProcessing"
+    );
+
+    int cameraFps =
+        settings.value(
+            "camera_fps",
+            30
+        ).toInt();
+
+    QString rgbResolution =
+        settings.value(
+            "rgb_resolution",
+            "HD720"
+        ).toString();
+
+    int cameraTimeoutMs =
+        settings.value(
+            "camera_timeout_ms",
+            1000
+        ).toInt();
+
+    bool cameraAutoReconnect =
+        settings.value(
+            "camera_auto_reconnect",
+            true
+        ).toBool();
+
+    int cameraReconnectIntervalMs =
+        settings.value(
+            "camera_reconnect_interval_ms",
+            2000
+        ).toInt();
+
+    int aiFrameInterval =
+        settings.value(
+            "ai_frame_interval",
+            1
+        ).toInt();
+
+    int visionDataTimeoutMs =
+        settings.value(
+            "vision_data_timeout_ms",
+            500
+        ).toInt();
+
+    settings.endGroup();
+
+
+
+
+    int cameraFpsIndex =
+        configCameraFpsCombo
+            ->findData(
+                cameraFps
+            );
+
+    if (cameraFpsIndex >= 0)
+    {
+        configCameraFpsCombo
+            ->setCurrentIndex(
+                cameraFpsIndex
+            );
+    }
+
+
+    int cameraResolutionIndex =
+        configCameraResolutionCombo
+            ->findData(
+                rgbResolution
+            );
+
+    if (cameraResolutionIndex >= 0)
+    {
+        configCameraResolutionCombo
+            ->setCurrentIndex(
+                cameraResolutionIndex
+            );
+    }
+
+
+    configCameraTimeoutSpin->setValue(
+        cameraTimeoutMs
+    );
+
+    configCameraAutoReconnectCheck->setChecked(
+        cameraAutoReconnect
+    );
+
+    configCameraReconnectIntervalSpin->setValue(
+        cameraReconnectIntervalMs
+    );
+
+    configAiFrameIntervalSpin->setValue(
+        aiFrameInterval
+    );
+
+    configVisionDataTimeoutSpin->setValue(
+        visionDataTimeoutMs
+    );
+
+        /*
+     * ========================================================
+     * Verificación de panojas
+     * ========================================================
+     */
+    settings.beginGroup(
+        "TasselVerification"
+    );
+
+    configTasselSpeedSpin->setValue(
+        settings.value(
+            "estimated_speed_kmh",
+            6.0
+        ).toDouble()
+    );
+
+    configTasselCameraDistanceSpin->setValue(
+        settings.value(
+            "camera_distance_mm",
+            3000
+        ).toInt()
+    );
+
+    configTasselTimingToleranceSpin->setValue(
+        settings.value(
+            "timing_tolerance_percent",
+            30.0
+        ).toDouble()
+    );
+
+    settings.endGroup();
+
+    updateTasselVerificationTiming();
 
     /*
     * ========================================================

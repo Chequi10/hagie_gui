@@ -34,6 +34,11 @@ int main()
 {
     TasselVerifier verifier;
 
+    verifier.setVerificationWindow(
+        1260,
+        2340
+    );
+
 
     /*
      * ========================================================
@@ -92,7 +97,7 @@ int main()
      * ========================================================
      *
      * La detección trasera llega 2000 ms después.
-     * Está dentro de la ventana 1000..5000 ms.
+     * Está dentro de la ventana 1260..2340 ms.
      *
      * Se considera que ESA panoja sigue presente.
      */
@@ -160,7 +165,7 @@ int main()
      * LA OTRA NUNCA APARECE ATRÁS
      * ========================================================
      *
-     * Avanzamos más allá de los 5000 ms.
+     * Avanzamos más allá de los 2340 ms.
      */
 
     verifier.update(
@@ -543,6 +548,119 @@ int main()
         << "TEST CUERPO OK"
         << std::endl;
 
+        /*
+     * ========================================================
+     * CASO 7:
+     * DETECCIÓN TRASERA DEMASIADO TEMPRANA
+     * ========================================================
+     *
+     * Ventana configurada:
+     * 1260..2340 ms.
+     *
+     * La panoja frontal aparece en 1000 ms.
+     * La trasera aparece en 2000 ms.
+     *
+     * Diferencia:
+     * 1000 ms.
+     *
+     * Es demasiado temprano.
+     * NO debe verificar la panoja.
+     */
 
+    verifier.reset();
+
+    verifier.setVerificationWindow(
+        1260,
+        2340
+    );
+
+
+    TasselDetector::Result earlyFrontResult;
+
+    earlyFrontResult.valid =
+        true;
+
+    earlyFrontResult.camera_index =
+        0;
+
+    earlyFrontResult.timestamp_ms =
+        1000;
+
+    earlyFrontResult.detections =
+    {
+        makeDetection(
+            0
+        )
+    };
+
+
+    verifier.processFrontDetections(
+        earlyFrontResult
+    );
+
+
+    TasselDetector::Result earlyRearResult;
+
+    earlyRearResult.valid =
+        true;
+
+    earlyRearResult.camera_index =
+        5;
+
+    earlyRearResult.timestamp_ms =
+        2000;
+
+    earlyRearResult.detections =
+    {
+        makeDetection(
+            0
+        )
+    };
+
+
+    verifier.processRearDetections(
+        earlyRearResult
+    );
+
+
+    state =
+        verifier.getState();
+
+
+    std::cout
+        << "Temprana - pendientes: "
+        << state.pending
+        << std::endl;
+
+    std::cout
+        << "Temprana - presentes: "
+        << state.verified_remaining
+        << std::endl;
+
+
+    if (state.pending != 1)
+    {
+        std::cerr
+            << "ERROR: una detección demasiado temprana verificó la panoja"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    if (state.verified_remaining != 0)
+    {
+        std::cerr
+            << "ERROR: una detección demasiado temprana fue marcada como presente"
+            << std::endl;
+
+        return 1;
+    }
+
+
+    std::cout
+        << "TEST TEMPORAL MINIMO OK"
+        << std::endl;
+        
     return 0;
 }

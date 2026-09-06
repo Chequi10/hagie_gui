@@ -566,6 +566,55 @@ private:
     bool logPreviousVisionRunning =
         false;    
 
+
+        /*
+     * ========================================================
+     * Parámetros generales de cámaras y procesamiento
+     * ========================================================
+     */
+
+    QComboBox *configCameraFpsCombo =
+        nullptr;
+
+    QComboBox *configCameraResolutionCombo =
+        nullptr;
+
+    QSpinBox *configCameraTimeoutSpin =
+        nullptr;
+
+    QCheckBox *configCameraAutoReconnectCheck =
+        nullptr;
+
+    QSpinBox *configCameraReconnectIntervalSpin =
+        nullptr;
+
+    QSpinBox *configAiFrameIntervalSpin =
+        nullptr;
+
+    QSpinBox *configVisionDataTimeoutSpin =
+        nullptr;
+
+        /*
+     * ========================================================
+     * Verificación de panojas
+     * ========================================================
+     */
+
+    QDoubleSpinBox *configTasselSpeedSpin =
+        nullptr;
+
+    QSpinBox *configTasselCameraDistanceSpin =
+        nullptr;
+
+    QDoubleSpinBox *configTasselTimingToleranceSpin =
+        nullptr;
+
+    QLabel *configTasselExpectedTimeLabel =
+        nullptr;
+
+    QLabel *configTasselVerificationWindowLabel =
+        nullptr;
+
     /*
     * Fuente utilizada para obtener
     * las mediciones de visión 3D.
@@ -717,6 +766,8 @@ private:
     void applyVisionBodyRegions();
 
     void syncConfigurationToWorker();
+
+    void updateTasselVerificationTiming();
     /*
     * Detecta las cámaras ZED conectadas,
     * compara sus seriales con la configuración

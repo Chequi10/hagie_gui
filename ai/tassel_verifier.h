@@ -35,6 +35,11 @@ public:
 
     void reset();
 
+    void setVerificationWindow(
+        std::uint64_t minDelayMs,
+        std::uint64_t maxDelayMs
+    );
+
 
     void processFrontDetections(
         const TasselDetector::Result& result
@@ -66,10 +71,10 @@ private:
     };
 
 
-    static constexpr std::uint64_t MIN_DELAY_MS =
+    std::uint64_t minDelayMs =
         1000;
 
-    static constexpr std::uint64_t MAX_DELAY_MS =
+    std::uint64_t maxDelayMs =
         5000;
 
 
