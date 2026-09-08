@@ -790,6 +790,8 @@ private:
     // CONFIGURACIÓN
     // ========================================================
 
+    QString configurationFilePath() const;
+
     void saveConfiguration();
 
     void loadConfiguration();

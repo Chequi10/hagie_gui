@@ -16,6 +16,8 @@
 #include <QTimer>
 #include <QPainter>
 #include <QPen>
+#include <QStandardPaths>
+#include <QDir>
 #include <QLineEdit>
 #include <QFileInfo>
 #include <QDialog>
@@ -3844,7 +3846,7 @@ QWidget *MainWindow::createTestsPage()
         * Esto NO activa AUTO.
         */
         QSettings testSettings(
-            "hagie_config.ini",
+            configurationFilePath(),
             QSettings::IniFormat
         );
 
@@ -3869,13 +3871,12 @@ QWidget *MainWindow::createTestsPage()
                 &QSpinBox::valueChanged
             ),
             this,
-            [body](int value)
+            [this, body](int value)
             {
                 QSettings settings(
-                    "hagie_config.ini",
+                    configurationFilePath(),
                     QSettings::IniFormat
                 );
-
                 QString key =
                     QString("Test/target_body_%1")
                         .arg(body);
@@ -10322,10 +10323,33 @@ void MainWindow::updateTasselVerificationTiming()
     );
 }
 
+QString MainWindow::configurationFilePath() const
+{
+    QString configDir =
+        QStandardPaths::writableLocation(
+            QStandardPaths::AppConfigLocation
+        );
+
+    QDir dir;
+
+    if (!dir.mkpath(configDir))
+    {
+        qWarning()
+            << "No se pudo crear el directorio de configuración:"
+            << configDir;
+    }
+
+    return QDir(configDir).filePath(
+        "hagie_config.ini"
+    );
+}
+
+
+
 void MainWindow::saveConfiguration()
 {
     QSettings settings(
-        "hagie_config.ini",
+        configurationFilePath(),
         QSettings::IniFormat
     );
 
@@ -10779,7 +10803,7 @@ void MainWindow::saveConfiguration()
 void MainWindow::loadConfiguration()
 {
     QSettings settings(
-        "hagie_config.ini",
+        configurationFilePath(),
         QSettings::IniFormat
     );
 
