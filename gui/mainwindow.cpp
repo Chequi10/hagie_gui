@@ -16,11 +16,11 @@
 #include <QTimer>
 #include <QPainter>
 #include <QPen>
-
 #include <QLineEdit>
 #include <QFileInfo>
-
-
+#include <QDialog>
+#include <QTextBrowser>
+#include <QDialogButtonBox>
 #include "ai/tassel_detector.h"
 #include "stm32/stm32_worker.h"
 #include "core/height_target_controller.h"
@@ -1176,18 +1176,506 @@ void MainWindow::createMenus()
 
 
     /*
-     * AYUDA
-     */
-    QMenu *helpMenu =
-        menuBar()->addMenu("Ayuda");
+ * ========================================================
+ * AYUDA
+ * ========================================================
+ */
+QMenu *helpMenu =
+    menuBar()->addMenu("Ayuda");
 
+
+/*
+ * Manual de uso
+ */
+QAction *manualAction =
+    helpMenu->addAction(
+        "Manual de uso"
+    );
+
+
+/*
+ * Información del sistema
+ */
+QAction *systemInfoAction =
     helpMenu->addAction(
         "Información del sistema"
     );
 
+
+helpMenu->addSeparator();
+
+
+/*
+ * Acerca de
+ */
+QAction *aboutAction =
     helpMenu->addAction(
         "Acerca de Hagie Control"
     );
+
+
+/*
+ * ========================================================
+ * MANUAL DE USO
+ * ========================================================
+ */
+connect(
+    manualAction,
+    &QAction::triggered,
+    this,
+    [this]()
+    {
+        QDialog dialog(this);
+
+        dialog.setWindowTitle(
+            "Manual de uso - Hagie Control"
+        );
+
+        dialog.resize(
+            900,
+            650
+        );
+
+
+        QVBoxLayout *layout =
+            new QVBoxLayout(&dialog);
+
+
+        QTextBrowser *text =
+            new QTextBrowser();
+
+        text->setOpenExternalLinks(
+            true
+        );
+
+        text->setHtml(
+            R"(
+            <h1>Hagie Control</h1>
+
+            <p>
+            Sistema inteligente para el control automático de altura,
+            detección de panojas y verificación de la efectividad
+            del despanojado.
+            </p>
+
+            <hr>
+
+            <h2>1. Vista general</h2>
+
+            <p>
+            La pantalla principal permite observar el
+            estado de los seis cuerpos de la máquina.
+            </p>
+
+            <p>
+            Para cada cuerpo se muestran:
+            </p>
+
+            <ul>
+                <li><b>Altura:</b> posición medida por el encoder.</li>
+                <li><b>Objetivo:</b> altura solicitada por el sistema.</li>
+                <li><b>Modo:</b> MANUAL o automático.</li>
+                <li><b>Válvula:</b> comando aplicado al actuador hidráulico.</li>
+                <li><b>Falla:</b> estado de diagnóstico del cuerpo.</li>
+            </ul>
+
+
+            <h2>2. Cámaras</h2>
+
+            <p>
+            El sistema utiliza siete cámaras físicas.
+            </p>
+
+            <ul>
+                <li>
+                <b>Cámaras 1 a 5:</b>
+                cámaras frontales 3D + RGB.
+                Se utilizan para observar el cultivo,
+                obtener información tridimensional y
+                detectar panojas mediante inteligencia artificial.
+                </li>
+
+                <li>
+                <b>Cámaras 6 y 7:</b>
+                cámaras traseras RGB utilizadas para
+                observar el resultado del trabajo realizado.
+                </li>
+            </ul>
+
+            <p>
+            Desde esta pantalla puede seleccionarse la
+            cámara que se desea visualizar.
+            </p>
+
+
+            <h2>3. Fallas</h2>
+
+            <p>
+            La pantalla de fallas concentra las condiciones
+            anormales detectadas por el sistema.
+            </p>
+
+            <p>
+            Debe utilizarse para identificar rápidamente
+            problemas de comunicación, sensores, actuadores
+            o subsistemas de control.
+            </p>
+
+
+            <h2>4. Test</h2>
+
+            <p>
+            El panel de test permite verificar individualmente
+            el funcionamiento de los cuerpos.
+            </p>
+
+            <p>
+            Desde esta pantalla pueden realizarse pruebas de:
+            </p>
+
+            <ul>
+                <li>Movimiento manual.</li>
+                <li>Lectura de encoders.</li>
+                <li>Accionamiento de válvulas.</li>
+                <li>Control automático.</li>
+                <li>Control automático utilizando visión 3D.</li>
+            </ul>
+
+            <p>
+            Las funciones de movimiento quedan inhibidas
+            cuando no existe comunicación válida con la STM32.
+            </p>
+
+
+            <h2>5. Configuración</h2>
+
+            <p>
+            Permite configurar los parámetros utilizados
+            por el sistema de control.
+            </p>
+
+            <p>
+            Entre ellos se encuentran:
+            </p>
+
+            <ul>
+                <li>Límites de altura.</li>
+                <li>Configuración de encoders.</li>
+                <li>Parámetros de cada cuerpo.</li>
+                <li>Configuración de visión.</li>
+                <li>Selección de la fuente de visión 3D.</li>
+            </ul>
+
+            <p>
+            Las fuentes disponibles son:
+            </p>
+
+            <ul>
+                <li><b>SIMULACIÓN ALTURAS</b></li>
+                <li><b>SIMULACIÓN CÁMARAS 3D</b></li>
+                <li><b>CÁMARAS 3D REALES</b></li>
+            </ul>
+
+
+            <h2>6. Comunicaciones</h2>
+
+            <p>
+            Esta pantalla permite supervisar las
+            comunicaciones entre los distintos módulos
+            electrónicos del sistema.
+            </p>
+
+            <p>
+            Incluye principalmente la comunicación con
+            la STM32 y el sistema CAN utilizado para el
+            accionamiento de las válvulas.
+            </p>
+
+
+            <h2>7. Logs</h2>
+
+            <p>
+            La pantalla de Logs registra cronológicamente
+            eventos importantes ocurridos durante el
+            funcionamiento de Hagie Control.
+            </p>
+
+            <p>
+            Los registros permiten diagnosticar fallas
+            y analizar el comportamiento del sistema.
+            </p>
+
+
+            <h2>8. Barra de estado</h2>
+
+            <p>
+            En la parte inferior de la pantalla se muestra
+            permanentemente el estado general del sistema.
+            </p>
+
+            <ul>
+                <li><b>STM32:</b> estado de comunicación con el controlador.</li>
+                <li><b>CAN:</b> estado de la red de actuadores.</li>
+                <li><b>IMU:</b> validez del sensor de orientación.</li>
+                <li><b>VISIÓN:</b> estado del sistema de visión 3D.</li>
+                <li><b>IA:</b> estado del sistema de detección.</li>
+                <li><b>CONFIG STM32:</b> estado de sincronización de configuración.</li>
+            </ul>
+
+
+            <h2>9. Parada total</h2>
+
+            <p>
+            El botón rojo <b>PARADA TOTAL</b> cancela
+            las órdenes de movimiento y ordena detener
+            los actuadores.
+            </p>
+
+            <p>
+            Debe utilizarse ante una situación anormal
+            o cuando sea necesario detener inmediatamente
+            el movimiento controlado por el sistema.
+            </p>
+
+
+            <hr>
+
+            <p>
+            <b>Hagie Control</b><br>
+            Sistema de visión y control automático de altura.
+            </p>
+            )"
+        );
+
+
+        layout->addWidget(
+            text
+        );
+
+
+        QDialogButtonBox *buttons =
+            new QDialogButtonBox(
+                QDialogButtonBox::Close
+            );
+
+        connect(
+            buttons,
+            &QDialogButtonBox::rejected,
+            &dialog,
+            &QDialog::reject
+        );
+
+        layout->addWidget(
+            buttons
+        );
+
+
+        dialog.exec();
+    }
+);
+
+
+/*
+ * ========================================================
+ * INFORMACIÓN DEL SISTEMA
+ * ========================================================
+ */
+connect(
+    systemInfoAction,
+    &QAction::triggered,
+    this,
+    [this]()
+    {
+        QDialog dialog(this);
+
+        dialog.setWindowTitle(
+            "Información del sistema"
+        );
+
+        dialog.resize(
+            650,
+            450
+        );
+
+
+        QVBoxLayout *layout =
+            new QVBoxLayout(&dialog);
+
+
+        QTextBrowser *text =
+            new QTextBrowser();
+
+        text->setHtml(
+            R"(
+            <h2>Arquitectura de Hagie Control</h2>
+
+            <p>
+            El sistema está compuesto por varios
+            subsistemas que trabajan en conjunto.
+            </p>
+
+            <ul>
+                <li><b>Computadora NVIDIA Jetson:</b>
+                    procesamiento principal.</li>
+
+                <li><b>STM32:</b>
+                    control en tiempo real, encoders
+                    y comunicación con actuadores.</li>
+
+                <li><b>CAN:</b>
+                    comunicación con los módulos
+                    de control de válvulas.</li>
+
+                <li><b>Visión 3D:</b>
+                    medición tridimensional del cultivo.</li>
+
+                <li><b>IA:</b>
+                    detección de panojas y verificación
+                    de la efectividad del despanojado.</li>
+
+                <li><b>IMU:</b>
+                    compensación de la orientación
+                    de la máquina.</li>
+
+                <li><b>Encoders:</b>
+                    medición de posición de los
+                    seis cuerpos.</li>
+            </ul>
+
+            <p>
+            La Jetson procesa la información de visión
+            y genera los objetivos de altura.
+            La STM32 ejecuta el control de los actuadores
+            y supervisa las señales de campo.
+            </p>
+            )"
+        );
+
+
+        layout->addWidget(
+            text
+        );
+
+
+        QDialogButtonBox *buttons =
+            new QDialogButtonBox(
+                QDialogButtonBox::Close
+            );
+
+        connect(
+            buttons,
+            &QDialogButtonBox::rejected,
+            &dialog,
+            &QDialog::reject
+        );
+
+        layout->addWidget(
+            buttons
+        );
+
+
+        dialog.exec();
+    }
+);
+
+
+/*
+ * ========================================================
+ * ACERCA DE HAGIE CONTROL
+ * ========================================================
+ */
+connect(
+    aboutAction,
+    &QAction::triggered,
+    this,
+    [this]()
+    {
+        QDialog dialog(this);
+
+        dialog.setWindowTitle(
+            "Acerca de Hagie Control"
+        );
+
+        dialog.resize(
+            500,
+            300
+        );
+
+
+        QVBoxLayout *layout =
+            new QVBoxLayout(&dialog);
+
+
+        QTextBrowser *text =
+            new QTextBrowser();
+
+        text->setHtml(
+            R"(
+            <div align="center">
+
+            <h1 style="margin-bottom: 4px;">
+            Hagie Control
+            </h1>
+
+            <h3 style="margin: 4px;">
+            Control inteligente y verificación de despanojado
+            </h3>
+
+            <p style="margin: 6px;">
+            Control automático de altura mediante visión 3D
+            y detección de panojas con inteligencia artificial.
+            </p>
+
+            
+            <p style="margin: 4px;">
+            <b>Plataforma:</b> NVIDIA Jetson + STM32
+            </p>
+
+            <p style="margin: 4px;">
+            <b>Visión:</b> Cámaras 3D + RGB
+            </p>
+
+            <hr>
+
+            <p style="margin: 6px;">
+            <b>Desarrollado por:</b><br>
+            Esp. Ing. Ezequiel Acerbo
+            </p>
+
+            <p style="margin: 4px;">
+            <b>Correo:</b> acerboezequiel@live.com
+            </p>
+
+            </div>
+            )"
+        );
+
+
+        layout->addWidget(
+            text
+        );
+
+
+        QDialogButtonBox *buttons =
+            new QDialogButtonBox(
+                QDialogButtonBox::Close
+            );
+
+        connect(
+            buttons,
+            &QDialogButtonBox::rejected,
+            &dialog,
+            &QDialog::reject
+        );
+
+        layout->addWidget(
+            buttons
+        );
+
+
+        dialog.exec();
+    }
+);
 }
 
 
