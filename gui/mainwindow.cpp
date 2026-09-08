@@ -1810,6 +1810,138 @@ QWidget *MainWindow::createDashboardPage()
 
     mainLayout->addLayout(bodyGrid);
 
+        /*
+     * ========================================================
+     * RENDIMIENTO DE DESPANOJADO
+     * ========================================================
+     */
+
+    QFrame *tasselPerformanceFrame =
+        new QFrame();
+
+    tasselPerformanceFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+
+    QVBoxLayout *tasselPerformanceLayout =
+        new QVBoxLayout(
+            tasselPerformanceFrame
+        );
+
+
+    QLabel *tasselPerformanceTitle =
+        new QLabel(
+            "RENDIMIENTO DE DESPANOJADO"
+        );
+
+    tasselPerformanceTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    tasselPerformanceTitle->setStyleSheet(
+        "font-size: 17px;"
+        "font-weight: bold;"
+    );
+
+    tasselPerformanceLayout->addWidget(
+        tasselPerformanceTitle
+    );
+
+
+    QHBoxLayout *tasselStatsLayout =
+        new QHBoxLayout();
+
+
+    tasselDetectedLabel =
+        new QLabel(
+            "Detectadas: 0"
+        );
+
+    tasselRemovedLabel =
+        new QLabel(
+            "Removidas: 0"
+        );
+
+    tasselRemainingLabel =
+        new QLabel(
+            "Presentes: 0"
+        );
+
+    tasselEfficiencyLabel =
+        new QLabel(
+            "Efectividad: -- %"
+        );
+
+
+    tasselDetectedLabel->setAlignment(
+        Qt::AlignCenter
+    );
+
+    tasselRemovedLabel->setAlignment(
+        Qt::AlignCenter
+    );
+
+    tasselRemainingLabel->setAlignment(
+        Qt::AlignCenter
+    );
+
+    tasselEfficiencyLabel->setAlignment(
+        Qt::AlignCenter
+    );
+
+
+        tasselDetectedLabel->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "color: #1565C0;"
+    );
+
+    tasselRemovedLabel->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "color: #2E7D32;"
+    );
+
+    tasselRemainingLabel->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "color: #C62828;"
+    );
+
+    tasselEfficiencyLabel->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "color: #616161;"
+    );
+
+
+    tasselStatsLayout->addWidget(
+        tasselDetectedLabel
+    );
+
+    tasselStatsLayout->addWidget(
+        tasselRemovedLabel
+    );
+
+    tasselStatsLayout->addWidget(
+        tasselRemainingLabel
+    );
+
+    tasselStatsLayout->addWidget(
+        tasselEfficiencyLabel
+    );
+
+
+    tasselPerformanceLayout->addLayout(
+        tasselStatsLayout
+    );
+
+
+    mainLayout->addWidget(
+        tasselPerformanceFrame
+    );
+
     /*
     * Mantener los paneles de cuerpos
     * en la zona superior de la pantalla.
@@ -8994,6 +9126,122 @@ void MainWindow::updateDashboard()
             );
         }
     }
+
+        /*
+     * ========================================================
+     * RENDIMIENTO DE DESPANOJADO
+     * ========================================================
+     */
+
+    const TasselCounter::State counterState =
+        tasselCounter.getState();
+
+    const TasselVerifier::State verifierState =
+        tasselVerifier.getState();
+
+
+    if (tasselDetectedLabel != nullptr)
+    {
+        tasselDetectedLabel->setText(
+            QString(
+                "Detectadas: %1"
+            ).arg(
+                counterState.front_count
+            )
+        );
+    }
+
+
+    if (tasselRemovedLabel != nullptr)
+    {
+        tasselRemovedLabel->setText(
+            QString(
+                "Removidas: %1"
+            ).arg(
+                verifierState.verified_removed
+            )
+        );
+    }
+
+
+    if (tasselRemainingLabel != nullptr)
+    {
+        tasselRemainingLabel->setText(
+            QString(
+                "Presentes: %1"
+            ).arg(
+                verifierState.verified_remaining
+            )
+        );
+    }
+
+
+    if (tasselEfficiencyLabel != nullptr)
+    {
+        const std::uint64_t verifiedTotal =
+            verifierState.verified_removed +
+            verifierState.verified_remaining;
+
+        if (verifiedTotal > 0)
+        {
+            const double efficiency =
+                100.0 *
+                static_cast<double>(
+                    verifierState.verified_removed
+                ) /
+                static_cast<double>(
+                    verifiedTotal
+                );
+
+            tasselEfficiencyLabel->setText(
+                QString(
+                    "Efectividad: %1 %"
+                ).arg(
+                    efficiency,
+                    0,
+                    'f',
+                    1
+                )
+            );
+
+                        if (efficiency >= 90.0)
+            {
+                tasselEfficiencyLabel->setStyleSheet(
+                    "font-size: 16px;"
+                    "font-weight: bold;"
+                    "color: #2E7D32;"
+                );
+            }
+            else if (efficiency >= 75.0)
+            {
+                tasselEfficiencyLabel->setStyleSheet(
+                    "font-size: 16px;"
+                    "font-weight: bold;"
+                    "color: #F9A825;"
+                );
+            }
+            else
+            {
+                tasselEfficiencyLabel->setStyleSheet(
+                    "font-size: 16px;"
+                    "font-weight: bold;"
+                    "color: #C62828;"
+                );
+            }
+        }
+        else
+        {
+            tasselEfficiencyLabel->setText(
+                "Efectividad: -- %"
+            );
+
+            tasselEfficiencyLabel->setStyleSheet(
+                "font-size: 16px;"
+                "font-weight: bold;"
+                "color: #616161;"
+            );
+        }
+    }
     updateSystemStatus();
     updateFaultPage();
     updateTestPage();
@@ -9095,6 +9343,167 @@ void MainWindow::updateDashboard()
 
         logPreviousVisionRunning =
             system.vision_running;
+    }
+
+        /*
+     * ========================================================
+     * LOG - CAMBIO DE ESTADO IA
+     * ========================================================
+     */
+    if (!logAiStateInitialized)
+    {
+        logPreviousAiRunning =
+            system.ai_running;
+
+        logAiStateInitialized =
+            true;
+    }
+    else if (system.ai_running !=
+            logPreviousAiRunning)
+    {
+        addLogMessage(
+            system.ai_running
+                ? "IA / detector de panojas activo"
+                : "IA / detector de panojas detenido"
+        );
+
+        logPreviousAiRunning =
+            system.ai_running;
+    }
+
+     /*
+     * ========================================================
+     * LOG - RESUMEN PERIÓDICO DE IA / DESPANOJADO
+     * ========================================================
+     */
+    const QDateTime nowLogTime =
+        QDateTime::currentDateTime();
+
+    if (!logLastAiSummaryTime.isValid() ||
+        logLastAiSummaryTime.msecsTo(nowLogTime) >= 5000)
+    {
+        const TasselCounter::State counterState =
+            tasselCounter.getState();
+
+        const TasselVerifier::State verifierState =
+            tasselVerifier.getState();
+
+        const std::uint64_t verifiedTotal =
+            verifierState.verified_removed +
+            verifierState.verified_remaining;
+
+        QString efficiencyText =
+            "--";
+
+        if (verifiedTotal > 0)
+        {
+            const double efficiency =
+                100.0 *
+                static_cast<double>(
+                    verifierState.verified_removed
+                ) /
+                static_cast<double>(
+                    verifiedTotal
+                );
+
+            efficiencyText =
+                QString::number(
+                    efficiency,
+                    'f',
+                    1
+                );
+        }
+
+        const QString aiSummary =
+            QString(
+                "IA: detectadas=%1 | removidas=%2 | "
+                "presentes=%3 | pendientes=%4 | "
+                "efectividad=%5 %"
+            )
+                .arg(counterState.front_count)
+                .arg(verifierState.verified_removed)
+                .arg(verifierState.verified_remaining)
+                .arg(verifierState.pending)
+                .arg(efficiencyText);
+
+        if (aiSummary != logPreviousAiSummary)
+        {
+            addLogMessage(
+                aiSummary
+            );
+
+            logPreviousAiSummary =
+                aiSummary;
+        }
+
+        logLastAiSummaryTime =
+            nowLogTime;
+    }
+    /*
+     * ========================================================
+     * LOG - RESUMEN PERIÓDICO DE VISIÓN 3D
+     * ========================================================
+     */
+    if (!logLastVisionSummaryTime.isValid() ||
+        logLastVisionSummaryTime.msecsTo(nowLogTime) >= 5000)
+    {
+        if (visionHeightSource != nullptr)
+        {
+            const VisionHeightSource::VisionResult visionResult =
+                visionHeightSource->getResult();
+
+            QStringList visionBodyTexts;
+
+            for (std::size_t body = 0;
+                 body < VisionHeightSource::BODY_COUNT;
+                 ++body)
+            {
+                const VisionHeightSource::BodyVisionResult& bodyResult =
+                    visionResult.bodies[body];
+
+                if (bodyResult.valid)
+                {
+                    visionBodyTexts.append(
+                        QString(
+                            "C%1=%2 mm"
+                        )
+                            .arg(body + 1)
+                            .arg(bodyResult.height_mm)
+                    );
+                }
+                else
+                {
+                    visionBodyTexts.append(
+                        QString(
+                            "C%1=INVÁLIDA"
+                        ).arg(body + 1)
+                    );
+                }
+            }
+
+            const QString visionSummary =
+                QString(
+                    "VISIÓN 3D: %1"
+                ).arg(
+                    visionBodyTexts.join(
+                        " | "
+                    )
+                );
+
+            if (visionSummary !=
+                logPreviousVisionSummary)
+            {
+                addLogMessage(
+                    visionSummary
+                );
+
+                logPreviousVisionSummary =
+                    visionSummary;
+            }
+        }
+
+        logLastVisionSummaryTime =
+            nowLogTime;
     }
 
     if (communicationsStm32StatusLabel != nullptr)

@@ -4,7 +4,6 @@
 
 #include <QMainWindow>
 #include <QLabel>
-
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -20,6 +19,7 @@
 #include "ai/tassel_counter.h"
 #include "ai/tassel_verifier.h"
 #include <QLineEdit>
+#include <QDateTime>
 
 
 class QStackedWidget;
@@ -74,7 +74,7 @@ private:
 
     Vision3DWorker *vision3DWorker;
 
-    
+
 
 
     // ========================================================
@@ -126,6 +126,23 @@ private:
         HagieState::BODY_COUNT
     > faultLabels {};
 
+        /*
+     * ========================================================
+     * RENDIMIENTO DE DESPANOJADO
+     * ========================================================
+     */
+
+    QLabel *tasselDetectedLabel =
+        nullptr;
+
+    QLabel *tasselRemovedLabel =
+        nullptr;
+
+    QLabel *tasselRemainingLabel =
+        nullptr;
+
+    QLabel *tasselEfficiencyLabel =
+        nullptr;
 
     // ========================================================
     // FALLAS
@@ -325,7 +342,7 @@ private:
         nullptr;
 
     QLabel *configVisionCameraMountingErrorLabel =
-        nullptr;    
+        nullptr;
 
     QLabel *communicationsStm32StatusLabel =
         nullptr;
@@ -428,7 +445,7 @@ private:
 
 
 
-    
+
 
     void loadVisionCameraIntoWidgets(
         std::size_t camera
@@ -564,7 +581,21 @@ private:
     false;
 
     bool logPreviousVisionRunning =
-        false;    
+        false;
+
+    bool logAiStateInitialized =
+        false;
+
+    bool logPreviousAiRunning =
+        false;
+
+    QDateTime logLastAiSummaryTime;
+
+    QDateTime logLastVisionSummaryTime;
+
+    QString logPreviousAiSummary;
+
+    QString logPreviousVisionSummary;
 
 
         /*
@@ -633,7 +664,7 @@ private:
         nullptr;
 
     QDoubleSpinBox *configYoloNmsSpin =
-        nullptr;  
+        nullptr;
 
 
     // ========================================================
