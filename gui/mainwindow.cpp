@@ -1692,23 +1692,51 @@ QWidget *MainWindow::createDashboardPage()
 
     QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
+    
+    mainLayout->setContentsMargins(
+        8,
+        8,
+        8,
+        8
+    );
+
+    mainLayout->setSpacing(
+        6
+    );    
 
 
     QLabel *title =
-        new QLabel(
-            "HAGIE - CONTROL DE ALTURA"
-        );
+    new QLabel(
+        "HAGIE CONTROL"
+    );
 
     title->setAlignment(
         Qt::AlignCenter
     );
 
     title->setStyleSheet(
-        "font-size: 24px;"
+        "font-size: 26px;"
         "font-weight: bold;"
     );
 
     mainLayout->addWidget(title);
+
+
+    QLabel *subtitle =
+        new QLabel(
+            "Control de altura · Detección y verificación de despanojado"
+        );
+
+    subtitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    subtitle->setStyleSheet(
+        "font-size: 15px;"
+        "font-weight: normal;"
+    );
+
+    mainLayout->addWidget(subtitle);
 
 
     /*
@@ -1781,6 +1809,13 @@ QWidget *MainWindow::createDashboardPage()
 
 
     mainLayout->addLayout(bodyGrid);
+
+    /*
+    * Mantener los paneles de cuerpos
+    * en la zona superior de la pantalla.
+    */
+
+    mainLayout->addStretch(1);
 
 
     /*
