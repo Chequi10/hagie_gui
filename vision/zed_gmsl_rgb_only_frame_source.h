@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "vision/rgb_frame_source.h"
 
@@ -36,9 +37,13 @@ public:
 
     ZedGmslRgbOnlyFrameSource(
         std::size_t cameraIndex,
-        uint32_t serialNumber
+        uint32_t serialNumber,
+        int cameraFps,
+        const std::string& cameraResolution,
+        int cameraTimeoutMs,
+        bool autoReconnect,
+        int reconnectIntervalMs
     );
-
 
     ~ZedGmslRgbOnlyFrameSource() override;
 
@@ -67,7 +72,28 @@ private:
 
     uint32_t serialNumber;
 
+    int cameraFps =
+    30;
+
+    std::string cameraResolution =
+    "HD720";
+
+    int cameraTimeoutMs =
+        1000;
+
+    bool autoReconnect =
+        true;
+
+    int reconnectIntervalMs =
+        2000;
+
     std::atomic<bool> running {false};
+
+    std::uint64_t lastSuccessfulGrabMs =
+        0;
+
+    std::uint64_t lastReconnectAttemptMs =
+        0;
 
 
 #ifdef HAGIE_ENABLE_ZED_SDK

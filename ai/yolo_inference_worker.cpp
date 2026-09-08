@@ -93,6 +93,20 @@ bool YoloInferenceWorker::isRunning() const
     return running.load();
 }
 
+void YoloInferenceWorker::setFrameInterval(
+    std::size_t interval)
+{
+    if (interval < 1)
+    {
+        interval =
+            1;
+    }
+
+    frameInterval.store(
+        interval
+    );
+}
+
 
 bool YoloInferenceWorker::getLatestResult(
     std::size_t cameraIndex,
@@ -270,6 +284,26 @@ void YoloInferenceWorker::workerLoop()
 
 
         TasselDetector::Result result;
+
+        const std::size_t currentInterval =
+            frameInterval.load();
+
+
+        frameCounters[cameraIndex]++;
+
+
+        if (frameCounters[cameraIndex] <
+            currentInterval)
+        {
+            lastProcessedTimestamp[cameraIndex] =
+                frame.timestamp_ms;
+
+            continue;
+        }
+
+
+        frameCounters[cameraIndex] =
+            0;
 
 
         if (!detector.processFrame(

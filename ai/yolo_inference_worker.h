@@ -58,6 +58,10 @@ public:
 
     bool isRunning() const;
 
+    void setFrameInterval(
+        std::size_t interval
+    );
+
 
     bool getLatestResult(
         std::size_t cameraIndex,
@@ -99,4 +103,14 @@ private:
         std::uint64_t,
         CAMERA_COUNT
     > lastProcessedTimestamp {};
+
+    std::atomic<std::size_t> frameInterval {
+        1
+    };
+
+
+    std::array<
+        std::size_t,
+        CAMERA_COUNT
+    > frameCounters {};
 };

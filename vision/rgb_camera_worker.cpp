@@ -30,10 +30,7 @@ bool RgbCameraWorker::setFrameSource(
 
    if (running)
     {
-        if (!source->start())
-        {
-            return false;
-        }
+        source->start();
     }
 
 

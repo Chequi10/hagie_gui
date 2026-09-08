@@ -162,7 +162,9 @@ MainWindow::MainWindow(
         auto source =
             std::make_unique<
                 SimulatedRgbFrameSource
-            >(camera);
+            >(
+                camera
+            );
 
         rgbCameraWorker.setFrameSource(
             camera,
@@ -473,16 +475,18 @@ void MainWindow::updateTestPage()
                     ).count()
             );
 
-        constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-            1000;
+        const uint64_t visionStaleTimeoutMs =
+        static_cast<uint64_t>(
+            configVisionDataTimeoutSpin != nullptr
+                ? configVisionDataTimeoutSpin->value()
+                : 1000
+        );
 
         bool visionFresh =
             bodyState.vision_valid &&
             bodyState.vision_timestamp_ms != 0 &&
             (nowMs - bodyState.vision_timestamp_ms) <=
-                VISION_STALE_TIMEOUT_MS;    
-
-
+                visionStaleTimeoutMs;
         /*
          * ====================================================
          * DIAGNÓSTICO DEL ENCODER
@@ -3471,16 +3475,18 @@ QWidget *MainWindow::createTestsPage()
                             ).count()
                     );
 
-                constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-                    1000;
+                const uint64_t visionStaleTimeoutMs =
+                    static_cast<uint64_t>(
+                        configVisionDataTimeoutSpin != nullptr
+                            ? configVisionDataTimeoutSpin->value()
+                            : 1000
+                    );
 
                 bool visionFresh =
                     bodyState.vision_valid &&
                     bodyState.vision_timestamp_ms != 0 &&
                     (nowMs - bodyState.vision_timestamp_ms) <=
-                        VISION_STALE_TIMEOUT_MS;    
-
-
+                        visionStaleTimeoutMs;
                 /*
                 * Condiciones mínimas para permitir AUTO VISIÓN.
                 */
@@ -3951,15 +3957,18 @@ QWidget *MainWindow::createTestsPage()
                                 ).count()
                         );
 
-                    constexpr uint64_t VISION_STALE_TIMEOUT_MS =
-                        1000;
+                    const uint64_t visionStaleTimeoutMs =
+                        static_cast<uint64_t>(
+                            configVisionDataTimeoutSpin != nullptr
+                                ? configVisionDataTimeoutSpin->value()
+                                : 1000
+                        );
 
                     bool visionFresh =
                         bodyState.vision_valid &&
                         bodyState.vision_timestamp_ms != 0 &&
                         (nowMs - bodyState.vision_timestamp_ms) <=
-                            VISION_STALE_TIMEOUT_MS;
-
+                            visionStaleTimeoutMs;
 
                     bool bodyCovered =
                         isBodyCoveredByActiveCamera(body);
@@ -5662,6 +5671,22 @@ QWidget *MainWindow::createConfigurationPage()
         1
     );
 
+    connect(
+        configAiFrameIntervalSpin,
+        QOverload<int>::of(
+            &QSpinBox::valueChanged
+        ),
+        this,
+        [this](int value)
+        {
+            yoloInferenceWorker.setFrameInterval(
+                static_cast<std::size_t>(
+                    value
+                )
+            );
+        }
+    );
+
     aiFrameIntervalLayout->addWidget(
         aiFrameIntervalLabel
     );
@@ -6254,9 +6279,21 @@ QWidget *MainWindow::createConfigurationPage()
                             ZedGmslPointCloudSource
                         >(
                             camera,
-                            serial
+                            serial,
+                            configCameraFpsCombo
+                                ->currentData()
+                                .toInt(),
+                            configCameraResolutionCombo
+                                ->currentData()
+                                .toString()
+                                .toStdString(),
+                            configCameraTimeoutSpin
+                                ->value(),
+                            configCameraAutoReconnectCheck
+                                ->isChecked(),
+                            configCameraReconnectIntervalSpin
+                                ->value()
                         );
-
 
                     auto sharedRgbFrame =
                         source->getSharedRgbFrame();
@@ -6401,7 +6438,20 @@ QWidget *MainWindow::createConfigurationPage()
                             ZedGmslRgbOnlyFrameSource
                         >(
                             camera,
-                            serial
+                            serial,
+                            configCameraFpsCombo
+                                ->currentData()
+                                .toInt(),
+                            configCameraResolutionCombo
+                                ->currentData()
+                                .toString()
+                                .toStdString(),
+                            configCameraTimeoutSpin
+                                ->value(),
+                            configCameraAutoReconnectCheck
+                                ->isChecked(),
+                            configCameraReconnectIntervalSpin
+                                ->value()
                         );
 
 
@@ -9538,14 +9588,6 @@ void MainWindow::saveConfiguration()
 
     settings.endGroup();
 
-        settings.setValue(
-        "vision_data_timeout_ms",
-        configVisionDataTimeoutSpin
-            ->value()
-    );
-
-    settings.endGroup();
-
 
     /*
      * ========================================================
@@ -10074,6 +10116,12 @@ void MainWindow::loadConfiguration()
 
     configAiFrameIntervalSpin->setValue(
         aiFrameInterval
+    );
+
+    yoloInferenceWorker.setFrameInterval(
+        static_cast<std::size_t>(
+            configAiFrameIntervalSpin->value()
+        )
     );
 
     configVisionDataTimeoutSpin->setValue(

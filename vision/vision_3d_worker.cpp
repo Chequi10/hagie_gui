@@ -390,38 +390,27 @@ bool Vision3DWorker::start()
     /*
      * Iniciar las fuentes.
      */
+    /*
+    * Iniciar las fuentes disponibles.
+    *
+    * Si una cámara falla al arrancar,
+    * las demás continúan funcionando.
+    *
+    * La fuente fallida queda instalada
+    * para poder intentar reconectarla
+    * posteriormente.
+    */
     for (std::size_t camera = 0;
-         camera < CAMERA_COUNT;
-         ++camera)
+        camera < CAMERA_COUNT;
+        ++camera)
     {
         if (pointCloudSources[camera] == nullptr)
         {
             continue;
         }
 
-
-        if (!pointCloudSources[camera]->start())
-        {
-            /*
-             * Si una fuente falla al iniciar,
-             * detener las que pudieran haberse
-             * iniciado anteriormente.
-             */
-            for (std::size_t previous = 0;
-                 previous < camera;
-                 ++previous)
-            {
-                if (pointCloudSources[previous] != nullptr)
-                {
-                    pointCloudSources[previous]->stop();
-                }
-            }
-
-
-            return false;
-        }
+        pointCloudSources[camera]->start();
     }
-
 
     running.store(
         true

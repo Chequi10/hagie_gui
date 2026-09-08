@@ -6,10 +6,20 @@
 ZedGmslRgbOnlyFrameSource::
 ZedGmslRgbOnlyFrameSource(
     std::size_t cameraIndex,
-    uint32_t serialNumber)
+    uint32_t serialNumber,
+    int cameraFps,
+    const std::string& cameraResolution,
+    int cameraTimeoutMs,
+    bool autoReconnect,
+    int reconnectIntervalMs)
     :
     cameraIndex(cameraIndex),
-    serialNumber(serialNumber)
+    serialNumber(serialNumber),
+    cameraFps(cameraFps),
+    cameraResolution(cameraResolution),
+    cameraTimeoutMs(cameraTimeoutMs),
+    autoReconnect(autoReconnect),
+    reconnectIntervalMs(reconnectIntervalMs)
 {
 }
 
@@ -40,12 +50,20 @@ ZedGmslRgbOnlyFrameSource::start()
     /*
      * Misma resolución y FPS que las cámaras delanteras.
      */
-    initParameters.camera_resolution =
-        sl::RESOLUTION::HD1200;
+    if (cameraResolution == "HD1080")
+    {
+        initParameters.camera_resolution =
+            sl::RESOLUTION::HD1080;
+    }
+    else
+    {
+        initParameters.camera_resolution =
+            sl::RESOLUTION::HD720;
+    }
 
 
     initParameters.camera_fps =
-        30;
+        cameraFps;
 
 
     /*
@@ -68,6 +86,23 @@ ZedGmslRgbOnlyFrameSource::start()
 
         return false;
     }
+
+    const std::uint64_t nowMs =
+        static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()
+            ).count()
+        );
+
+
+    lastSuccessfulGrabMs =
+        nowMs;
+
+    lastReconnectAttemptMs =
+        nowMs;
 
 
     running.store(true);
@@ -120,7 +155,44 @@ ZedGmslRgbOnlyFrameSource::getFrame(
 
     if (!running.load())
     {
-        return false;
+        if (!autoReconnect)
+        {
+            return false;
+        }
+
+
+        const std::uint64_t nowMs =
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds
+                >(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
+            );
+
+
+        if (lastReconnectAttemptMs != 0 &&
+            (nowMs - lastReconnectAttemptMs) <
+                static_cast<std::uint64_t>(
+                    reconnectIntervalMs
+                ))
+        {
+            return false;
+        }
+
+
+        lastReconnectAttemptMs =
+            nowMs;
+
+
+        stop();
+
+
+        if (!start())
+        {
+            return false;
+        }
     }
 
 
@@ -137,8 +209,44 @@ ZedGmslRgbOnlyFrameSource::getFrame(
 
     if (grabResult != sl::ERROR_CODE::SUCCESS)
     {
+        const std::uint64_t nowMs =
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds
+                >(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
+            );
+
+
+        const std::uint64_t elapsedMs =
+            nowMs - lastSuccessfulGrabMs;
+
+
+        if (elapsedMs >=
+            static_cast<std::uint64_t>(
+                cameraTimeoutMs
+            ))
+        {
+            running.store(
+                false
+            );
+        }
+
+
         return false;
     }
+
+    lastSuccessfulGrabMs =
+        static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()
+            ).count()
+        );
 
 
     /*

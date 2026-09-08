@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <string>
 #include <mutex>
 #include <memory>
 #include "vision/rgb_frame_source.h"
@@ -69,7 +70,12 @@ public:
 
     ZedGmslPointCloudSource(
         std::size_t cameraIndex,
-        uint32_t serialNumber
+        uint32_t serialNumber,
+        int cameraFps,
+        const std::string& cameraResolution,
+        int cameraTimeoutMs,
+        bool autoReconnect,
+        int reconnectIntervalMs
     );
 
 
@@ -127,11 +133,32 @@ private:
 
     uint32_t serialNumber;
 
+    int cameraFps =
+    30;
+
+    std::string cameraResolution =
+    "HD720";
+
+    int cameraTimeoutMs =
+        1000;
+
+    bool autoReconnect =
+        true;
+
+    int reconnectIntervalMs =
+        2000;
+
     std::atomic<bool> running {false};
 
     SharedRgbFramePtr sharedRgbFrame;
 
     std::uint64_t lastPointCloudTimestampMs = 0;
+
+    std::uint64_t lastSuccessfulGrabMs =
+        0;
+
+    std::uint64_t lastReconnectAttemptMs =
+        0;
 
     /*
      * ========================================================
