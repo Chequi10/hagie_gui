@@ -296,10 +296,73 @@ void VisionHeightSource::generateSimulatedResult()
     /*
      * Variación simulada 0..40 mm.
      */
-    uint16_t variation =
-        static_cast<uint16_t>(
-            simulationStep % 41
-        );
+    /*
+    * ============================================================
+    * PERFIL DE ALTURA SIMULADA POR ESCALONES
+    * ============================================================
+    *
+    * workerLoop() corre cada 100 ms.
+    *
+    * 50 pasos  = 5 segundos.
+    *
+    * Esto permite observar claramente en el Trend:
+    *
+    * - cambio de objetivo;
+    * - retardo del encoder;
+    * - tiempo de establecimiento.
+    */
+
+    const uint32_t phase =
+        simulationStep % 250U;
+
+
+    /*
+    * Offset común por etapa.
+    */
+    int32_t stepOffsetMm =
+        0;
+
+
+    if (phase < 50U)
+    {
+        /*
+        * 0 a 5 s
+        */
+        stepOffsetMm =
+            0;
+    }
+    else if (phase < 100U)
+    {
+        /*
+        * 5 a 10 s
+        */
+        stepOffsetMm =
+            100;
+    }
+    else if (phase < 150U)
+    {
+        /*
+        * 10 a 15 s
+        */
+        stepOffsetMm =
+            -50;
+    }
+    else if (phase < 200U)
+    {
+        /*
+        * 15 a 20 s
+        */
+        stepOffsetMm =
+            150;
+    }
+    else
+    {
+        /*
+        * 20 a 25 s
+        */
+        stepOffsetMm =
+            20;
+    }
 
 
     /*
@@ -333,23 +396,57 @@ void VisionHeightSource::generateSimulatedResult()
          * visualmente que cada cuerpo recibe
          * información independiente.
          */
+        /*
+        * Cada cuerpo parte de una altura base distinta.
+        *
+        * Todos reciben escalones,
+        * pero con una pequeña diferencia entre cuerpos
+        * para comprobar que los históricos son independientes.
+        */
+        int32_t simulatedHeight =
+            static_cast<int32_t>(
+                BASE_HEIGHT_MM[body]
+            )
+            +
+            stepOffsetMm;
+
+
+        /*
+        * Pequeña separación adicional entre respuestas
+        * para que no sean idénticas.
+        */
         if ((body % 2) == 0)
         {
-            newResult
-                .bodies[body]
-                .height_mm =
-                    BASE_HEIGHT_MM[body]
-                    + variation;
+            simulatedHeight +=
+                static_cast<int32_t>(
+                    body * 5
+                );
         }
         else
         {
-            newResult
-                .bodies[body]
-                .height_mm =
-                    BASE_HEIGHT_MM[body]
-                    - variation;
+            simulatedHeight -=
+                static_cast<int32_t>(
+                    body * 5
+                );
         }
 
+
+        /*
+        * Protección.
+        */
+        if (simulatedHeight < 0)
+        {
+            simulatedHeight =
+                0;
+        }
+
+
+        newResult
+            .bodies[body]
+            .height_mm =
+                static_cast<uint16_t>(
+                    simulatedHeight
+                );
 
         newResult
             .bodies[body]

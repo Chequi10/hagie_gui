@@ -49,6 +49,9 @@
 #include "vision/zed_gmsl_point_cloud_source.h"
 #include "vision/zed_gmsl_rgb_frame_source.h"
 #include "vision/zed_gmsl_rgb_only_frame_source.h"
+#include "height_trend_widget.h"
+#include <QShortcut>
+#include <QKeySequence>
 
 
 
@@ -76,6 +79,58 @@ MainWindow::MainWindow(
     setWindowTitle(
         "Hagie Control"
     );
+
+    QShortcut *fullScreenShortcut =
+    new QShortcut(
+        QKeySequence(Qt::Key_F11),
+        this
+    );
+
+    fullScreenShortcut->setContext(
+        Qt::ApplicationShortcut
+    );
+
+    connect(
+        fullScreenShortcut,
+        &QShortcut::activated,
+        this,
+        [this]()
+        {
+            if (isFullScreen())
+            {
+                showNormal();
+            }
+            else
+            {
+                showFullScreen();
+            }
+        }
+    );
+
+    QShortcut *escapeShortcut =
+        new QShortcut(
+            QKeySequence(Qt::Key_Escape),
+            this
+        );
+
+    escapeShortcut->setContext(
+        Qt::ApplicationShortcut
+    );
+
+    connect(
+        escapeShortcut,
+        &QShortcut::activated,
+        this,
+        [this]()
+        {
+            if (isFullScreen())
+            {
+                showNormal();
+            }
+        }
+    );
+
+    
 
     resize(
         1280,
@@ -1940,16 +1995,177 @@ QWidget *MainWindow::createDashboardPage()
     );
 
 
-    mainLayout->addWidget(
+   mainLayout->addWidget(
         tasselPerformanceFrame
     );
 
+
     /*
-    * Mantener los paneles de cuerpos
-    * en la zona superior de la pantalla.
+    * ========================================================
+    * TENDENCIA DE ALTURA
+    * ========================================================
     */
 
-    mainLayout->addStretch(1);
+    QHBoxLayout *trendControlsLayout =
+        new QHBoxLayout();
+
+
+    QLabel *trendBodyLabel =
+        new QLabel("Cuerpo:");
+
+    QComboBox *trendBodyCombo =
+        new QComboBox();
+
+    for (int body = 0;
+        body < 6;
+        ++body)
+    {
+        trendBodyCombo->addItem(
+            QString("Cuerpo %1")
+                .arg(body + 1)
+        );
+    }
+
+
+    QLabel *trendTimeLabel =
+        new QLabel("Ventana:");
+
+    QComboBox *trendTimeCombo =
+        new QComboBox();
+
+    trendTimeCombo->addItem("30 s", 30.0);
+    trendTimeCombo->addItem("1 min", 60.0);
+    trendTimeCombo->addItem("5 min", 300.0);
+    trendTimeCombo->addItem("10 min", 600.0);
+    trendTimeCombo->addItem("30 min", 1800.0);
+
+
+    QLabel *trendScaleLabel =
+        new QLabel("Escala:");
+
+    QComboBox *trendScaleCombo =
+        new QComboBox();
+
+    trendScaleCombo->addItem("FIJA");
+    trendScaleCombo->addItem("AUTO");
+
+
+    trendControlsLayout->addStretch();
+
+    trendControlsLayout->addWidget(
+        trendBodyLabel
+    );
+
+    trendControlsLayout->addWidget(
+        trendBodyCombo
+    );
+
+    trendControlsLayout->addSpacing(20);
+
+    trendControlsLayout->addWidget(
+        trendTimeLabel
+    );
+
+    trendControlsLayout->addWidget(
+        trendTimeCombo
+    );
+
+    trendControlsLayout->addSpacing(20);
+
+    trendControlsLayout->addWidget(
+        trendScaleLabel
+    );
+
+    trendControlsLayout->addWidget(
+        trendScaleCombo
+    );
+
+    trendControlsLayout->addStretch();
+
+
+    mainLayout->addLayout(
+        trendControlsLayout
+    );
+
+    heightTrendWidget =
+        new HeightTrendWidget();
+
+    heightTrendWidget->setAutoScale(
+        false
+    );
+
+    heightTrendWidget->setFixedRange(
+        0.0,
+        800.0
+    );
+
+    connect(
+        trendTimeCombo,
+        &QComboBox::currentIndexChanged,
+        this,
+        [this, trendTimeCombo](int)
+        {
+            if (heightTrendWidget == nullptr)
+            {
+                return;
+            }
+
+            heightTrendWidget->setVisibleWindowSeconds(
+                trendTimeCombo->currentData()
+                    .toDouble()
+            );
+        }
+    );
+
+
+    connect(
+        trendScaleCombo,
+        &QComboBox::currentIndexChanged,
+        this,
+        [this, trendScaleCombo](int)
+        {
+            if (heightTrendWidget == nullptr)
+            {
+                return;
+            }
+
+            const bool autoScale =
+                trendScaleCombo->currentText() ==
+                "AUTO";
+
+            heightTrendWidget->setAutoScale(
+                autoScale
+            );
+        }
+    );
+
+
+    connect(
+        trendBodyCombo,
+        &QComboBox::currentIndexChanged,
+        this,
+        [this](int index)
+        {
+            trendSelectedBody =
+                index;
+
+            if (heightTrendWidget != nullptr)
+            {
+                heightTrendWidget->setSelectedBody(
+                    index
+                );
+            }
+        }
+    );
+
+    heightTrendWidget->setVisibleWindowSeconds(
+        30.0
+    );
+
+    mainLayout->addWidget(
+        heightTrendWidget,
+        1
+    );
 
 
     /*
@@ -3557,9 +3773,6 @@ QWidget *MainWindow::createTestsPage()
     QVBoxLayout *mainLayout =
         new QVBoxLayout(page);
 
-    mainLayout->setSizeConstraint(
-        QLayout::SetMinimumSize
-    );
 
 
     QLabel *title =
@@ -4748,7 +4961,7 @@ QWidget *MainWindow::createTestsPage()
         250
     );
 
-
+    
     /*
      * ========================================================
      * Botón global de seguridad
@@ -4865,6 +5078,8 @@ QWidget *MainWindow::createTestsPage()
         scrollArea,
         1
     );
+
+    
 
 
     /*
@@ -8953,6 +9168,175 @@ QWidget *MainWindow::createConfigurationPage()
         controlFrame
     );
 
+        /*
+     * ========================================================
+     * Gestión hidráulica
+     * ========================================================
+     */
+
+    QFrame *hydraulicFrame =
+        new QFrame();
+
+    hydraulicFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QGridLayout *hydraulicLayout =
+        new QGridLayout(hydraulicFrame);
+
+
+    QLabel *hydraulicTitle =
+        new QLabel(
+            "GESTIÓN HIDRÁULICA"
+        );
+
+    hydraulicTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    hydraulicLayout->addWidget(
+        hydraulicTitle,
+        0,
+        0,
+        1,
+        4
+    );
+
+
+    QLabel *hydraulicModeLabel =
+        new QLabel(
+            "Modo"
+        );
+
+    configHydraulicModeCombo =
+        new QComboBox();
+
+    configHydraulicModeCombo->addItem(
+        "NORMAL / DESACTIVADA",
+        0
+    );
+
+    configHydraulicModeCombo->addItem(
+        "BÁSICA",
+        1
+    );
+
+
+    QLabel *hydraulicThresholdLabel =
+        new QLabel(
+            "Umbral demanda fuerte"
+        );
+
+    configHydraulicHighThresholdSpin =
+        new QSpinBox();
+
+    configHydraulicHighThresholdSpin->setRange(
+        1,
+        1000
+    );
+
+    configHydraulicHighThresholdSpin->setValue(
+        700
+    );
+
+
+    QLabel *hydraulicMaxBodiesLabel =
+        new QLabel(
+            "Máx. cuerpos alta demanda"
+        );
+
+    configHydraulicMaxBodiesSpin =
+        new QSpinBox();
+
+    configHydraulicMaxBodiesSpin->setRange(
+        1,
+        static_cast<int>(
+            HagieState::BODY_COUNT
+        )
+    );
+
+    configHydraulicMaxBodiesSpin->setValue(
+        2
+    );
+
+
+    QLabel *hydraulicSecondaryLabel =
+        new QLabel(
+            "Demanda secundaria (%)"
+        );
+
+    configHydraulicSecondaryPercentSpin =
+        new QSpinBox();
+
+    configHydraulicSecondaryPercentSpin->setRange(
+        0,
+        100
+    );
+
+    configHydraulicSecondaryPercentSpin->setSuffix(
+        " %"
+    );
+
+    configHydraulicSecondaryPercentSpin->setValue(
+        40
+    );
+
+
+    hydraulicLayout->addWidget(
+        hydraulicModeLabel,
+        1,
+        0
+    );
+
+    hydraulicLayout->addWidget(
+        configHydraulicModeCombo,
+        1,
+        1
+    );
+
+    hydraulicLayout->addWidget(
+        hydraulicThresholdLabel,
+        1,
+        2
+    );
+
+    hydraulicLayout->addWidget(
+        configHydraulicHighThresholdSpin,
+        1,
+        3
+    );
+
+
+    hydraulicLayout->addWidget(
+        hydraulicMaxBodiesLabel,
+        2,
+        0
+    );
+
+    hydraulicLayout->addWidget(
+        configHydraulicMaxBodiesSpin,
+        2,
+        1
+    );
+
+    hydraulicLayout->addWidget(
+        hydraulicSecondaryLabel,
+        2,
+        2
+    );
+
+    hydraulicLayout->addWidget(
+        configHydraulicSecondaryPercentSpin,
+        2,
+        3
+    );
+
+
+    controlPageLayout->addWidget(
+        hydraulicFrame
+    );
+
     controlPageLayout->addStretch();
 
 
@@ -9081,6 +9465,146 @@ void MainWindow::updateDashboard()
         return;
     }
 
+    /*
+    * ============================================================
+    * SIMULACIÓN DEL LAZO DE ALTURA
+    * ============================================================
+    *
+    * Solamente funciona cuando la fuente de visión está
+    * en SIMULATION.
+    *
+    * Simulamos:
+    *
+    * visión 3D -> objetivo -> respuesta hidráulica -> encoder
+    *
+    * En modo real este bloque no modifica nada.
+    */
+
+    if (visionHeightSource != nullptr &&
+        heightTargetController != nullptr &&
+        visionHeightSource->getSourceMode() ==
+            VisionHeightSource::SourceMode::SIMULATION)
+    {
+        for (std::size_t body = 0;
+            body < HagieState::BODY_COUNT;
+            ++body)
+        {
+            HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+
+            /*
+            * Calcular objetivo exactamente mediante
+            * HeightTargetController.
+            */
+            HeightTargetController::TargetResult
+                targetResult =
+                    heightTargetController
+                        ->calculateTarget(
+                            body,
+                            bodyState.vision_height_mm,
+                            bodyState.vision_valid
+                        );
+
+
+            if (!targetResult.valid)
+            {
+                continue;
+            }
+
+
+            /*
+            * En simulación no dependemos de que STM32Worker
+            * esté conectado para publicar el objetivo.
+            */
+            state->setBodyTarget(
+                body,
+                targetResult.target_mm
+            );
+
+
+            /*
+            * Primera ejecución:
+            * arrancar el encoder algo separado del objetivo
+            * para poder observar cómo converge.
+            */
+            if (!simulatedEncoderInitialized[body])
+            {
+                simulatedEncoderHeightMm[body] =
+                    static_cast<double>(
+                        targetResult.target_mm
+                    ) - 80.0;
+
+                if (simulatedEncoderHeightMm[body] < 0.0)
+                {
+                    simulatedEncoderHeightMm[body] =
+                        0.0;
+                }
+
+                simulatedEncoderInitialized[body] =
+                    true;
+            }
+
+
+            const double target =
+                static_cast<double>(
+                    targetResult.target_mm
+                );
+
+
+            /*
+            * Diferentes velocidades de respuesta por cuerpo.
+            *
+            * Esto nos permite comprobar que los seis históricos
+            * son realmente independientes.
+            */
+            const double alpha =
+                0.055 +
+                static_cast<double>(body) *
+                    0.008;
+
+
+            const double error =
+                target -
+                simulatedEncoderHeightMm[body];
+
+
+            /*
+            * Modelo simple de respuesta hidráulica.
+            */
+            simulatedEncoderHeightMm[body] +=
+                alpha * error;
+
+
+            /*
+            * Limitar físicamente la simulación.
+            */
+            if (simulatedEncoderHeightMm[body] < 0.0)
+            {
+                simulatedEncoderHeightMm[body] =
+                    0.0;
+            }
+
+            if (simulatedEncoderHeightMm[body] > 2000.0)
+            {
+                simulatedEncoderHeightMm[body] =
+                    2000.0;
+            }
+
+
+            /*
+            * Publicarlo como si fuera la lectura
+            * proveniente del encoder físico.
+            */
+            state->setBodyHeight(
+                body,
+                static_cast<uint16_t>(
+                    simulatedEncoderHeightMm[body] + 0.5
+                )
+            );
+        }
+    }
+
     for (std::size_t body = 0;
          body < HagieState::BODY_COUNT;
          ++body)
@@ -9108,6 +9632,19 @@ void MainWindow::updateDashboard()
             QString("Válvula: %1")
                 .arg(bodyState.valve_command)
         );
+
+        if (heightTrendWidget != nullptr)
+        {
+            heightTrendWidget->addSample(
+                static_cast<int>(body),
+                static_cast<double>(
+                    bodyState.target_mm
+                ),
+                static_cast<double>(
+                    bodyState.height_mm
+                )
+            );
+        }
 
         if (bodyState.faults == 0)
         {
@@ -10345,6 +10882,33 @@ QString MainWindow::configurationFilePath() const
 }
 
 
+bool MainWindow::systemReadyForAuto() const
+{
+    if (state == nullptr)
+    {
+        return false;
+    }
+
+    const HagieState::SystemState system =
+        state->getSystemState();
+
+    /*
+     * Condiciones generales necesarias para
+     * permitir funcionamiento automático.
+     */
+    if (!system.stm32_connected)
+    {
+        return false;
+    }
+
+    if (!system.can_ok)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 
 void MainWindow::saveConfiguration()
 {
@@ -10488,6 +11052,45 @@ void MainWindow::saveConfiguration()
     );
 
     settings.endGroup();
+
+
+        /*
+     * ========================================================
+     * Gestión hidráulica
+     * ========================================================
+     */
+    settings.beginGroup(
+        "Hydraulic"
+    );
+
+    settings.setValue(
+        "management_mode",
+        configHydraulicModeCombo
+            ->currentData()
+            .toInt()
+    );
+
+    settings.setValue(
+        "high_command_threshold",
+        configHydraulicHighThresholdSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "max_high_demand_bodies",
+        configHydraulicMaxBodiesSpin
+            ->value()
+    );
+
+    settings.setValue(
+        "secondary_percent",
+        configHydraulicSecondaryPercentSpin
+            ->value()
+    );
+
+    settings.endGroup();
+
+    
 
         /*
      * ========================================================
@@ -10967,6 +11570,58 @@ void MainWindow::loadConfiguration()
         settings.value(
             "target_timeout_ms",
             1000
+        ).toInt()
+    );
+
+    settings.endGroup();
+
+        /*
+     * ========================================================
+     * Gestión hidráulica
+     * ========================================================
+     */
+    settings.beginGroup(
+        "Hydraulic"
+    );
+
+    int hydraulicMode =
+        settings.value(
+            "management_mode",
+            0
+        ).toInt();
+
+    int hydraulicModeIndex =
+        configHydraulicModeCombo
+            ->findData(
+                hydraulicMode
+            );
+
+    if (hydraulicModeIndex >= 0)
+    {
+        configHydraulicModeCombo
+            ->setCurrentIndex(
+                hydraulicModeIndex
+            );
+    }
+
+    configHydraulicHighThresholdSpin->setValue(
+        settings.value(
+            "high_command_threshold",
+            700
+        ).toInt()
+    );
+
+    configHydraulicMaxBodiesSpin->setValue(
+        settings.value(
+            "max_high_demand_bodies",
+            2
+        ).toInt()
+    );
+
+    configHydraulicSecondaryPercentSpin->setValue(
+        settings.value(
+            "secondary_percent",
+            40
         ).toInt()
     );
 
@@ -11540,6 +12195,51 @@ void MainWindow::syncConfigurationToWorker()
             )
         );
     }
+
+        /*
+     * K 0x10
+     * Modo de gestión hidráulica.
+     */
+    stm32Worker->setHydraulicManagementMode(
+        static_cast<uint8_t>(
+            configHydraulicModeCombo
+                ->currentData()
+                .toInt()
+        )
+    );
+
+    /*
+     * K 0x11
+     * Umbral de alta demanda.
+     */
+    stm32Worker->setHydraulicHighCommandThreshold(
+        static_cast<uint16_t>(
+            configHydraulicHighThresholdSpin
+                ->value()
+        )
+    );
+
+    /*
+     * K 0x12
+     * Máximo de cuerpos con alta demanda simultánea.
+     */
+    stm32Worker->setHydraulicMaxHighDemandBodies(
+        static_cast<uint8_t>(
+            configHydraulicMaxBodiesSpin
+                ->value()
+        )
+    );
+
+    /*
+     * K 0x13
+     * Porcentaje para demandas secundarias.
+     */
+    stm32Worker->setHydraulicSecondaryPercent(
+        static_cast<uint8_t>(
+            configHydraulicSecondaryPercentSpin
+                ->value()
+        )
+    );
     /*
     * Ya cargamos toda la configuración en runtimeConfig.
     * Ahora comenzar el envío secuencial K -> ACK -> K.

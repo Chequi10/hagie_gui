@@ -142,6 +142,25 @@ public:
         float mm_per_pulse
     );
 
+        void setHydraulicManagementMode(
+        uint8_t mode
+    );
+
+
+    void setHydraulicHighCommandThreshold(
+        uint16_t threshold
+    );
+
+
+    void setHydraulicMaxHighDemandBodies(
+        uint8_t max_bodies
+    );
+
+
+    void setHydraulicSecondaryPercent(
+        uint8_t percent
+    );
+
 
     enum class ConfigSyncStatus
     {
@@ -206,6 +225,22 @@ private:
 
         uint32_t target_timeout_ms =
             1000;
+
+                // ----------------------------------------------------
+        // Gestión hidráulica
+        // ----------------------------------------------------
+
+        uint8_t hydraulic_management_mode =
+            0;
+
+        uint16_t hydraulic_high_command_threshold =
+            700;
+
+        uint8_t hydraulic_max_high_demand_bodies =
+            2;
+
+        uint8_t hydraulic_secondary_percent =
+            40;    
     };
 
 
@@ -321,7 +356,12 @@ private:
         SET_NO_MOVEMENT_TIMEOUT,
         SET_TARGET_TIMEOUT,
         SET_ENCODER_DIRECTION,
-        SET_ENCODER_SCALE
+        SET_ENCODER_SCALE,
+
+        SET_HYDRAULIC_MANAGEMENT_MODE,
+        SET_HYDRAULIC_HIGH_COMMAND_THRESHOLD,
+        SET_HYDRAULIC_MAX_HIGH_DEMAND_BODIES,
+        SET_HYDRAULIC_SECONDARY_PERCENT
     };
 
 
@@ -432,13 +472,18 @@ private:
      *  9      -> K05
      * 10..15  -> K06 cuerpos 0..5
      * 16..21  -> K07 cuerpos 0..5
-     *
-     * 22      -> terminada
-     */
+    * 22      -> K10 modo gestión hidráulica
+    * 23      -> K11 umbral demanda fuerte
+    * 24      -> K12 máximo cuerpos alta demanda
+    * 25      -> K13 porcentaje secundario
+    *
+    * 26      -> terminada
+    * 
+    *  */
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            22;
+            26;
 
 
     uint8_t configSyncStep =

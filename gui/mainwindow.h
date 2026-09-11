@@ -33,6 +33,7 @@ class QDoubleSpinBox;
 class QComboBox;
 class VisionHeightSource;
 class Vision3DWorker;
+class HeightTrendWidget;
 
 
 class MainWindow : public QMainWindow
@@ -73,6 +74,16 @@ private:
     Vision3DProcessor *vision3DProcessor;
 
     Vision3DWorker *vision3DWorker;
+
+    HeightTrendWidget *heightTrendWidget = nullptr;
+
+    std::array<double, HagieState::BODY_COUNT>
+        simulatedEncoderHeightMm {};
+
+    std::array<bool, HagieState::BODY_COUNT>
+        simulatedEncoderInitialized {};
+
+    int trendSelectedBody = 0;
 
 
 
@@ -550,6 +561,22 @@ private:
     QSpinBox *configTargetTimeoutSpin =
     nullptr;
 
+        // ========================================================
+    // GESTIÓN HIDRÁULICA
+    // ========================================================
+
+    QComboBox *configHydraulicModeCombo =
+        nullptr;
+
+    QSpinBox *configHydraulicHighThresholdSpin =
+        nullptr;
+
+    QSpinBox *configHydraulicMaxBodiesSpin =
+        nullptr;
+
+    QSpinBox *configHydraulicSecondaryPercentSpin =
+        nullptr;
+
     QPlainTextEdit *logsTextEdit =
         nullptr;
 
@@ -791,6 +818,8 @@ private:
     // ========================================================
 
     QString configurationFilePath() const;
+
+    bool systemReadyForAuto() const;
 
     void saveConfiguration();
 

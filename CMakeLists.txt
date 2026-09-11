@@ -42,6 +42,9 @@ add_executable(
     gui/mainwindow.cpp
     gui/mainwindow.h
 
+    gui/height_trend_widget.cpp
+    gui/height_trend_widget.h
+
     core/hagie_state.cpp
     core/hagie_state.h
     core/height_target_controller.cpp
@@ -372,4 +375,31 @@ target_include_directories(
     tassel_verifier_test
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# ============================================================
+# TEST HEIGHT TREND
+# ============================================================
+
+add_executable(
+    height_trend_test
+
+    tests/height_trend_test.cpp
+
+    gui/height_trend_widget.cpp
+    gui/height_trend_widget.h
+)
+
+
+target_include_directories(
+    height_trend_test
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+
+target_link_libraries(
+    height_trend_test
+    PRIVATE
+    Qt6::Widgets
 )

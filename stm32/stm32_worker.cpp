@@ -452,6 +452,51 @@ void STM32Worker::processTxQueue()
 
                 break;
             }
+
+                        case CommandType::SET_HYDRAULIC_MANAGEMENT_MODE:
+            {
+                stm32->set_hydraulic_management_mode(
+                    static_cast<uint8_t>(
+                        command.value
+                    )
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HYDRAULIC_HIGH_COMMAND_THRESHOLD:
+            {
+                stm32->set_hydraulic_high_command_threshold(
+                    command.value_u16_1
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HYDRAULIC_MAX_HIGH_DEMAND_BODIES:
+            {
+                stm32->set_hydraulic_max_high_demand_bodies(
+                    static_cast<uint8_t>(
+                        command.value
+                    )
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HYDRAULIC_SECONDARY_PERCENT:
+            {
+                stm32->set_hydraulic_secondary_percent(
+                    static_cast<uint8_t>(
+                        command.value
+                    )
+                );
+
+                break;
+            }
         }
     }
 }
@@ -731,6 +776,88 @@ void STM32Worker::setEncoderScale(
         true;
 }
 
+void STM32Worker::setHydraulicManagementMode(
+    uint8_t mode)
+{
+    if (mode > 1)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.hydraulic_management_mode =
+        mode;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHydraulicHighCommandThreshold(
+    uint16_t threshold)
+{
+    if (threshold == 0 ||
+        threshold > 1000)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.hydraulic_high_command_threshold =
+        threshold;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHydraulicMaxHighDemandBodies(
+    uint8_t max_bodies)
+{
+    if (max_bodies == 0 ||
+        max_bodies >
+            HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.hydraulic_max_high_demand_bodies =
+        max_bodies;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHydraulicSecondaryPercent(
+    uint8_t percent)
+{
+    if (percent > 100)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.hydraulic_secondary_percent =
+        percent;
+
+    runtimeConfig.valid =
+        true;
+}
+
 
 // ============================================================
 // SINCRONIZACIÓN CONFIGURACIÓN
@@ -961,18 +1088,61 @@ void STM32Worker::sendCurrentConfigurationCommand()
     }
 
 
-    /*
+       /*
      * 16..21 -> K07
      */
-    else
+    else if (configSyncStep <= 21)
     {
         uint8_t body =
             configSyncStep - 16;
 
-
         stm32->set_encoder_scale(
             body,
             configCopy.encoder_scale[body]
+        );
+    }
+
+
+    /*
+     * 22 -> K10
+     */
+    else if (configSyncStep == 22)
+    {
+        stm32->set_hydraulic_management_mode(
+            configCopy.hydraulic_management_mode
+        );
+    }
+
+
+    /*
+     * 23 -> K11
+     */
+    else if (configSyncStep == 23)
+    {
+        stm32->set_hydraulic_high_command_threshold(
+            configCopy.hydraulic_high_command_threshold
+        );
+    }
+
+
+    /*
+     * 24 -> K12
+     */
+    else if (configSyncStep == 24)
+    {
+        stm32->set_hydraulic_max_high_demand_bodies(
+            configCopy.hydraulic_max_high_demand_bodies
+        );
+    }
+
+
+    /*
+     * 25 -> K13
+     */
+    else if (configSyncStep == 25)
+    {
+        stm32->set_hydraulic_secondary_percent(
+            configCopy.hydraulic_secondary_percent
         );
     }
 
@@ -1546,6 +1716,73 @@ void STM32Worker::configureCallbacks()
                             true;
                     }
 
+
+                    break;
+                }
+
+                                case 22:
+                {
+                    if (
+                        ack.subcommand == 0x10 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected
+                                .hydraulic_management_mode
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 23:
+                {
+                    if (
+                        ack.subcommand == 0x11 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected
+                                .hydraulic_high_command_threshold
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 24:
+                {
+                    if (
+                        ack.subcommand == 0x12 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected
+                                .hydraulic_max_high_demand_bodies
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 25:
+                {
+                    if (
+                        ack.subcommand == 0x13 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expected
+                                .hydraulic_secondary_percent
+                    )
+                    {
+                        validAck = true;
+                    }
 
                     break;
                 }

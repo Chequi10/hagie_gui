@@ -271,6 +271,34 @@ public:
         float mm_per_pulse
     );
 
+        // K 0x10
+    // 0 = NORMAL
+    // 1 = BÁSICO
+    void set_hydraulic_management_mode(
+        uint8_t mode
+    );
+
+
+    // K 0x11
+    // Umbral de demanda hidráulica fuerte.
+    void set_hydraulic_high_command_threshold(
+        uint16_t threshold
+    );
+
+
+    // K 0x12
+    // Máximo de cuerpos con demanda fuerte simultánea.
+    void set_hydraulic_max_high_demand_bodies(
+        uint8_t max_bodies
+    );
+
+
+    // K 0x13
+    // Porcentaje aplicado a demandas fuertes secundarias.
+    void set_hydraulic_secondary_percent(
+        uint8_t percent
+    );
+
 private:
 
     // ============================================================

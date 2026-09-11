@@ -10,6 +10,11 @@
 #include "vision/vision_3d_worker.h"
 #include "vision/simulated_point_cloud_source.h"
 #include <memory>
+#include <QTimer>
+#include <QScreen>
+#include <QShortcut>
+#include <QKeySequence>
+
 
 
 
@@ -272,7 +277,7 @@ int main(
     );
 
 
-    window.show();
+    window.showFullScreen();
 
 
     /*

@@ -1016,6 +1016,115 @@ void stm32canbus_serialif::set_encoder_scale(
     protocol::packet_encoder::send(7);
 }
 
+// ------------------------------------------------------------
+// K 0x10 - Modo gestión hidráulica
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_hydraulic_management_mode(
+    uint8_t mode)
+{
+    if (mode > 1)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x10;
+    payload[2] = mode;
+
+    protocol::packet_encoder::send(3);
+}
+
+
+// ------------------------------------------------------------
+// K 0x11 - Umbral demanda hidráulica fuerte
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::
+    set_hydraulic_high_command_threshold(
+        uint16_t threshold)
+{
+    if (threshold == 0 ||
+        threshold > 1000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x11;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (threshold >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            threshold & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x12 - Máximo de demandas fuertes
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::
+    set_hydraulic_max_high_demand_bodies(
+        uint8_t max_bodies)
+{
+    if (max_bodies == 0 ||
+        max_bodies > BODY_COUNT)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x12;
+    payload[2] = max_bodies;
+
+    protocol::packet_encoder::send(3);
+}
+
+
+// ------------------------------------------------------------
+// K 0x13 - Porcentaje demandas secundarias
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::
+    set_hydraulic_secondary_percent(
+        uint8_t percent)
+{
+    if (percent > 100)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x13;
+    payload[2] = percent;
+
+    protocol::packet_encoder::send(3);
+}
+
 // ============================================================
 // Envío físico por Boost.Asio
 // ============================================================
