@@ -52,6 +52,10 @@
 #include "height_trend_widget.h"
 #include <QShortcut>
 #include <QKeySequence>
+#include <QPainter>
+#include <QPainterPath>
+
+
 
 
 
@@ -8191,6 +8195,8 @@ QWidget *MainWindow::createConfigurationPage()
     configVisionCameraPositionX =
         new QDoubleSpinBox();
 
+        
+
     configVisionCameraPositionX->setRange(
         -20000.0,
         20000.0
@@ -8217,6 +8223,8 @@ QWidget *MainWindow::createConfigurationPage()
     configVisionCameraPositionY->setDecimals(
         1
     );
+
+
 
 
     QLabel *cameraPositionZLabel =
@@ -8288,6 +8296,56 @@ QWidget *MainWindow::createConfigurationPage()
 
     configVisionCameraPitch->setDecimals(
         2
+    );
+    
+    auto updateCurrentCameraPosition =
+        [this]()
+        {
+            if (currentVisionCamera >=
+                Vision3DProcessor::CAMERA_COUNT)
+            {
+                return;
+            }
+
+            auto &config =
+                visionCameraConfigs[
+                    currentVisionCamera
+                ];
+
+            config.geometry.position_x_mm =
+                static_cast<float>(
+                    configVisionCameraPositionX
+                        ->value()
+                );
+
+            config.geometry.position_y_mm =
+                static_cast<float>(
+                    configVisionCameraPositionY
+                        ->value()
+                );
+
+            updateMachineCameraReference();
+        };
+
+
+    connect(
+        configVisionCameraPositionX,
+        &QDoubleSpinBox::valueChanged,
+        this,
+        [updateCurrentCameraPosition](double)
+        {
+            updateCurrentCameraPosition();
+        }
+    );
+
+    connect(
+        configVisionCameraPositionY,
+        &QDoubleSpinBox::valueChanged,
+        this,
+        [updateCurrentCameraPosition](double)
+        {
+            updateCurrentCameraPosition();
+        }
     );
 
 
@@ -8965,6 +9023,103 @@ QWidget *MainWindow::createConfigurationPage()
         regionGrid
     );
 
+    /*
+    * ========================================================
+    * Referencia visual de ejes y regiones
+    * ========================================================
+    */
+    machineReferenceWidget =
+        new MachineReferenceWidget();
+
+    machineReferenceWidget->setMinimumHeight(
+        320
+    );
+
+    regionsPageLayout->addWidget(
+        machineReferenceWidget
+    );
+
+    /*
+    * ========================================================
+    * Actualización gráfica de regiones 3D
+    * ========================================================
+    */
+    auto updateMachineReference =
+        [this]()
+        {
+            if (machineReferenceWidget == nullptr)
+            {
+                return;
+            }
+
+            for (int body = 0;
+                body < HagieState::BODY_COUNT;
+                ++body)
+            {
+                machineReferenceWidget->setBodyRegion(
+                    body,
+                    configVisionRegionMinX[body]->value(),
+                    configVisionRegionMaxX[body]->value(),
+                    configVisionRegionMinY[body]->value(),
+                    configVisionRegionMaxY[body]->value()
+                );
+            }
+        };
+
+
+    for (int body = 0;
+        body < HagieState::BODY_COUNT;
+        ++body)
+    {
+        connect(
+            configVisionRegionMinX[body],
+            &QDoubleSpinBox::valueChanged,
+            this,
+            [updateMachineReference](double)
+            {
+                updateMachineReference();
+            }
+        );
+
+        connect(
+            configVisionRegionMaxX[body],
+            &QDoubleSpinBox::valueChanged,
+            this,
+            [updateMachineReference](double)
+            {
+                updateMachineReference();
+            }
+        );
+
+        connect(
+            configVisionRegionMinY[body],
+            &QDoubleSpinBox::valueChanged,
+            this,
+            [updateMachineReference](double)
+            {
+                updateMachineReference();
+            }
+        );
+
+        connect(
+            configVisionRegionMaxY[body],
+            &QDoubleSpinBox::valueChanged,
+            this,
+            [updateMachineReference](double)
+            {
+                updateMachineReference();
+            }
+        );
+    }
+
+
+    /*
+    * Dibujar inicialmente los valores actuales.
+    */
+    updateMachineReference();
+
+    
+
     regionsPageLayout->addStretch();
 
 
@@ -9550,6 +9705,352 @@ QWidget *MainWindow::createConfigurationPage()
         3
     );
 
+        /*
+     * ========================================================
+     * Ayuda de sintonía PID
+     * ========================================================
+     */
+    QLabel *heightTuningHelp =
+        new QLabel();
+
+    heightTuningHelp->setText(
+        "<b>Referencia rápida:</b><br>"
+        "<b>Kp:</b> aumenta la rapidez de respuesta. "
+        "Un valor excesivo puede producir oscilación.<br>"
+        "<b>Ki:</b> corrige errores persistentes respecto del objetivo. "
+        "Un valor excesivo puede provocar sobrepaso.<br>"
+        "<b>Kd:</b> amortigua cambios rápidos y ayuda a reducir "
+        "oscilación y sobrepaso.<br>"
+        "<b>Banda muerta:</b> zona alrededor del objetivo donde "
+        "la válvula permanece en cero.<br>"
+        "<b>Ajuste recomendado:</b> comenzar con Ki = 0 y Kd = 0. "
+        "Ajustar primero Kp y agregar Ki/Kd solamente si la respuesta "
+        "real lo requiere."
+    );
+
+    heightTuningHelp->setWordWrap(
+        true
+    );
+
+    heightTuningHelp->setStyleSheet(
+        "QLabel {"
+        "padding: 5px;"
+        "background-color: rgba(0, 0, 0, 20);"
+        "border-radius: 4px;"
+        "}"
+    );
+
+    heightTuningLayout->addWidget(
+        heightTuningHelp,
+        3,
+        0,
+        1,
+        4
+    );
+
+
+    /*
+     * ========================================================
+     * Gráfica ilustrativa de respuesta
+     * ========================================================
+     */
+    QLabel *pidReferenceGraph =
+        new QLabel();
+
+    pidReferenceGraph->setAlignment(
+        Qt::AlignCenter
+    );
+
+    pidReferenceGraph->setMinimumHeight(
+        170
+    );
+
+
+    QPixmap pidPixmap(
+        800,
+        185
+    );
+
+    pidPixmap.fill(
+        Qt::white
+    );
+
+
+    QPainter painter(
+        &pidPixmap
+    );
+
+    painter.setRenderHint(
+        QPainter::Antialiasing,
+        true
+    );
+
+
+    /*
+     * Área de gráfica.
+     */
+    const int left = 55;
+    const int right = 735;
+    const int top = 25;
+    const int bottom = 155;
+
+    /*
+     * Ejes.
+     */
+    painter.setPen(
+        QPen(
+            Qt::black,
+            1
+        )
+    );
+
+    painter.drawLine(
+        left,
+        bottom,
+        right,
+        bottom
+    );
+
+    painter.drawLine(
+        left,
+        bottom,
+        left,
+        top
+    );
+
+
+    /*
+     * Objetivo.
+     */
+    QPen targetPen(
+        Qt::darkGreen,
+        2,
+        Qt::DashLine
+    );
+
+    painter.setPen(
+        targetPen
+    );
+
+    const int targetY = 60;
+
+    painter.drawLine(
+        left,
+        targetY,
+        right,
+        targetY
+    );
+
+    painter.drawText(
+        left + 5,
+        targetY - 5,
+        "OBJETIVO"
+    );
+
+
+    /*
+     * Respuesta lenta.
+     */
+    QPainterPath slowPath;
+
+    slowPath.moveTo(
+        left,
+        bottom
+    );
+
+    slowPath.cubicTo(
+        left + 180,
+        bottom - 5,
+        left + 360,
+        targetY + 35,
+        right,
+        targetY + 8
+    );
+
+    painter.setPen(
+        QPen(
+            Qt::gray,
+            2
+        )
+    );
+
+    painter.drawPath(
+        slowPath
+    );
+
+
+    /*
+     * Respuesta adecuada.
+     */
+    QPainterPath goodPath;
+
+    goodPath.moveTo(
+        left,
+        bottom
+    );
+
+    goodPath.cubicTo(
+        left + 110,
+        bottom - 10,
+        left + 230,
+        targetY + 3,
+        left + 360,
+        targetY
+    );
+
+    goodPath.cubicTo(
+        left + 480,
+        targetY,
+        left + 590,
+        targetY,
+        right,
+        targetY
+    );
+
+    painter.setPen(
+        QPen(
+            Qt::blue,
+            3
+        )
+    );
+
+    painter.drawPath(
+        goodPath
+    );
+
+
+    /*
+     * Respuesta oscilante.
+     */
+    QPainterPath oscillatingPath;
+
+    oscillatingPath.moveTo(
+        left,
+        bottom
+    );
+
+    oscillatingPath.cubicTo(
+        left + 100,
+        bottom - 20,
+        left + 160,
+        targetY - 40,
+        left + 250,
+        targetY - 18
+    );
+
+    oscillatingPath.cubicTo(
+        left + 330,
+        targetY + 28,
+        left + 390,
+        targetY + 22,
+        left + 455,
+        targetY + 6
+    );
+
+    oscillatingPath.cubicTo(
+        left + 530,
+        targetY - 15,
+        left + 590,
+        targetY - 8,
+        right,
+        targetY
+    );
+
+    painter.setPen(
+        QPen(
+            Qt::red,
+            2
+        )
+    );
+
+    painter.drawPath(
+        oscillatingPath
+    );
+
+
+    /*
+     * Leyenda de la gráfica.
+     */
+    painter.setPen(
+        Qt::gray
+    );
+
+    painter.drawText(
+        80,
+        178,
+        "Lenta"
+    );
+
+    painter.setPen(
+        Qt::blue
+    );
+
+    painter.drawText(
+        190,
+        178,
+        "Adecuada"
+    );
+
+    painter.setPen(
+        Qt::red
+    );
+
+    painter.drawText(
+        330,
+        178,
+        "Oscilante / sobrepaso"
+    );
+
+    painter.setPen(
+        Qt::black
+    );
+
+    painter.drawText(
+        565,
+        178,
+        "Tiempo →"
+    );
+
+
+    painter.end();
+
+
+    pidReferenceGraph->setPixmap(
+        pidPixmap
+    );
+
+    heightTuningLayout->addWidget(
+        pidReferenceGraph,
+        4,
+        0,
+        1,
+        4
+    );
+
+
+    QLabel *pidGraphNote =
+        new QLabel(
+            "REFERENCIA DE SINTONÍA — GRÁFICA ILUSTRATIVA, "
+            "NO REPRESENTA DATOS REALES DE LA MÁQUINA"
+        );
+
+    pidGraphNote->setAlignment(
+        Qt::AlignCenter
+    );
+
+    pidGraphNote->setStyleSheet(
+        "font-size: 11px;"
+        "font-style: italic;"
+    );
+
+    heightTuningLayout->addWidget(
+        pidGraphNote,
+        5,
+        0,
+        1,
+        4
+    );
+
 
     controlPageLayout->addWidget(
         heightTuningFrame
@@ -9577,17 +10078,22 @@ QWidget *MainWindow::createConfigurationPage()
         &QPushButton::clicked,
         this,
         [this]()
+        
         {
-            if (stm32Worker == nullptr)
-            {
-                return;
-            }
-
+            /*
+            * Guardar siempre la configuración local,
+            * independientemente de que exista STM32.
+            */
             saveConfiguration();
 
-            syncConfigurationToWorker();
-
-            
+            /*
+            * Sincronizar con STM32 solamente
+            * si el worker está disponible.
+            */
+            if (stm32Worker != nullptr)
+            {
+                syncConfigurationToWorker();
+            }
         }
     );
 
@@ -10778,6 +11284,39 @@ void MainWindow::updateFaultPage()
     }
 }
 
+void MainWindow::updateMachineCameraReference()
+{
+    if (machineReferenceWidget == nullptr)
+    {
+        return;
+    }
+
+    for (std::size_t camera = 0;
+         camera < Vision3DProcessor::CAMERA_COUNT;
+         ++camera)
+    {
+        const Vision3DProcessor::CameraConfig &config =
+            visionCameraConfigs[camera];
+
+        const double xM =
+            static_cast<double>(
+                config.geometry.position_x_mm
+            ) / 1000.0;
+
+        const double yM =
+            static_cast<double>(
+                config.geometry.position_y_mm
+            ) / 1000.0;
+
+        machineReferenceWidget->setCameraPosition(
+            static_cast<int>(camera),
+            xM,
+            yM,
+            config.enabled
+        );
+    }
+}
+
 void MainWindow::saveVisionCameraFromWidgets(
     std::size_t camera)
 {
@@ -10855,6 +11394,8 @@ void MainWindow::saveVisionCameraFromWidgets(
         static_cast<float>(
             configVisionCameraPitch->value()
         );
+      
+      
 }
 
 
@@ -11134,6 +11675,10 @@ void MainWindow::saveConfiguration()
         configurationFilePath(),
         QSettings::IniFormat
     );
+
+    qInfo()
+    << "CONFIG FILE REAL:"
+    << settings.fileName();
 
         /*
      * ========================================================
@@ -11432,15 +11977,6 @@ void MainWindow::saveConfiguration()
         "Vision"
     );
 
-    /*
-    * ========================================================
-    * Fuente de visión 3D
-    * ========================================================
-    */
-    settings.beginGroup(
-        "Vision"
-    );
-
     settings.setValue(
         "source_mode",
         configVisionSourceCombo
@@ -11519,6 +12055,9 @@ void MainWindow::saveConfiguration()
 
         const auto& config =
             visionCameraConfigs[camera];
+
+
+       
 
 
         settings.setValue(
@@ -12273,6 +12812,12 @@ void MainWindow::loadConfiguration()
 
         settings.endGroup();
     }
+
+    /*
+    * Actualizar referencia gráfica con las
+    * posiciones reales cargadas de las cámaras.
+    */
+    updateMachineCameraReference();
 
         /*
      * ========================================================

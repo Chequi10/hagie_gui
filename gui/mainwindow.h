@@ -21,6 +21,7 @@
 #include <QLineEdit>
 #include <QDateTime>
 #include <QDoubleSpinBox>
+#include "machine_reference_widget.h"
 
 
 class QStackedWidget;
@@ -77,6 +78,9 @@ private:
     Vision3DWorker *vision3DWorker;
 
     HeightTrendWidget *heightTrendWidget = nullptr;
+
+    MachineReferenceWidget *machineReferenceWidget =
+    nullptr;
 
     std::array<double, HagieState::BODY_COUNT>
         simulatedEncoderHeightMm {};
@@ -466,6 +470,8 @@ private:
     void saveVisionCameraFromWidgets(
         std::size_t camera
     );
+
+    void updateMachineCameraReference();
 
 
     // ========================================================

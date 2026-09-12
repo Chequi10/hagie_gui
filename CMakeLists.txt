@@ -45,6 +45,9 @@ add_executable(
     gui/height_trend_widget.cpp
     gui/height_trend_widget.h
 
+    gui/machine_reference_widget.cpp
+    gui/machine_reference_widget.h
+
     core/hagie_state.cpp
     core/hagie_state.h
     core/height_target_controller.cpp
@@ -91,6 +94,7 @@ add_executable(
 
     ai/yolo_inference_worker.cpp
     ai/yolo_inference_worker.h
+
 )
 
 
