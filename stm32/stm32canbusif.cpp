@@ -1280,6 +1280,84 @@ void stm32canbus_serialif::set_height_control_deadband(
     protocol::packet_encoder::send(4);
 }
 
+// ------------------------------------------------------------
+// K 0x18 - Compensación hidráulica de SUBIDA por cuerpo
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_up_compensation_percent(
+    uint8_t body,
+    int8_t percent)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    if (percent < -20 ||
+        percent > 20)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x18;
+    payload[2] = body;
+
+    /*
+     * int8_t -> byte crudo en complemento a dos.
+     *
+     * Ejemplo:
+     *  +10 -> 10
+     *  -10 -> 246
+     */
+    payload[3] =
+        static_cast<uint8_t>(
+            percent
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x19 - Compensación hidráulica de BAJADA por cuerpo
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_down_compensation_percent(
+    uint8_t body,
+    int8_t percent)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    if (percent < -20 ||
+        percent > 20)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x19;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            percent
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
 // ============================================================
 // Envío físico por Boost.Asio
 // ============================================================

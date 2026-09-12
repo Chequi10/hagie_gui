@@ -326,6 +326,21 @@ public:
         float deadband_mm
     );
 
+        // K 0x18
+    // Compensación hidráulica de subida por cuerpo, en porcentaje.
+    void set_height_up_compensation_percent(
+        uint8_t body,
+        int8_t percent
+    );
+
+
+    // K 0x19
+    // Compensación hidráulica de bajada por cuerpo, en porcentaje.
+    void set_height_down_compensation_percent(
+        uint8_t body,
+        int8_t percent
+    );
+
 private:
 
     // ============================================================

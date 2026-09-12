@@ -981,6 +981,61 @@ void STM32Worker::setHeightControlDeadband(
         true;
 }
 
+void STM32Worker::setHeightUpCompensationPercent(
+    uint8_t body,
+    int8_t percent)
+{
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    if (percent < -20 ||
+        percent > 20)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig
+        .height_up_compensation_percent[body] =
+        percent;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHeightDownCompensationPercent(
+    uint8_t body,
+    int8_t percent)
+{
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    if (percent < -20 ||
+        percent > 20)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig
+        .height_down_compensation_percent[body] =
+        percent;
+
+    runtimeConfig.valid =
+        true;
+}
+
 
 // ============================================================
 // SINCRONIZACIÓN CONFIGURACIÓN
@@ -1297,6 +1352,39 @@ void STM32Worker::sendCurrentConfigurationCommand()
     {
         stm32->set_height_control_deadband(
             configCopy.height_control_deadband_mm
+        );
+    }
+
+        /*
+     * 30..35 -> K18
+     * Compensación hidráulica SUBIDA
+     */
+    else if (configSyncStep <= 35)
+    {
+        uint8_t body =
+            configSyncStep - 30;
+
+        stm32->set_height_up_compensation_percent(
+            body,
+            configCopy
+                .height_up_compensation_percent[body]
+        );
+    }
+
+
+    /*
+     * 36..41 -> K19
+     * Compensación hidráulica BAJADA
+     */
+    else if (configSyncStep <= 41)
+    {
+        uint8_t body =
+            configSyncStep - 36;
+
+        stm32->set_height_down_compensation_percent(
+            body,
+            configCopy
+                .height_down_compensation_percent[body]
         );
     }
 
@@ -2028,6 +2116,71 @@ void STM32Worker::configureCallbacks()
                         ack.body == 0xFF &&
                         ack.value1 ==
                             expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+                                /*
+                 * 30..35 -> ACK K18
+                 * Compensación hidráulica SUBIDA
+                 */
+                case 30:
+                case 31:
+                case 32:
+                case 33:
+                case 34:
+                case 35:
+                {
+                    uint8_t body =
+                        configSyncStep - 30;
+
+                    uint32_t expectedValue =
+                        static_cast<uint8_t>(
+                            expected
+                                .height_up_compensation_percent[body]
+                        );
+
+                    if (
+                        ack.subcommand == 0x18 &&
+                        ack.body == body &&
+                        ack.value1 == expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                 * 36..41 -> ACK K19
+                 * Compensación hidráulica BAJADA
+                 */
+                case 36:
+                case 37:
+                case 38:
+                case 39:
+                case 40:
+                case 41:
+                {
+                    uint8_t body =
+                        configSyncStep - 36;
+
+                    uint32_t expectedValue =
+                        static_cast<uint8_t>(
+                            expected
+                                .height_down_compensation_percent[body]
+                        );
+
+                    if (
+                        ack.subcommand == 0x19 &&
+                        ack.body == body &&
+                        ack.value1 == expectedValue
                     )
                     {
                         validAck = true;

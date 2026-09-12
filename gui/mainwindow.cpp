@@ -9487,6 +9487,126 @@ QWidget *MainWindow::createConfigurationPage()
         3
     );
 
+        /*
+     * ========================================================
+     * Compensación hidráulica individual
+     * ========================================================
+     */
+
+    QLabel *compensationTitle =
+        new QLabel(
+            "COMPENSACIÓN INDIVIDUAL POR CUERPO"
+        );
+
+    compensationTitle->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    hydraulicLayout->addWidget(
+        compensationTitle,
+        3,
+        0,
+        1,
+        4
+    );
+
+
+    QLabel *compensationBodyLabel =
+        new QLabel("Cuerpo");
+
+    QLabel *compensationUpLabel =
+        new QLabel("Subida");
+
+    QLabel *compensationDownLabel =
+        new QLabel("Bajada");
+
+
+    hydraulicLayout->addWidget(
+        compensationBodyLabel,
+        4,
+        0
+    );
+
+    hydraulicLayout->addWidget(
+        compensationUpLabel,
+        4,
+        1
+    );
+
+    hydraulicLayout->addWidget(
+        compensationDownLabel,
+        4,
+        2
+    );
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        QLabel *bodyLabel =
+            new QLabel(
+                QString("Cuerpo %1")
+                    .arg(body + 1)
+            );
+
+        configHeightUpCompensationSpin[body] =
+            new QSpinBox();
+
+        configHeightUpCompensationSpin[body]->setRange(
+            -20,
+            20
+        );
+
+        configHeightUpCompensationSpin[body]->setSuffix(
+            " %"
+        );
+
+        configHeightUpCompensationSpin[body]->setValue(
+            0
+        );
+
+
+        configHeightDownCompensationSpin[body] =
+            new QSpinBox();
+
+        configHeightDownCompensationSpin[body]->setRange(
+            -20,
+            20
+        );
+
+        configHeightDownCompensationSpin[body]->setSuffix(
+            " %"
+        );
+
+        configHeightDownCompensationSpin[body]->setValue(
+            0
+        );
+
+
+        int row =
+            5 +
+            static_cast<int>(body);
+
+        hydraulicLayout->addWidget(
+            bodyLabel,
+            row,
+            0
+        );
+
+        hydraulicLayout->addWidget(
+            configHeightUpCompensationSpin[body],
+            row,
+            1
+        );
+
+        hydraulicLayout->addWidget(
+            configHeightDownCompensationSpin[body],
+            row,
+            2
+        );
+    }
+
 
     controlPageLayout->addWidget(
         hydraulicFrame
@@ -11853,6 +11973,25 @@ void MainWindow::saveConfiguration()
             ->value()
     );
 
+        for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        settings.setValue(
+            QString("up_compensation_%1")
+                .arg(body + 1),
+            configHeightUpCompensationSpin[body]
+                ->value()
+        );
+
+        settings.setValue(
+            QString("down_compensation_%1")
+                .arg(body + 1),
+            configHeightDownCompensationSpin[body]
+                ->value()
+        );
+    }
+
     settings.endGroup();
 
 
@@ -12408,6 +12547,29 @@ void MainWindow::loadConfiguration()
             40
         ).toInt()
     );
+
+        for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        configHeightUpCompensationSpin[body]
+            ->setValue(
+                settings.value(
+                    QString("up_compensation_%1")
+                        .arg(body + 1),
+                    0
+                ).toInt()
+            );
+
+        configHeightDownCompensationSpin[body]
+            ->setValue(
+                settings.value(
+                    QString("down_compensation_%1")
+                        .arg(body + 1),
+                    0
+                ).toInt()
+            );
+    }
 
     settings.endGroup();
 
@@ -13106,9 +13268,38 @@ void MainWindow::syncConfigurationToWorker()
             configHeightDeadbandSpin->value()
         )
     );
+
+        /*
+     * K 0x18 y K 0x19
+     * Compensación individual por cuerpo.
+     *
+     * K18 = subida
+     * K19 = bajada
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        stm32Worker->setHeightUpCompensationPercent(
+            static_cast<uint8_t>(body),
+            static_cast<int8_t>(
+                configHeightUpCompensationSpin[body]
+                    ->value()
+            )
+        );
+
+        stm32Worker->setHeightDownCompensationPercent(
+            static_cast<uint8_t>(body),
+            static_cast<int8_t>(
+                configHeightDownCompensationSpin[body]
+                    ->value()
+            )
+        );
+    }
     /*
     * Ya cargamos toda la configuración en runtimeConfig.
     * Ahora comenzar el envío secuencial K -> ACK -> K.
     */
     stm32Worker->beginConfigurationSync();
+
 }

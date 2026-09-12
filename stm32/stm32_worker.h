@@ -165,6 +165,16 @@ public:
     void setHeightControlKd(float kd);
     void setHeightControlDeadband(float deadband_mm);
 
+        void setHeightUpCompensationPercent(
+        uint8_t body,
+        int8_t percent
+    );
+
+    void setHeightDownCompensationPercent(
+        uint8_t body,
+        int8_t percent
+    );
+
 
     enum class ConfigSyncStatus
     {
@@ -261,6 +271,20 @@ private:
 
             float height_control_deadband_mm =
                 10.0f;
+                    // ----------------------------------------------------
+            // Compensación hidráulica individual por cuerpo
+            // ----------------------------------------------------
+
+            std::array<
+                int8_t,
+                HagieState::BODY_COUNT
+            > height_up_compensation_percent {};
+
+
+            std::array<
+                int8_t,
+                HagieState::BODY_COUNT
+            > height_down_compensation_percent {};
     };
 
 
@@ -511,7 +535,7 @@ private:
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            30;
+            42;
 
 
     uint8_t configSyncStep =

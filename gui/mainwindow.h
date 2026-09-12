@@ -589,6 +589,16 @@ private:
     QDoubleSpinBox *configHeightKiSpin = nullptr;
     QDoubleSpinBox *configHeightKdSpin = nullptr;
     QDoubleSpinBox *configHeightDeadbandSpin = nullptr;
+        std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configHeightUpCompensationSpin {};
+
+
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configHeightDownCompensationSpin {};
 
     QPlainTextEdit *logsTextEdit =
         nullptr;
