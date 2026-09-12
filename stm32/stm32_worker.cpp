@@ -452,8 +452,8 @@ void STM32Worker::processTxQueue()
 
                 break;
             }
-
-                        case CommandType::SET_HYDRAULIC_MANAGEMENT_MODE:
+    
+            case CommandType::SET_HYDRAULIC_MANAGEMENT_MODE:
             {
                 stm32->set_hydraulic_management_mode(
                     static_cast<uint8_t>(
@@ -493,6 +493,45 @@ void STM32Worker::processTxQueue()
                     static_cast<uint8_t>(
                         command.value
                     )
+                );
+
+                break;
+            }
+
+            case CommandType::SET_HEIGHT_CONTROL_KP:
+            {
+                stm32->set_height_control_kp(
+                    command.value_float
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HEIGHT_CONTROL_KI:
+            {
+                stm32->set_height_control_ki(
+                    command.value_float
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HEIGHT_CONTROL_KD:
+            {
+                stm32->set_height_control_kd(
+                    command.value_float
+                );
+
+                break;
+            }
+
+
+            case CommandType::SET_HEIGHT_CONTROL_DEADBAND:
+            {
+                stm32->set_height_control_deadband(
+                    command.value_float
                 );
 
                 break;
@@ -859,6 +898,90 @@ void STM32Worker::setHydraulicSecondaryPercent(
 }
 
 
+void STM32Worker::setHeightControlKp(
+    float kp)
+{
+    if (kp < 0.0f ||
+        kp > 100.0f)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.height_control_kp =
+        kp;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHeightControlKi(
+    float ki)
+{
+    if (ki < 0.0f ||
+        ki > 100.0f)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.height_control_ki =
+        ki;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHeightControlKd(
+    float kd)
+{
+    if (kd < 0.0f ||
+        kd > 100.0f)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.height_control_kd =
+        kd;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHeightControlDeadband(
+    float deadband_mm)
+{
+    if (deadband_mm < 0.0f ||
+        deadband_mm > 500.0f)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.height_control_deadband_mm =
+        deadband_mm;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
 // ============================================================
 // SINCRONIZACIÓN CONFIGURACIÓN
 // ============================================================
@@ -1143,6 +1266,37 @@ void STM32Worker::sendCurrentConfigurationCommand()
     {
         stm32->set_hydraulic_secondary_percent(
             configCopy.hydraulic_secondary_percent
+        );
+    }
+
+    else if (configSyncStep == 26)
+    {
+        stm32->set_height_control_kp(
+            configCopy.height_control_kp
+        );
+    }
+
+
+    else if (configSyncStep == 27)
+    {
+        stm32->set_height_control_ki(
+            configCopy.height_control_ki
+        );
+    }
+
+
+    else if (configSyncStep == 28)
+    {
+        stm32->set_height_control_kd(
+            configCopy.height_control_kd
+        );
+    }
+
+
+    else if (configSyncStep == 29)
+    {
+        stm32->set_height_control_deadband(
+            configCopy.height_control_deadband_mm
         );
     }
 
@@ -1779,6 +1933,101 @@ void STM32Worker::configureCallbacks()
                         ack.value1 ==
                             expected
                                 .hydraulic_secondary_percent
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+                                case 26:
+                {
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected
+                                .height_control_kp
+                            * 100.0f
+                            + 0.5f
+                        );
+
+                    if (
+                        ack.subcommand == 0x14 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 27:
+                {
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected
+                                .height_control_ki
+                            * 100.0f
+                            + 0.5f
+                        );
+
+                    if (
+                        ack.subcommand == 0x15 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 28:
+                {
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected
+                                .height_control_kd
+                            * 100.0f
+                            + 0.5f
+                        );
+
+                    if (
+                        ack.subcommand == 0x16 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 29:
+                {
+                    uint32_t expectedValue =
+                        static_cast<uint32_t>(
+                            expected
+                                .height_control_deadband_mm
+                            * 100.0f
+                            + 0.5f
+                        );
+
+                    if (
+                        ack.subcommand == 0x17 &&
+                        ack.body == 0xFF &&
+                        ack.value1 ==
+                            expectedValue
                     )
                     {
                         validAck = true;

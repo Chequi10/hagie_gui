@@ -299,6 +299,33 @@ public:
         uint8_t percent
     );
 
+    // K 0x14
+    // Kp del control de altura, enviado x100.
+    void set_height_control_kp(
+        float kp
+    );
+
+
+    // K 0x15
+    // Ki del control de altura, enviado x100.
+    void set_height_control_ki(
+        float ki
+    );
+
+
+    // K 0x16
+    // Kd del control de altura, enviado x100.
+    void set_height_control_kd(
+        float kd
+    );
+
+
+    // K 0x17
+    // Banda muerta en mm, enviada x100.
+    void set_height_control_deadband(
+        float deadband_mm
+    );
+
 private:
 
     // ============================================================

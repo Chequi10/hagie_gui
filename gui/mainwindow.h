@@ -20,6 +20,7 @@
 #include "ai/tassel_verifier.h"
 #include <QLineEdit>
 #include <QDateTime>
+#include <QDoubleSpinBox>
 
 
 class QStackedWidget;
@@ -576,6 +577,12 @@ private:
 
     QSpinBox *configHydraulicSecondaryPercentSpin =
         nullptr;
+
+    QDoubleSpinBox *configHeightKpSpin = 
+        nullptr;
+    QDoubleSpinBox *configHeightKiSpin = nullptr;
+    QDoubleSpinBox *configHeightKdSpin = nullptr;
+    QDoubleSpinBox *configHeightDeadbandSpin = nullptr;
 
     QPlainTextEdit *logsTextEdit =
         nullptr;

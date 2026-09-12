@@ -142,7 +142,7 @@ public:
         float mm_per_pulse
     );
 
-        void setHydraulicManagementMode(
+    void setHydraulicManagementMode(
         uint8_t mode
     );
 
@@ -160,6 +160,10 @@ public:
     void setHydraulicSecondaryPercent(
         uint8_t percent
     );
+    void setHeightControlKp(float kp);
+    void setHeightControlKi(float ki);
+    void setHeightControlKd(float kd);
+    void setHeightControlDeadband(float deadband_mm);
 
 
     enum class ConfigSyncStatus
@@ -240,7 +244,23 @@ private:
             2;
 
         uint8_t hydraulic_secondary_percent =
-            40;    
+            40;  
+            
+            // ----------------------------------------------------
+            // Sintonía control de altura
+            // ----------------------------------------------------
+
+            float height_control_kp =
+                5.0f;
+
+            float height_control_ki =
+                0.0f;
+
+            float height_control_kd =
+                0.0f;
+
+            float height_control_deadband_mm =
+                10.0f;
     };
 
 
@@ -361,7 +381,12 @@ private:
         SET_HYDRAULIC_MANAGEMENT_MODE,
         SET_HYDRAULIC_HIGH_COMMAND_THRESHOLD,
         SET_HYDRAULIC_MAX_HIGH_DEMAND_BODIES,
-        SET_HYDRAULIC_SECONDARY_PERCENT
+        SET_HYDRAULIC_SECONDARY_PERCENT,
+
+        SET_HEIGHT_CONTROL_KP,
+        SET_HEIGHT_CONTROL_KI,
+        SET_HEIGHT_CONTROL_KD,
+        SET_HEIGHT_CONTROL_DEADBAND
     };
 
 
@@ -476,14 +501,17 @@ private:
     * 23      -> K11 umbral demanda fuerte
     * 24      -> K12 máximo cuerpos alta demanda
     * 25      -> K13 porcentaje secundario
+    * 26      -> K14 Kp control altura
+    * 27      -> K15 Ki control altura
+    * 28      -> K16 Kd control altura
+    * 29      -> K17 banda muerta
     *
-    * 26      -> terminada
-    * 
-    *  */
+    * 30      -> terminada
+    */
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            26;
+            30;
 
 
     uint8_t configSyncStep =

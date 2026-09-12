@@ -9337,6 +9337,224 @@ QWidget *MainWindow::createConfigurationPage()
         hydraulicFrame
     );
 
+        /*
+     * ========================================================
+     * Sintonía control de altura
+     * ========================================================
+     */
+
+    QFrame *heightTuningFrame =
+        new QFrame();
+
+    heightTuningFrame->setFrameShape(
+        QFrame::StyledPanel
+    );
+
+    QGridLayout *heightTuningLayout =
+        new QGridLayout(
+            heightTuningFrame
+        );
+
+
+    QLabel *heightTuningTitle =
+        new QLabel(
+            "SINTONÍA CONTROL DE ALTURA"
+        );
+
+    heightTuningTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+    );
+
+    heightTuningLayout->addWidget(
+        heightTuningTitle,
+        0,
+        0,
+        1,
+        4
+    );
+
+
+    /*
+     * Kp
+     */
+    QLabel *heightKpLabel =
+        new QLabel(
+            "Kp"
+        );
+
+    configHeightKpSpin =
+        new QDoubleSpinBox();
+
+    configHeightKpSpin->setRange(
+        0.0,
+        100.0
+    );
+
+    configHeightKpSpin->setDecimals(
+        2
+    );
+
+    configHeightKpSpin->setSingleStep(
+        0.10
+    );
+
+    configHeightKpSpin->setValue(
+        5.00
+    );
+
+
+    /*
+     * Ki
+     */
+    QLabel *heightKiLabel =
+        new QLabel(
+            "Ki"
+        );
+
+    configHeightKiSpin =
+        new QDoubleSpinBox();
+
+    configHeightKiSpin->setRange(
+        0.0,
+        100.0
+    );
+
+    configHeightKiSpin->setDecimals(
+        2
+    );
+
+    configHeightKiSpin->setSingleStep(
+        0.10
+    );
+
+    configHeightKiSpin->setValue(
+        0.00
+    );
+
+
+    /*
+     * Kd
+     */
+    QLabel *heightKdLabel =
+        new QLabel(
+            "Kd"
+        );
+
+    configHeightKdSpin =
+        new QDoubleSpinBox();
+
+    configHeightKdSpin->setRange(
+        0.0,
+        100.0
+    );
+
+    configHeightKdSpin->setDecimals(
+        2
+    );
+
+    configHeightKdSpin->setSingleStep(
+        0.10
+    );
+
+    configHeightKdSpin->setValue(
+        0.00
+    );
+
+
+    /*
+     * Banda muerta
+     */
+    QLabel *heightDeadbandLabel =
+        new QLabel(
+            "Banda muerta"
+        );
+
+    configHeightDeadbandSpin =
+        new QDoubleSpinBox();
+
+    configHeightDeadbandSpin->setRange(
+        0.0,
+        500.0
+    );
+
+    configHeightDeadbandSpin->setDecimals(
+        2
+    );
+
+    configHeightDeadbandSpin->setSingleStep(
+        1.0
+    );
+
+    configHeightDeadbandSpin->setSuffix(
+        " mm"
+    );
+
+    configHeightDeadbandSpin->setValue(
+        10.00
+    );
+
+
+    /*
+     * Fila Kp / Ki
+     */
+    heightTuningLayout->addWidget(
+        heightKpLabel,
+        1,
+        0
+    );
+
+    heightTuningLayout->addWidget(
+        configHeightKpSpin,
+        1,
+        1
+    );
+
+    heightTuningLayout->addWidget(
+        heightKiLabel,
+        1,
+        2
+    );
+
+    heightTuningLayout->addWidget(
+        configHeightKiSpin,
+        1,
+        3
+    );
+
+
+    /*
+     * Fila Kd / banda muerta
+     */
+    heightTuningLayout->addWidget(
+        heightKdLabel,
+        2,
+        0
+    );
+
+    heightTuningLayout->addWidget(
+        configHeightKdSpin,
+        2,
+        1
+    );
+
+    heightTuningLayout->addWidget(
+        heightDeadbandLabel,
+        2,
+        2
+    );
+
+    heightTuningLayout->addWidget(
+        configHeightDeadbandSpin,
+        2,
+        3
+    );
+
+
+    controlPageLayout->addWidget(
+        heightTuningFrame
+    );
+
     controlPageLayout->addStretch();
 
 
@@ -11063,6 +11281,8 @@ void MainWindow::saveConfiguration()
         "Hydraulic"
     );
 
+
+
     settings.setValue(
         "management_mode",
         configHydraulicModeCombo
@@ -11086,6 +11306,31 @@ void MainWindow::saveConfiguration()
         "secondary_percent",
         configHydraulicSecondaryPercentSpin
             ->value()
+    );
+
+    settings.endGroup();
+
+
+    settings.beginGroup("HeightControl");
+
+    settings.setValue(
+        "kp",
+        configHeightKpSpin->value()
+    );
+
+    settings.setValue(
+        "ki",
+        configHeightKiSpin->value()
+    );
+
+    settings.setValue(
+        "kd",
+        configHeightKdSpin->value()
+    );
+
+    settings.setValue(
+        "deadband_mm",
+        configHeightDeadbandSpin->value()
     );
 
     settings.endGroup();
@@ -11623,6 +11868,39 @@ void MainWindow::loadConfiguration()
             "secondary_percent",
             40
         ).toInt()
+    );
+
+    settings.endGroup();
+
+
+    settings.beginGroup("HeightControl");
+
+    configHeightKpSpin->setValue(
+        settings.value(
+            "kp",
+            5.0
+        ).toDouble()
+    );
+
+    configHeightKiSpin->setValue(
+        settings.value(
+            "ki",
+            0.0
+        ).toDouble()
+    );
+
+    configHeightKdSpin->setValue(
+        settings.value(
+            "kd",
+            0.0
+        ).toDouble()
+    );
+
+    configHeightDeadbandSpin->setValue(
+        settings.value(
+            "deadband_mm",
+            10.0
+        ).toDouble()
     );
 
     settings.endGroup();
@@ -12238,6 +12516,49 @@ void MainWindow::syncConfigurationToWorker()
         static_cast<uint8_t>(
             configHydraulicSecondaryPercentSpin
                 ->value()
+        )
+    );
+
+    /*
+     * K 0x14
+     * Ganancia proporcional Kp.
+     */
+    stm32Worker->setHeightControlKp(
+        static_cast<float>(
+            configHeightKpSpin->value()
+        )
+    );
+
+
+    /*
+     * K 0x15
+     * Ganancia integral Ki.
+     */
+    stm32Worker->setHeightControlKi(
+        static_cast<float>(
+            configHeightKiSpin->value()
+        )
+    );
+
+
+    /*
+     * K 0x16
+     * Ganancia derivativa Kd.
+     */
+    stm32Worker->setHeightControlKd(
+        static_cast<float>(
+            configHeightKdSpin->value()
+        )
+    );
+
+
+    /*
+     * K 0x17
+     * Banda muerta del control de altura.
+     */
+    stm32Worker->setHeightControlDeadband(
+        static_cast<float>(
+            configHeightDeadbandSpin->value()
         )
     );
     /*

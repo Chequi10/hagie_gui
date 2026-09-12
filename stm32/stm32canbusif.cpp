@@ -1125,6 +1125,161 @@ void stm32canbus_serialif::
     protocol::packet_encoder::send(3);
 }
 
+// ------------------------------------------------------------
+// K 0x14 - Ganancia proporcional Kp
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_control_kp(
+    float kp)
+{
+    if (kp < 0.0f ||
+        kp > 100.0f)
+    {
+        return;
+    }
+
+    uint16_t raw =
+        static_cast<uint16_t>(
+            kp * 100.0f + 0.5f
+        );
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x14;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x15 - Ganancia integral Ki
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_control_ki(
+    float ki)
+{
+    if (ki < 0.0f ||
+        ki > 100.0f)
+    {
+        return;
+    }
+
+    uint16_t raw =
+        static_cast<uint16_t>(
+            ki * 100.0f + 0.5f
+        );
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x15;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x16 - Ganancia derivativa Kd
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_control_kd(
+    float kd)
+{
+    if (kd < 0.0f ||
+        kd > 100.0f)
+    {
+        return;
+    }
+
+    uint16_t raw =
+        static_cast<uint16_t>(
+            kd * 100.0f + 0.5f
+        );
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x16;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
+
+// ------------------------------------------------------------
+// K 0x17 - Banda muerta control de altura
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_height_control_deadband(
+    float deadband_mm)
+{
+    if (deadband_mm < 0.0f ||
+        deadband_mm > 500.0f)
+    {
+        return;
+    }
+
+    uint16_t raw =
+        static_cast<uint16_t>(
+            deadband_mm * 100.0f + 0.5f
+        );
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x17;
+
+    payload[2] =
+        static_cast<uint8_t>(
+            (raw >> 8) & 0xFF
+        );
+
+    payload[3] =
+        static_cast<uint8_t>(
+            raw & 0xFF
+        );
+
+    protocol::packet_encoder::send(4);
+}
+
 // ============================================================
 // Envío físico por Boost.Asio
 // ============================================================
