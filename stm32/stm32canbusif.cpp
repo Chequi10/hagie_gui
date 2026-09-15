@@ -113,6 +113,12 @@ void stm32canbus_serialif::set_encoder_callback(
     on_encoder = std::move(callback);
 }
 
+void stm32canbus_serialif::set_encoder_raw_callback(
+    encoder_raw_callback callback)
+{
+    on_encoder_raw = std::move(callback);
+}
+
 
 void stm32canbus_serialif::set_valve_callback(
     valve_callback callback)
@@ -262,6 +268,55 @@ void stm32canbus_serialif::handle_packet(
             if (on_encoder)
             {
                 on_encoder(state);
+            }
+
+            break;
+        }
+
+                // ----------------------------------------------------
+        // 'M' - Posición bruta de los 6 encoders
+        // ----------------------------------------------------
+
+        case 'M':
+        {
+            /*
+             * 1 byte opcode +
+             * 6 encoders x 8 bytes = 49 bytes.
+             */
+            if (n != 49)
+            {
+                return;
+            }
+
+            encoder_raw_state state;
+
+            for (std::size_t i = 0;
+                 i < BODY_COUNT;
+                 ++i)
+            {
+                const std::size_t index =
+                    1 + (i * 8);
+
+                uint64_t value = 0;
+
+                for (std::size_t byte = 0;
+                     byte < 8;
+                     ++byte)
+                {
+                    value =
+                        (value << 8) |
+                        static_cast<uint64_t>(
+                            payload[index + byte]
+                        );
+                }
+
+                state.position[i] =
+                    static_cast<int64_t>(value);
+            }
+
+            if (on_encoder_raw)
+            {
+                on_encoder_raw(state);
             }
 
             break;

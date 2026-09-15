@@ -1502,6 +1502,32 @@ void STM32Worker::configureCallbacks()
         }
     );
 
+        // --------------------------------------------------------
+    // ENCODERS - POSICIÓN BRUTA
+    // --------------------------------------------------------
+
+    stm32->set_encoder_raw_callback(
+        [this](
+            const stm32canbus_serialif::encoder_raw_state&
+                encoderRawState)
+        {
+            if (state == nullptr)
+            {
+                return;
+            }
+
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                state->setBodyEncoderRawCount(
+                    body,
+                    encoderRawState.position[body]
+                );
+            }
+        }
+    );
+
 
     // --------------------------------------------------------
     // VÁLVULAS

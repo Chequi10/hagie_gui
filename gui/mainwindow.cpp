@@ -4426,16 +4426,33 @@ QWidget *MainWindow::createTestsPage()
                     ->setEnabled(false);
 
 
+               
+
+
                 /*
-                * Calcular objetivo usando visión + offset.
+                * Obtener la medición 3D correspondiente
+                * físicamente a la posición del cuerpo.
+                *
+                * La cámara está aproximadamente 300 mm
+                * por delante.
+                */
+                VisionHeightSample delayedSample =
+                    getDelayedVisionSample(
+                        body,
+                        nowMs
+                    );
+
+
+                /*
+                * Calcular objetivo usando la muestra retrasada.
                 */
                 HeightTargetController::TargetResult
                     targetResult =
                         heightTargetController
                             ->calculateTarget(
                                 body,
-                                bodyState.vision_height_mm,
-                                bodyState.vision_valid
+                                delayedSample.height_mm,
+                                delayedSample.valid
                             );
 
 
@@ -4921,13 +4938,30 @@ QWidget *MainWindow::createTestsPage()
                     /*
                     * Calcular el objetivo 3D actual.
                     */
+                    /*
+                    * Obtener la medición 3D que corresponde
+                    * físicamente a la posición actual del cuerpo.
+                    *
+                    * La cámara está aproximadamente 300 mm
+                    * por delante del cuerpo.
+                    */
+                    VisionHeightSample delayedSample =
+                        getDelayedVisionSample(
+                            body,
+                            nowMs
+                        );
+
+
+                    /*
+                    * Calcular objetivo usando la muestra retrasada.
+                    */
                     HeightTargetController::TargetResult
                         targetResult =
                             heightTargetController
                                 ->calculateTarget(
                                     body,
-                                    bodyState.vision_height_mm,
-                                    visionFresh
+                                    delayedSample.height_mm,
+                                    delayedSample.valid
                                 );
 
 
@@ -5548,9 +5582,878 @@ QWidget *MainWindow::createConfigurationPage()
     QWidget *bodiesPage =
         new QWidget();
 
+
+        /*
+     * ========================================================
+     * PÁGINA CALIBRACIÓN DE CUERPOS
+     * ========================================================
+     */
+    QWidget *calibrationPage =
+        new QWidget();
+
+    QVBoxLayout *calibrationPageLayout =
+        new QVBoxLayout(
+            calibrationPage
+        );
+
+
+    QLabel *calibrationTitle =
+        new QLabel(
+            "CALIBRACIÓN DE CUERPOS"
+        );
+
+    calibrationTitle->setAlignment(
+        Qt::AlignCenter
+    );
+
+    calibrationTitle->setStyleSheet(
+        "font-size: 20px;"
+        "font-weight: bold;"
+    );
+
+    calibrationPageLayout->addWidget(
+        calibrationTitle
+    );
+
+
+    /*
+     * Selector de cuerpo.
+     */
+    QHBoxLayout *calibrationBodyLayout =
+        new QHBoxLayout();
+
+    QLabel *calibrationBodyLabel =
+        new QLabel(
+            "Cuerpo:"
+        );
+
+    configCalibrationBodyCombo =
+        new QComboBox();
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        configCalibrationBodyCombo->addItem(
+            QString("CUERPO %1")
+                .arg(body + 1)
+        );
+    }
+
+    
+
+    calibrationBodyLayout->addWidget(
+        calibrationBodyLabel
+    );
+
+    calibrationBodyLayout->addWidget(
+        configCalibrationBodyCombo
+    );
+
+    calibrationBodyLayout->addStretch();
+
+    calibrationPageLayout->addLayout(
+        calibrationBodyLayout
+    );
+
+
+    /*
+     * ========================================================
+     * HOMING / RECORRIDO
+     * ========================================================
+     */
+    QLabel *homingTitle =
+        new QLabel(
+            "HOMING / RECORRIDO DEL ENCODER"
+        );
+
+    homingTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "margin-top: 15px;"
+    );
+
+    calibrationPageLayout->addWidget(
+        homingTitle
+    );
+
+
+    configCalibrationEncoderLabel =
+        new QLabel(
+            "Encoder actual: ---"
+        );
+
+    configCalibrationPositionLabel =
+        new QLabel(
+            "Posición relativa: --- mm"
+        );
+
+    configCalibrationCalculatedHeightLabel =
+        new QLabel(
+            "Altura calculada: --- mm"
+        );
+
+    configCalibrationLowerSensorLabel =
+        new QLabel(
+            "SENSOR INFERIOR: SIN DATOS"
+        );
+
+    configCalibrationUpperSensorLabel =
+        new QLabel(
+            "SENSOR SUPERIOR: SIN DATOS"
+        );
+
+    configCalibrationStateLabel =
+        new QLabel(
+            "Estado: SIN CALIBRAR"
+        );
+
+    configCalibrationMessageLabel =
+        new QLabel(
+            "Mensaje: ---"
+        );
+
+    configCalibrationMinLabel =
+        new QLabel(
+            "Encoder mínimo: ---"
+        );
+
+    configCalibrationMaxLabel =
+        new QLabel(
+            "Encoder máximo: ---"
+        );
+
+
+    configCalibrationLowerSensorLabel->setStyleSheet(
+        "font-weight: bold;"
+        "font-size: 15px;"
+    );
+
+    configCalibrationUpperSensorLabel->setStyleSheet(
+        "font-weight: bold;"
+        "font-size: 15px;"
+    );
+
+    configCalibrationStateLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    configCalibrationMessageLabel->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+
+    calibrationPageLayout->addWidget(
+        configCalibrationEncoderLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationPositionLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationLowerSensorLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationUpperSensorLabel
+    );
+
+    calibrationPageLayout->addWidget(
+    configCalibrationPositionLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationCalculatedHeightLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationLowerSensorLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationStateLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationStateLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationMessageLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationMinLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationMinLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationMaxLabel
+    );
+
+
+    configCalibrationSetZeroButton =
+        new QPushButton(
+            "FIJAR POSICIÓN ACTUAL COMO 0 mm"
+        );
+
+    configCalibrationSetMaxButton =
+        new QPushButton(
+            "GUARDAR MÁXIMO ACTUAL"
+        );
+
+    configCalibrationSetZeroButton
+        ->setMinimumHeight(40);
+
+    configCalibrationSetMaxButton
+        ->setMinimumHeight(40);
+
+    calibrationPageLayout->addWidget(
+        configCalibrationSetZeroButton
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationSetMaxButton
+    );
+
+
+    /*
+     * ========================================================
+     * ALTURA REAL
+     * ========================================================
+     */
+    QLabel *realHeightTitle =
+        new QLabel(
+            "ALTURA REAL DE LA HERRAMIENTA RESPECTO DEL SUELO"
+        );
+
+    realHeightTitle->setStyleSheet(
+        "font-size: 16px;"
+        "font-weight: bold;"
+        "margin-top: 15px;"
+    );
+
+    calibrationPageLayout->addWidget(
+        realHeightTitle
+    );
+
+
+    QHBoxLayout *realHeightLayout =
+        new QHBoxLayout();
+
+    QLabel *realHeightLabel =
+        new QLabel(
+            "Altura medida:"
+        );
+
+    configCalibrationRealHeightSpin =
+        new QSpinBox();
+
+    configCalibrationRealHeightSpin->setRange(
+        0,
+        2000
+    );
+
+    configCalibrationRealHeightSpin->setSuffix(
+        " mm"
+    );
+
+    realHeightLayout->addWidget(
+        realHeightLabel
+    );
+
+    realHeightLayout->addWidget(
+        configCalibrationRealHeightSpin
+    );
+
+    realHeightLayout->addStretch();
+
+    calibrationPageLayout->addLayout(
+        realHeightLayout
+    );
+
+
+    configCalibrationAddPointButton =
+        new QPushButton(
+            "GUARDAR PUNTO DE CALIBRACIÓN"
+        );
+
+    configCalibrationClearButton =
+        new QPushButton(
+            "BORRAR CALIBRACIÓN"
+        );
+
+    configCalibrationPointsLabel =
+        new QLabel(
+            "Puntos de calibración: ninguno"
+        );
+
+    configCalibrationAddPointButton
+        ->setMinimumHeight(40);
+
+    configCalibrationClearButton
+        ->setMinimumHeight(40);
+
+
+    calibrationPageLayout->addWidget(
+        configCalibrationAddPointButton
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationPointsLabel
+    );
+
+    calibrationPageLayout->addWidget(
+        configCalibrationClearButton
+    );
+
+    calibrationPageLayout->addStretch(); 
+    
+    connect(
+        configCalibrationBodyCombo,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this](int index)
+
+        {if (index < 0 ||
+            index >= static_cast<int>(
+                HagieState::BODY_COUNT
+            ))
+        {
+            return;
+        }
+
+        /*
+        * Guardar la altura medida escrita
+        * para el cuerpo que estamos dejando.
+        */
+        if (currentCalibrationBody <
+                HagieState::BODY_COUNT &&
+            configCalibrationRealHeightSpin != nullptr)
+        {
+            bodyCalibration[
+                currentCalibrationBody
+            ].currentRealHeightMm =
+                configCalibrationRealHeightSpin->value();
+        }
+
+        /*
+        * Cambiar al nuevo cuerpo.
+        */
+        currentCalibrationBody =
+            static_cast<std::size_t>(
+                index
+            );
+
+        const BodyCalibration &cal =
+            bodyCalibration[
+                currentCalibrationBody
+            ];
+
+        /*
+        * Recuperar la altura medida
+        * correspondiente a este cuerpo.
+        */
+        if (configCalibrationRealHeightSpin != nullptr)
+        {
+            configCalibrationRealHeightSpin->setValue(
+                cal.currentRealHeightMm
+            );
+        }
+
+            /*
+             * Actualizar únicamente los datos
+             * que ya tenemos en memoria.
+             *
+             * Encoder y sensores reales se
+             * conectarán en el siguiente paso.
+             */
+            configCalibrationEncoderLabel
+                ->setText(
+                    "Encoder actual: ---"
+                );
+
+            configCalibrationPositionLabel
+                ->setText(
+                    "Posición relativa: --- mm"
+                );
+
+            configCalibrationLowerSensorLabel
+                ->setText(
+                    "SENSOR INFERIOR: SIN DATOS"
+                );
+
+            configCalibrationUpperSensorLabel
+                ->setText(
+                    "SENSOR SUPERIOR: SIN DATOS"
+                );
+
+            if (cal.referenced)
+            {
+                configCalibrationMinLabel
+                    ->setText(
+                        QString(
+                            "Encoder mínimo: %1"
+                        )
+                        .arg(
+                            cal.encoderZero
+                        )
+                    );
+            }
+            else
+            {
+                configCalibrationMinLabel
+                    ->setText(
+                        "Encoder mínimo: ---"
+                    );
+            }
+
+            if (cal.calibrated)
+            {
+                configCalibrationMaxLabel
+                    ->setText(
+                        QString(
+                            "Encoder máximo: %1"
+                        )
+                        .arg(
+                            cal.encoderMaximum
+                        )
+                    );
+
+                configCalibrationStateLabel
+                    ->setText(
+                        "Estado: CALIBRADO"
+                    );
+            }
+            else if (cal.referenced)
+            {
+                configCalibrationMaxLabel
+                    ->setText(
+                        "Encoder máximo: ---"
+                    );
+
+                configCalibrationStateLabel
+                    ->setText(
+                        "Estado: REFERENCIADO"
+                    );
+            }
+            else
+            {
+                configCalibrationMaxLabel
+                    ->setText(
+                        "Encoder máximo: ---"
+                    );
+
+                configCalibrationStateLabel
+                    ->setText(
+                        "Estado: SIN CALIBRAR"
+                    );
+            }
+
+            
+
+            /*
+            * Mostrar los puntos pertenecientes
+            * únicamente al cuerpo seleccionado.
+            */
+            if (cal.points.empty())
+            {
+                configCalibrationPointsLabel->setText(
+                    "Puntos de calibración: ninguno"
+                );
+            }
+            else
+            {
+                configCalibrationPointsLabel->setText(
+                    QString(
+                        "Puntos de calibración: %1"
+                    ).arg(
+                        cal.points.size()
+                    )
+                );
+            }
+
+        }
+    );
+
+    connect(
+        configCalibrationSetZeroButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            const std::size_t body =
+                currentCalibrationBody;
+
+            if (body >= HagieState::BODY_COUNT)
+            {
+                return;
+            }
+
+            const HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+            BodyCalibration &cal =
+                bodyCalibration[body];
+
+            /*
+             * Guardamos la posición actual
+             * como referencia mecánica.
+             */
+            cal.encoderZero =
+                  bodyState.encoder_raw_count;
+
+            cal.referenced = true;
+
+            /*
+             * Al establecer un nuevo cero,
+             * invalidamos cualquier máximo
+             * anterior.
+             */
+            cal.calibrated = false;
+
+            cal.encoderMaximum = 0;
+
+
+            configCalibrationMinLabel->setText(
+                QString(
+                    "Encoder mínimo: %1"
+                ).arg(
+                    cal.encoderZero
+                )
+            );
+
+            configCalibrationMaxLabel->setText(
+                "Encoder máximo: ---"
+            );
+
+            configCalibrationPositionLabel->setText(
+               "Posición relativa: 0 pulsos"
+            );
+
+            configCalibrationStateLabel->setText(
+                "Estado: REFERENCIADO"
+            );
+        }
+    );
+
+    connect(
+        configCalibrationSetMaxButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            const std::size_t body =
+                currentCalibrationBody;
+
+            if (body >= HagieState::BODY_COUNT)
+            {
+                return;
+            }
+
+            BodyCalibration &cal =
+                bodyCalibration[body];
+
+            /*
+            * No podemos guardar el máximo
+            * si todavía no establecimos el cero.
+            */
+            if (!cal.referenced)
+            {
+                configCalibrationStateLabel->setText(
+                    "Estado: PRIMERO FIJAR 0 mm"
+                );
+
+                return;
+            }
+
+            const HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+            const int64_t currentEncoder =
+                 bodyState.encoder_raw_count;
+
+            /*
+            * El máximo debe estar por encima
+            * de la referencia cero.
+            */
+            if (currentEncoder <= cal.encoderZero)
+            {
+                configCalibrationStateLabel->setText(
+                    "Estado: MÁXIMO INVÁLIDO"
+                );
+
+                return;
+            }
+
+            cal.encoderMaximum =
+                currentEncoder;
+
+            cal.calibrated =
+                true;
+
+            configCalibrationMaxLabel->setText(
+                QString(
+                    "Encoder máximo: %1"
+                ).arg(
+                    cal.encoderMaximum
+                )
+            );
+
+            configCalibrationStateLabel->setText(
+                "Estado: CALIBRADO"
+            );
+        }
+    );
+
+
+    
+   
+
+
+    /*
+    * ========================================================
+    * GUARDAR PUNTO DE CALIBRACIÓN
+    * ========================================================
+    */
+    connect(
+        configCalibrationAddPointButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            const std::size_t body =
+                currentCalibrationBody;
+
+            if (body >= HagieState::BODY_COUNT)
+            {
+                return;
+            }
+
+            BodyCalibration &cal =
+                bodyCalibration[body];
+
+            /*
+            * Primero debe existir una referencia
+            * mecánica de 0 mm.
+            */
+            if (!cal.referenced)
+            {
+                configCalibrationStateLabel->setText(
+                    "Estado: PRIMERO FIJAR 0 mm"
+                );
+
+                return;
+            }
+
+            const HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+            /*
+            * Posición relativa respecto del
+            * cero mecánico guardado.
+            */
+            const int64_t encoderPosition =
+                bodyState.encoder_raw_count -
+                cal.encoderZero;
+
+            /*
+            * Para guardar puntos necesitamos tener
+            * definido el recorrido completo.
+            */
+            if (!cal.calibrated)
+            {
+                configCalibrationStateLabel->setText(
+                    "Estado: PRIMERO GUARDAR MÁXIMO"
+                );
+
+                return;
+            }
+
+            /*
+            * Recorrido mecánico calibrado.
+            */
+            const int64_t maximumTravel =
+                cal.encoderMaximum -
+                cal.encoderZero;
+
+            /*
+            * No permitir puntos fuera del
+            * recorrido mecánico válido.
+            */
+            if (encoderPosition < 0 ||
+                encoderPosition > maximumTravel)
+            {
+                configCalibrationMessageLabel->setText(
+                    QString(
+                        "Mensaje: PUNTO FUERA DE RECORRIDO (%1 pulsos)"
+                    ).arg(
+                        encoderPosition
+                    )
+                );
+
+                return;
+            }
+
+
+            /*
+            * Altura real medida manualmente
+            * desde el suelo.
+            */
+            const int realHeightMm =
+                configCalibrationRealHeightSpin->value();
+
+            CalibrationPoint point;
+
+            point.encoderPosition =
+                encoderPosition;
+
+            point.realHeightMm =
+                realHeightMm;
+
+            cal.points.push_back(
+                point
+            );
+
+            /*
+            * Actualizar mínimo y máximo
+            * de altura real.
+            */
+            if (cal.points.size() == 1)
+            {
+                cal.realMinimumHeightMm =
+                    realHeightMm;
+
+                cal.realMaximumHeightMm =
+                    realHeightMm;
+            }
+            else
+            {
+                if (realHeightMm <
+                    cal.realMinimumHeightMm)
+                {
+                    cal.realMinimumHeightMm =
+                        realHeightMm;
+                }
+
+                if (realHeightMm >
+                    cal.realMaximumHeightMm)
+                {
+                    cal.realMaximumHeightMm =
+                        realHeightMm;
+                }
+            }
+
+            /*
+            * Mostrar cantidad de puntos.
+            */
+            configCalibrationPointsLabel->setText(
+                QString(
+                    "Puntos de calibración: %1"
+                ).arg(
+                    cal.points.size()
+                )
+            );
+
+            configCalibrationMessageLabel->setText(
+                QString(
+                    "Mensaje: PUNTO GUARDADO (%1 mm -> %2 mm)"
+                )
+                .arg(
+                    encoderPosition
+                )
+                .arg(
+                    realHeightMm
+                )
+            );
+        }
+    );
+
+
+        /*
+    * ========================================================
+    * BORRAR CALIBRACIÓN DEL CUERPO ACTUAL
+    * ========================================================
+    */
+    connect(
+        configCalibrationClearButton,
+        &QPushButton::clicked,
+        this,
+        [this]()
+        {
+            const std::size_t body =
+                currentCalibrationBody;
+
+            if (body >= HagieState::BODY_COUNT)
+            {
+                return;
+            }
+
+            BodyCalibration &cal =
+                bodyCalibration[body];
+
+            /*
+             * Borrar toda la calibración
+             * correspondiente a este cuerpo.
+             */
+            cal.referenced = false;
+            cal.calibrated = false;
+
+            cal.encoderZero = 0;
+            cal.encoderMaximum = 0;
+
+            cal.realMinimumHeightMm = 0;
+            cal.realMaximumHeightMm = 0;
+            cal.currentRealHeightMm = 0;
+
+            cal.points.clear();
+
+            /*
+             * Actualizar la pantalla.
+             */
+            configCalibrationRealHeightSpin->setValue(
+                0
+            );
+
+            configCalibrationMinLabel->setText(
+                "Encoder mínimo: ---"
+            );
+
+            configCalibrationMaxLabel->setText(
+                "Encoder máximo: ---"
+            );
+
+            configCalibrationPositionLabel->setText(
+                "Posición relativa: SIN REFERENCIA"
+            );
+
+            configCalibrationPointsLabel->setText(
+                "Puntos de calibración: ninguno"
+            );
+
+            configCalibrationStateLabel->setText(
+                "Estado: SIN CALIBRAR"
+            );
+
+            /*
+             * Guardar inmediatamente el borrado
+             * en hagie_config.ini.
+             */
+            saveConfiguration();
+        }
+    );
+
+
     QVBoxLayout *bodiesPageLayout =
         new QVBoxLayout(
             bodiesPage
+
         );
 
 
@@ -5587,7 +6490,7 @@ QWidget *MainWindow::createConfigurationPage()
         rearRgbCamerasTitle
     );
 
-        QHBoxLayout *rearRgbCameraSelectorLayout =
+    QHBoxLayout *rearRgbCameraSelectorLayout =
         new QHBoxLayout();
 
     QLabel *rearRgbCameraSelectorLabel =
@@ -6123,6 +7026,10 @@ QWidget *MainWindow::createConfigurationPage()
         tasselVerificationPage
     );
 
+        configurationStack->addWidget(
+        calibrationPage
+    );
+
     QPushButton *generalButton =
     new QPushButton(
         "GENERAL"
@@ -6158,6 +7065,11 @@ QWidget *MainWindow::createConfigurationPage()
             "VERIFICACIÓN PANOJAS"
         );
 
+    QPushButton *calibrationButton =
+        new QPushButton(
+            "CALIBRACIÓN"
+        );
+
 
     generalButton->setMinimumHeight(50);
     bodiesButton->setMinimumHeight(50);
@@ -6165,38 +7077,18 @@ QWidget *MainWindow::createConfigurationPage()
     rearRgbCamerasButton->setMinimumHeight(50);
     regionsButton->setMinimumHeight(50);
     controlButton->setMinimumHeight(50);
-        tasselVerificationButton->setMinimumHeight(
-        50
-    );
+    tasselVerificationButton->setMinimumHeight(50);
+    calibrationButton->setMinimumHeight(50);
 
 
-    configurationMenuLayout->addWidget(
-        generalButton
-    );
-
-    configurationMenuLayout->addWidget(
-        bodiesButton
-    );
-
-    configurationMenuLayout->addWidget(
-        camerasButton
-    );
-
-    configurationMenuLayout->addWidget(
-        rearRgbCamerasButton
-    );
-
-    configurationMenuLayout->addWidget(
-        regionsButton
-    );
-
-    configurationMenuLayout->addWidget(
-        controlButton
-    );
-
-    configurationMenuLayout->addWidget(
-        tasselVerificationButton
-    );
+    configurationMenuLayout->addWidget(generalButton);
+    configurationMenuLayout->addWidget(bodiesButton);
+    configurationMenuLayout->addWidget(camerasButton);
+    configurationMenuLayout->addWidget(rearRgbCamerasButton);
+    configurationMenuLayout->addWidget(regionsButton);
+    configurationMenuLayout->addWidget(controlButton);
+    configurationMenuLayout->addWidget(tasselVerificationButton);
+    configurationMenuLayout->addWidget(calibrationButton);
 
     configurationMenuLayout->addStretch();
 
@@ -6272,7 +7164,7 @@ QWidget *MainWindow::createConfigurationPage()
         }
     );
 
-        connect(
+    connect(
         tasselVerificationButton,
         &QPushButton::clicked,
         this,
@@ -6280,6 +7172,18 @@ QWidget *MainWindow::createConfigurationPage()
         {
             configurationStack->setCurrentIndex(
                 6
+            );
+        }
+    );
+
+    connect(
+        calibrationButton,
+        &QPushButton::clicked,
+        this,
+        [configurationStack]()
+        {
+            configurationStack->setCurrentIndex(
+                7
             );
         }
     );
@@ -10308,6 +11212,72 @@ void MainWindow::updateDashboard()
     {
         return;
     }
+    /*
+    * ============================================================
+    * HISTORIAL DE ALTURA 3D
+    * ============================================================
+    *
+    * Guardamos únicamente mediciones nuevas.
+    *
+    * El timestamp permite evitar duplicar la misma muestra
+    * aunque updateDashboard() se ejecute varias veces.
+    */
+    for (std::size_t body = 0;
+        body < HagieState::BODY_COUNT;
+        ++body)
+    {
+        HagieState::BodyState bodyState =
+            state->getBodyState(body);
+
+        if (!bodyState.vision_valid ||
+            bodyState.vision_timestamp_ms == 0)
+        {
+            continue;
+        }
+
+        if (bodyState.vision_timestamp_ms ==
+            lastVisionHistoryTimestamp[body])
+        {
+            continue;
+        }
+
+        VisionHeightSample sample;
+
+        sample.height_mm =
+            bodyState.vision_height_mm;
+
+        sample.timestamp_ms =
+            bodyState.vision_timestamp_ms;
+
+        sample.valid =
+            true;
+
+        visionHeightHistory[body].push_back(
+            sample
+        );
+
+        lastVisionHistoryTimestamp[body] =
+            bodyState.vision_timestamp_ms;
+
+
+        /*
+        * Por ahora limitamos el historial a 10 segundos.
+        *
+        * Más adelante la selección real dependerá
+        * de velocidad y distancia recorrida.
+        */
+        const uint64_t minimumTimestamp =
+            bodyState.vision_timestamp_ms > 10000
+                ? bodyState.vision_timestamp_ms - 10000
+                : 0;
+
+        while (!visionHeightHistory[body].empty() &&
+            visionHeightHistory[body].front().timestamp_ms <
+                minimumTimestamp)
+        {
+            visionHeightHistory[body].pop_front();
+        }
+    }
 
     /*
     * ============================================================
@@ -10341,14 +11311,31 @@ void MainWindow::updateDashboard()
             * Calcular objetivo exactamente mediante
             * HeightTargetController.
             */
-            HeightTargetController::TargetResult
-                targetResult =
-                    heightTargetController
-                        ->calculateTarget(
-                            body,
-                            bodyState.vision_height_mm,
-                            bodyState.vision_valid
-                        );
+            const uint64_t nowMs =
+            static_cast<uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now()
+                            .time_since_epoch()
+                    ).count()
+            );
+
+        VisionHeightSample delayedSample =
+            getDelayedVisionSample(
+                body,
+                nowMs
+            );
+
+           
+
+        HeightTargetController::TargetResult
+            targetResult =
+                heightTargetController
+                    ->calculateTarget(
+                        body,
+                        delayedSample.height_mm,
+                        delayedSample.valid
+                    );
 
 
             if (!targetResult.valid)
@@ -10506,6 +11493,171 @@ void MainWindow::updateDashboard()
                         16
                     )
             );
+        }
+    }
+
+    
+    /*
+    * ========================================================
+    * CALIBRACIÓN - LECTURA EN VIVO DEL CUERPO SELECCIONADO
+    * ========================================================
+    */
+    if (configCalibrationBodyCombo != nullptr &&
+        configCalibrationEncoderLabel != nullptr &&
+        configCalibrationPositionLabel != nullptr &&
+        configCalibrationMinLabel != nullptr &&
+        configCalibrationMaxLabel != nullptr &&
+        configCalibrationStateLabel != nullptr)
+    {
+        const std::size_t body =
+            currentCalibrationBody;
+
+        if (body < HagieState::BODY_COUNT)
+        {
+            const HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+            const BodyCalibration &cal =
+                bodyCalibration[body];
+
+            /*
+            * Lectura actual del encoder.
+            */
+            configCalibrationEncoderLabel->setText(
+                QString(
+                    "Encoder bruto: %1 pulsos"
+                ).arg(
+                    bodyState.encoder_raw_count
+                )
+            );
+
+            /*
+            * Estado SIN REFERENCIA.
+            */
+            if (!cal.referenced)
+            {
+                configCalibrationPositionLabel->setText(
+                    "Posición relativa: SIN REFERENCIA"
+                );
+
+                configCalibrationMinLabel->setText(
+                    "Encoder mínimo: ---"
+                );
+
+                configCalibrationMaxLabel->setText(
+                    "Encoder máximo: ---"
+                );
+
+                configCalibrationStateLabel->setText(
+                    "Estado: SIN CALIBRAR"
+                );
+
+                configCalibrationCalculatedHeightLabel->setText(
+                    "Altura calculada: --- mm"
+                );
+            }
+
+            /*
+            * Estado REFERENCIADO pero todavía
+            * sin máximo guardado.
+            */
+            else if (!cal.calibrated)
+            {
+                const int64_t relativePosition =
+                    bodyState.encoder_raw_count -
+                    cal.encoderZero;
+
+                configCalibrationPositionLabel->setText(
+                    QString(
+                        "Posición relativa: %1 pulsos"
+                    ).arg(
+                        relativePosition
+                    )
+                );
+
+                configCalibrationMinLabel->setText(
+                    QString(
+                        "Encoder mínimo: %1"
+                    ).arg(
+                        cal.encoderZero
+                    )
+                );
+
+                configCalibrationMaxLabel->setText(
+                    "Encoder máximo: ---"
+                );
+
+                configCalibrationStateLabel->setText(
+                    "Estado: REFERENCIADO"
+                );
+
+                configCalibrationCalculatedHeightLabel->setText(
+                    "Altura calculada: --- mm"
+                );
+            }
+
+            /*
+            * Estado completamente CALIBRADO.
+            */
+            else
+            {
+                const int64_t relativePosition =
+                    bodyState.encoder_raw_count -
+                    cal.encoderZero;
+
+                configCalibrationPositionLabel->setText(
+                    QString(
+                        "Posición relativa: %1 pulsos"
+                    ).arg(
+                        relativePosition
+                    )
+                );
+
+                double calculatedHeightMm = 0.0;
+
+                if (interpolateCalibrationHeight(
+                        body,
+                        relativePosition,
+                        calculatedHeightMm))
+                {
+                    configCalibrationCalculatedHeightLabel->setText(
+                        QString(
+                            "Altura calculada: %1 mm"
+                        ).arg(
+                            calculatedHeightMm,
+                            0,
+                            'f',
+                            1
+                        )
+                    );
+                }
+                else
+                {
+                    configCalibrationCalculatedHeightLabel->setText(
+                        "Altura calculada: --- mm"
+                    );
+                }
+
+                configCalibrationMinLabel->setText(
+                    QString(
+                        "Encoder mínimo: %1"
+                    ).arg(
+                        cal.encoderZero
+                    )
+                );
+
+                configCalibrationMaxLabel->setText(
+                    QString(
+                        "Encoder máximo: %1"
+                    ).arg(
+                        cal.encoderMaximum
+                    )
+                );
+
+                configCalibrationStateLabel->setText(
+                    "Estado: CALIBRADO"
+                );
+            }
         }
     }
 
@@ -11649,6 +12801,85 @@ void MainWindow::applyVisionBodyRegions()
         );
     }
 }
+
+double MainWindow::getForwardSpeedKmh() const
+{
+    if (configTasselSpeedSpin == nullptr)
+    {
+        return 0.0;
+    }
+
+    return configTasselSpeedSpin->value();
+}
+
+MainWindow::VisionHeightSample
+MainWindow::getDelayedVisionSample(
+    std::size_t body,
+    uint64_t nowMs) const
+{
+    VisionHeightSample result;
+
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return result;
+    }
+
+    const double speedKmh =
+        getForwardSpeedKmh();
+
+    if (speedKmh <= 0.0)
+    {
+        return result;
+    }
+
+    constexpr double CAMERA_TO_BODY_DISTANCE_MM =
+        300.0;
+
+    const double speedMmPerMs =
+        speedKmh / 3.6;
+
+    const double delayMs =
+        CAMERA_TO_BODY_DISTANCE_MM /
+        speedMmPerMs;
+
+    const uint64_t delayMsRounded =
+        static_cast<uint64_t>(
+            qRound(delayMs)
+        );
+
+    if (nowMs < delayMsRounded)
+    {
+        return result;
+    }
+
+    const uint64_t desiredTimestamp =
+        nowMs - delayMsRounded;
+
+    const auto& history =
+        visionHeightHistory[body];
+
+    if (history.empty())
+    {
+        return result;
+    }
+
+    /*
+     * Buscar la muestra más reciente que ya haya
+     * llegado físicamente a la posición del cuerpo.
+     */
+    for (auto it = history.rbegin();
+         it != history.rend();
+         ++it)
+    {
+        if (it->timestamp_ms <= desiredTimestamp)
+        {
+            return *it;
+        }
+    }
+
+    return result;
+}
+
 void MainWindow::updateTasselVerificationTiming()
 {
     if (configTasselSpeedSpin == nullptr ||
@@ -11661,7 +12892,7 @@ void MainWindow::updateTasselVerificationTiming()
     }
 
     const double speedKmh =
-        configTasselSpeedSpin->value();
+        getForwardSpeedKmh();
 
     const double distanceMm =
         static_cast<double>(
@@ -11788,6 +13019,136 @@ bool MainWindow::systemReadyForAuto() const
     return true;
 }
 
+bool MainWindow::interpolateCalibrationHeight(
+    std::size_t body,
+    int64_t encoderPosition,
+    double &heightMm
+) const
+{
+    /*
+     * Verificar cuerpo válido.
+     */
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return false;
+    }
+
+    const BodyCalibration &cal =
+        bodyCalibration[body];
+
+    /*
+     * Necesitamos como mínimo dos puntos
+     * para poder interpolar.
+     */
+    if (cal.points.size() < 2)
+    {
+        return false;
+    }
+
+    /*
+     * Buscar el punto inmediatamente inferior
+     * y el inmediatamente superior a la
+     * posición actual del encoder.
+     *
+     * No importa en qué orden fueron
+     * guardados los puntos.
+     */
+    const CalibrationPoint *lowerPoint =
+        nullptr;
+
+    const CalibrationPoint *upperPoint =
+        nullptr;
+
+    for (const CalibrationPoint &point :
+         cal.points)
+    {
+        if (point.encoderPosition <=
+            encoderPosition)
+        {
+            if (lowerPoint == nullptr ||
+                point.encoderPosition >
+                    lowerPoint->encoderPosition)
+            {
+                lowerPoint =
+                    &point;
+            }
+        }
+
+        if (point.encoderPosition >=
+            encoderPosition)
+        {
+            if (upperPoint == nullptr ||
+                point.encoderPosition <
+                    upperPoint->encoderPosition)
+            {
+                upperPoint =
+                    &point;
+            }
+        }
+    }
+
+    /*
+     * Estamos fuera del rango realmente
+     * medido con puntos de calibración.
+     */
+    if (lowerPoint == nullptr ||
+        upperPoint == nullptr)
+    {
+        return false;
+    }
+
+    /*
+     * Si estamos exactamente sobre un
+     * punto conocido, no hace falta
+     * interpolar.
+     */
+    if (lowerPoint->encoderPosition ==
+        upperPoint->encoderPosition)
+    {
+        heightMm =
+            static_cast<double>(
+                lowerPoint->realHeightMm
+            );
+
+        return true;
+    }
+
+    /*
+     * Interpolación lineal entre los dos
+     * puntos que rodean la posición actual.
+     */
+    const double x0 =
+        static_cast<double>(
+            lowerPoint->encoderPosition
+        );
+
+    const double x1 =
+        static_cast<double>(
+            upperPoint->encoderPosition
+        );
+
+    const double y0 =
+        static_cast<double>(
+            lowerPoint->realHeightMm
+        );
+
+    const double y1 =
+        static_cast<double>(
+            upperPoint->realHeightMm
+        );
+
+    const double x =
+        static_cast<double>(
+            encoderPosition
+        );
+
+    heightMm =
+        y0 +
+        ((x - x0) / (x1 - x0)) *
+        (y1 - y0);
+
+    return true;
+}
 
 void MainWindow::saveConfiguration()
 {
@@ -11799,6 +13160,25 @@ void MainWindow::saveConfiguration()
     qInfo()
     << "CONFIG FILE REAL:"
     << settings.fileName();
+
+
+    /*
+    * ========================================================
+    * Guardar el valor actualmente visible de altura medida
+    * ========================================================
+    *
+    * El valor del QSpinBox normalmente se guarda al cambiar
+    * de cuerpo. Si el usuario pulsa GUARDAR CONFIGURACIÓN
+    * sin cambiar de cuerpo, debemos copiarlo primero.
+    */
+    if (configCalibrationRealHeightSpin != nullptr &&
+        currentCalibrationBody < HagieState::BODY_COUNT)
+    {
+        bodyCalibration[
+            currentCalibrationBody
+        ].currentRealHeightMm =
+            configCalibrationRealHeightSpin->value();
+    }
 
         /*
      * ========================================================
@@ -11899,6 +13279,83 @@ void MainWindow::saveConfiguration()
             "vision_region_min_points",
             configVisionRegionMinPoints[body]->value()
         );
+
+        settings.setValue(
+            "CalibrationReferenced",
+            bodyCalibration[body].referenced
+        );
+
+        settings.setValue(
+            "CalibrationCalibrated",
+            bodyCalibration[body].calibrated
+        );
+
+        settings.setValue(
+            "CalibrationEncoderZero",
+            static_cast<qlonglong>(
+                bodyCalibration[body].encoderZero
+            )
+        );
+
+        settings.setValue(
+            "CalibrationEncoderMaximum",
+            static_cast<qlonglong>(
+                bodyCalibration[body].encoderMaximum
+            )
+        );
+
+        settings.setValue(
+            "CalibrationRealMinimumHeightMm",
+            bodyCalibration[body].realMinimumHeightMm
+        );
+
+        settings.setValue(
+            "CalibrationRealMaximumHeightMm",
+            bodyCalibration[body].realMaximumHeightMm
+        );
+
+        settings.setValue(
+            "CalibrationCurrentRealHeightMm",
+            bodyCalibration[body].currentRealHeightMm
+        );
+
+        
+
+        /*
+        * ========================================================
+        * PUNTOS DE CALIBRACIÓN ENCODER <-> ALTURA REAL
+        * ========================================================
+        */
+
+        settings.beginWriteArray(
+            "calibration_points"
+        );
+
+        const BodyCalibration &cal =
+            bodyCalibration[body];
+
+        for (std::size_t i = 0;
+            i < cal.points.size();
+            ++i)
+        {
+            settings.setArrayIndex(
+                static_cast<int>(i)
+            );
+
+            settings.setValue(
+                "encoder_position",
+                static_cast<qlonglong>(
+                    cal.points[i].encoderPosition
+                )
+            );
+
+            settings.setValue(
+                "real_height_mm",
+                cal.points[i].realHeightMm
+            );
+        }
+
+        settings.endArray();
 
         settings.endGroup();
     }
@@ -12451,10 +13908,102 @@ void MainWindow::loadConfiguration()
                 ->setCurrentIndex(index);
         }
 
-        
+        bodyCalibration[body].referenced =
+            settings.value(
+                "CalibrationReferenced",
+                false
+            ).toBool();
+
+        bodyCalibration[body].calibrated =
+            settings.value(
+                "CalibrationCalibrated",
+                false
+            ).toBool();
+
+        bodyCalibration[body].encoderZero =
+            settings.value(
+                "CalibrationEncoderZero",
+                0
+            ).toLongLong();
+
+        bodyCalibration[body].encoderMaximum =
+            settings.value(
+                "CalibrationEncoderMaximum",
+                0
+            ).toLongLong();
+
+        bodyCalibration[body].realMinimumHeightMm =
+            settings.value(
+                "CalibrationRealMinimumHeightMm",
+                0
+            ).toInt();
+
+        bodyCalibration[body].realMaximumHeightMm =
+            settings.value(
+                "CalibrationRealMaximumHeightMm",
+                0
+            ).toInt();
+
+        /*
+        * ========================================================
+        * ALTURA MANUAL ACTUAL DEL CUERPO
+        * ========================================================
+        */
+        bodyCalibration[body].currentRealHeightMm =
+            settings.value(
+                "CalibrationCurrentRealHeightMm",
+                0
+            ).toInt();
+
+        /*
+        * ========================================================
+        * PUNTOS DE CALIBRACIÓN
+        * Encoder relativo <-> altura real
+        * ========================================================
+        */
+
+        /*
+        * Limpiar primero para evitar duplicar puntos
+        * si loadConfiguration() se ejecuta nuevamente.
+        */
+        bodyCalibration[body].points.clear();
+
+        const int pointCount =
+            settings.beginReadArray(
+                "calibration_points"
+            );
+
+        for (int i = 0;
+            i < pointCount;
+            ++i)
+        {
+            settings.setArrayIndex(i);
+
+            CalibrationPoint point;
+
+            point.encoderPosition =
+                settings.value(
+                    "encoder_position",
+                    0
+                ).toLongLong();
+
+            point.realHeightMm =
+                settings.value(
+                    "real_height_mm",
+                    0
+                ).toInt();
+
+            bodyCalibration[body].points.push_back(
+                point
+            );
+        }
+
+        settings.endArray();
 
         settings.endGroup();
     }
+
+   
 
     applyVisionBodyRegions();
 
@@ -13073,6 +14622,62 @@ void MainWindow::loadConfiguration()
                     ]
                 )
             );
+        }
+
+        /*
+        * ========================================================
+        * REFRESCAR CALIBRACIÓN DEL CUERPO ACTUAL
+        * ========================================================
+        *
+        * Al iniciar, CUERPO 1 ya está seleccionado y por eso
+        * currentIndexChanged no necesariamente se dispara.
+        * Mostramos directamente los datos ya cargados del INI.
+        */
+        if (configCalibrationBodyCombo != nullptr &&
+            configCalibrationRealHeightSpin != nullptr &&
+            configCalibrationPointsLabel != nullptr)
+        {
+            int index =
+                configCalibrationBodyCombo->currentIndex();
+
+            if (index < 0 ||
+                index >= static_cast<int>(
+                    HagieState::BODY_COUNT
+                ))
+            {
+                index = 0;
+            }
+
+            currentCalibrationBody =
+                static_cast<std::size_t>(
+                    index
+                );
+
+            const BodyCalibration &cal =
+                bodyCalibration[
+                    currentCalibrationBody
+                ];
+
+            configCalibrationRealHeightSpin->setValue(
+                cal.currentRealHeightMm
+            );
+
+            if (cal.points.empty())
+            {
+                configCalibrationPointsLabel->setText(
+                    "Puntos de calibración: ninguno"
+                );
+            }
+            else
+            {
+                configCalibrationPointsLabel->setText(
+                    QString(
+                        "Puntos de calibración: %1"
+                    ).arg(
+                        cal.points.size()
+                    )
+                );
+            }
         }
     }
 

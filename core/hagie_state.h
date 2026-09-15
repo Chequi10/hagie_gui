@@ -26,6 +26,29 @@ public:
          */
         uint16_t height_mm = 0;
 
+                /*
+         * Conteo bruto recibido del encoder.
+         *
+         * Unidad: pulsos.
+         *
+         * Se conserva separado de height_mm para poder
+         * realizar calibración multipunto sin perder
+         * la altura calculada actualmente por STM32.
+         */
+        int64_t encoder_raw_count = 0;
+
+
+        /*
+         * Final de carrera / sensor inductivo inferior.
+         */
+        bool lower_limit_active = false;
+
+
+        /*
+         * Final de carrera / sensor inductivo superior.
+         */
+        bool upper_limit_active = false;
+
 
         /*
          * Objetivo actual enviado al control.
@@ -165,6 +188,23 @@ public:
     void setBodyHeight(
         std::size_t body,
         uint16_t height_mm
+    );
+
+        void setBodyEncoderRawCount(
+        std::size_t body,
+        int64_t encoder_raw_count
+    );
+
+
+    void setBodyLowerLimitActive(
+        std::size_t body,
+        bool active
+    );
+
+
+    void setBodyUpperLimitActive(
+        std::size_t body,
+        bool active
     );
 
 

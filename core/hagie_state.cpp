@@ -29,6 +29,65 @@ void HagieState::setBodyHeight(
         height_mm;
 }
 
+void HagieState::setBodyEncoderRawCount(
+    std::size_t body,
+    int64_t encoder_raw_count)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].encoder_raw_count =
+        encoder_raw_count;
+}
+
+
+void HagieState::setBodyLowerLimitActive(
+    std::size_t body,
+    bool active)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].lower_limit_active =
+        active;
+}
+
+
+void HagieState::setBodyUpperLimitActive(
+    std::size_t body,
+    bool active)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].upper_limit_active =
+        active;
+}
+
 
 void HagieState::setBodyTarget(
     std::size_t body,

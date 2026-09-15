@@ -32,6 +32,17 @@ public:
         std::array<uint16_t, BODY_COUNT> height_mm {};
     };
 
+        /*
+     * Posición bruta acumulada de los encoders
+     * recibida desde STM32 mediante OPCODE 'M'.
+     *
+     * Unidad: pulsos.
+     */
+    struct encoder_raw_state
+    {
+        std::array<int64_t, BODY_COUNT> position {};
+    };
+
     struct config_ack
     {
         uint8_t subcommand = 0;
@@ -107,6 +118,9 @@ public:
     using encoder_callback =
         std::function<void(const encoder_state&)>;
 
+    using encoder_raw_callback =
+        std::function<void(const encoder_raw_state&)>;
+
     using valve_callback =
         std::function<void(const valve_state&)>;
 
@@ -152,6 +166,10 @@ public:
 
     void set_encoder_callback(
         encoder_callback callback
+    );
+
+    void set_encoder_raw_callback(
+        encoder_raw_callback callback
     );
 
     void set_valve_callback(
@@ -367,6 +385,8 @@ private:
     // ============================================================
 
     encoder_callback on_encoder;
+
+    encoder_raw_callback on_encoder_raw;
 
     valve_callback on_valve;
 

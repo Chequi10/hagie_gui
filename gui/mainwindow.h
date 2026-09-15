@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <array>
 #include <chrono>
+#include <deque>
 #include <cstdint>
 #include <QCheckBox>
 #include <vector>
@@ -549,6 +550,101 @@ private:
     > configEncoderDirectionCombo {};
 
 
+        // ========================================================
+    // CALIBRACIÓN DE CUERPOS / ENCODERS
+    // ========================================================
+
+    QComboBox *configCalibrationBodyCombo =
+        nullptr;
+
+    QLabel *configCalibrationEncoderLabel =
+        nullptr;
+
+    QLabel *configCalibrationPositionLabel =
+        nullptr;
+
+    QLabel *configCalibrationCalculatedHeightLabel =
+        nullptr;
+
+    QLabel *configCalibrationLowerSensorLabel =
+        nullptr;
+
+    QLabel *configCalibrationUpperSensorLabel =
+        nullptr;
+
+    QLabel *configCalibrationStateLabel =
+        nullptr;
+
+    QLabel *configCalibrationMessageLabel =
+         nullptr;
+
+    QLabel *configCalibrationMinLabel =
+        nullptr;
+
+    QLabel *configCalibrationMaxLabel =
+        nullptr;
+
+    QPushButton *configCalibrationSetZeroButton =
+        nullptr;
+
+    QPushButton *configCalibrationSetMaxButton =
+        nullptr;
+
+    QSpinBox *configCalibrationRealHeightSpin =
+        nullptr;
+
+    QPushButton *configCalibrationAddPointButton =
+        nullptr;
+
+    QPushButton *configCalibrationClearButton =
+        nullptr;
+
+    QLabel *configCalibrationPointsLabel =
+        nullptr;
+
+
+   struct CalibrationPoint
+    {
+        int64_t encoderPosition = 0;
+        int realHeightMm = 0;
+    };
+
+    struct BodyCalibration
+    {
+        bool referenced = false;
+
+        bool calibrated = false;
+
+        int64_t encoderZero = 0;
+
+        int64_t encoderMaximum = 0;
+
+        int realMinimumHeightMm = 0;
+
+        int realMaximumHeightMm = 0;
+
+        int currentRealHeightMm = 0;
+
+        std::vector<CalibrationPoint> points;
+    };
+
+
+    std::array<
+        BodyCalibration,
+        HagieState::BODY_COUNT
+    > bodyCalibration {};
+
+
+    std::size_t currentCalibrationBody =
+        0;
+
+    bool interpolateCalibrationHeight(
+        std::size_t body,
+        int64_t encoderPosition,
+        double &heightMm
+    ) const;    
+
+
     // ========================================================
     // CONFIGURACIÓN GLOBAL
     // ========================================================
@@ -764,6 +860,23 @@ private:
         HagieState::BODY_COUNT
     > testVisionAutoEnabled {};
 
+    struct VisionHeightSample
+        {
+            uint16_t height_mm = 0;
+            uint64_t timestamp_ms = 0;
+            bool valid = false;
+        };
+
+    std::array<
+        std::deque<VisionHeightSample>,
+        HagieState::BODY_COUNT
+    > visionHeightHistory {};
+
+    std::array<
+        uint64_t,
+        HagieState::BODY_COUNT
+    > lastVisionHistoryTimestamp {};
+
     // ========================================================
     // CÁMARAS RGB
     // ========================================================
@@ -804,7 +917,22 @@ private:
     );
     void updateCameraPage();
 
+    /*
+    * Velocidad longitudinal de avance de la máquina.
+    *
+    * Actualmente proviene del valor configurado
+    * manualmente en la GUI.
+    *
+    * Más adelante esta misma función utilizará
+    * la velocidad real medida mediante la
+    * rueda dentada + sensor inductivo.
+    */
+    double getForwardSpeedKmh() const;
 
+    VisionHeightSample getDelayedVisionSample(
+        std::size_t body,
+        uint64_t nowMs
+    ) const;
 
 
     // ========================================================
