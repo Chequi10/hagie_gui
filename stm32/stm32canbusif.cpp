@@ -119,6 +119,12 @@ void stm32canbus_serialif::set_encoder_raw_callback(
     on_encoder_raw = std::move(callback);
 }
 
+void stm32canbus_serialif::set_limit_sensor_callback(
+    limit_sensor_callback callback)
+{
+    on_limit_sensor = std::move(callback);
+}
+
 
 void stm32canbus_serialif::set_valve_callback(
     valve_callback callback)
@@ -317,6 +323,52 @@ void stm32canbus_serialif::handle_packet(
             if (on_encoder_raw)
             {
                 on_encoder_raw(state);
+            }
+
+            break;
+        }
+
+
+                // ----------------------------------------------------
+        // 'N' - Sensores de límite de los 6 cuerpos
+        // ----------------------------------------------------
+
+        case 'N':
+        {
+            /*
+             * [0] = 'N'
+             * [1] = sensores inferiores, bits 0..5
+             * [2] = sensores superiores, bits 0..5
+             */
+            if (n != 3)
+            {
+                return;
+            }
+
+            limit_sensor_state state;
+
+            const uint8_t lowerMask = payload[1];
+            const uint8_t upperMask = payload[2];
+
+            for (std::size_t body = 0;
+                 body < BODY_COUNT;
+                 ++body)
+            {
+                const uint8_t mask =
+                    static_cast<uint8_t>(
+                        1U << body
+                    );
+
+                state.lower[body] =
+                    (lowerMask & mask) != 0;
+
+                state.upper[body] =
+                    (upperMask & mask) != 0;
+            }
+
+            if (on_limit_sensor)
+            {
+                on_limit_sensor(state);
             }
 
             break;

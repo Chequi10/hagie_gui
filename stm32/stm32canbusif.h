@@ -43,6 +43,19 @@ public:
         std::array<int64_t, BODY_COUNT> position {};
     };
 
+        /*
+     * Estado de los sensores de límite
+     * recibido desde STM32 mediante OPCODE 'N'.
+     *
+     * false = sensor libre
+     * true  = sensor activo
+     */
+    struct limit_sensor_state
+    {
+        std::array<bool, BODY_COUNT> lower {};
+        std::array<bool, BODY_COUNT> upper {};
+    };
+
     struct config_ack
     {
         uint8_t subcommand = 0;
@@ -121,6 +134,9 @@ public:
     using encoder_raw_callback =
         std::function<void(const encoder_raw_state&)>;
 
+    using limit_sensor_callback =
+        std::function<void(const limit_sensor_state&)>;
+
     using valve_callback =
         std::function<void(const valve_state&)>;
 
@@ -170,6 +186,10 @@ public:
 
     void set_encoder_raw_callback(
         encoder_raw_callback callback
+    );
+
+    void set_limit_sensor_callback(
+        limit_sensor_callback callback
     );
 
     void set_valve_callback(
@@ -387,6 +407,8 @@ private:
     encoder_callback on_encoder;
 
     encoder_raw_callback on_encoder_raw;
+
+    limit_sensor_callback on_limit_sensor;
 
     valve_callback on_valve;
 

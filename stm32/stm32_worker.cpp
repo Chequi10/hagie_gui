@@ -1529,6 +1529,38 @@ void STM32Worker::configureCallbacks()
     );
 
 
+        // --------------------------------------------------------
+    // SENSORES DE LÍMITE
+    // --------------------------------------------------------
+
+    stm32->set_limit_sensor_callback(
+        [this](
+            const stm32canbus_serialif::limit_sensor_state&
+                limitState)
+        {
+            if (state == nullptr)
+            {
+                return;
+            }
+
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                state->setBodyLowerLimitActive(
+                    body,
+                    limitState.lower[body]
+                );
+
+                state->setBodyUpperLimitActive(
+                    body,
+                    limitState.upper[body]
+                );
+            }
+        }
+    );
+
+
     // --------------------------------------------------------
     // VÁLVULAS
     // --------------------------------------------------------

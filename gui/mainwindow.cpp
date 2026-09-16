@@ -11212,6 +11212,9 @@ void MainWindow::updateDashboard()
     {
         return;
     }
+
+    const HagieState::SystemState systemState =
+    state->getSystemState();
     /*
     * ============================================================
     * HISTORIAL DE ALTURA 3D
@@ -11519,6 +11522,38 @@ void MainWindow::updateDashboard()
 
             const BodyCalibration &cal =
                 bodyCalibration[body];
+
+
+            /*
+             * Sensores de límite.
+             *
+             * Solamente mostramos su estado cuando
+             * existe comunicación con la STM32.
+             */
+            if (systemState.stm32_connected)
+            {
+                configCalibrationLowerSensorLabel->setText(
+                    bodyState.lower_limit_active
+                        ? "SENSOR INFERIOR: ACTIVO"
+                        : "SENSOR INFERIOR: LIBRE"
+                );
+
+                configCalibrationUpperSensorLabel->setText(
+                    bodyState.upper_limit_active
+                        ? "SENSOR SUPERIOR: ACTIVO"
+                        : "SENSOR SUPERIOR: LIBRE"
+                );
+            }
+            else
+            {
+                configCalibrationLowerSensorLabel->setText(
+                    "SENSOR INFERIOR: SIN DATOS"
+                );
+
+                configCalibrationUpperSensorLabel->setText(
+                    "SENSOR SUPERIOR: SIN DATOS"
+                );
+            }    
 
             /*
             * Lectura actual del encoder.
