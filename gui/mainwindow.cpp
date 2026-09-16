@@ -11534,13 +11534,13 @@ void MainWindow::updateDashboard()
             {
                 configCalibrationLowerSensorLabel->setText(
                     bodyState.lower_limit_active
-                        ? "SENSOR INFERIOR: ACTIVO"
+                        ? "SENSOR INFERIOR: ACTIVO - BAJADA BLOQUEADA"
                         : "SENSOR INFERIOR: LIBRE"
                 );
 
                 configCalibrationUpperSensorLabel->setText(
                     bodyState.upper_limit_active
-                        ? "SENSOR SUPERIOR: ACTIVO"
+                        ? "SENSOR SUPERIOR: ACTIVO - SUBIDA BLOQUEADA"
                         : "SENSOR SUPERIOR: LIBRE"
                 );
             }
