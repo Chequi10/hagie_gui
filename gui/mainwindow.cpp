@@ -6102,6 +6102,25 @@ QWidget *MainWindow::createConfigurationPage()
             BodyCalibration &cal =
                 bodyCalibration[body];
 
+
+                            const HagieState::SystemState systemState =
+                state->getSystemState();
+
+            /*
+             * Con STM32 real conectada, la referencia
+             * mecánica solamente puede fijarse cuando
+             * el sensor inferior está activo.
+             */
+            if (systemState.stm32_connected &&
+                !bodyState.lower_limit_active)
+            {
+                configCalibrationMessageLabel->setText(
+                    "Mensaje: LLEVAR EL CUERPO AL SENSOR INFERIOR"
+                );
+
+                return;
+            }
+
             /*
              * Guardamos la posición actual
              * como referencia mecánica.
