@@ -43,6 +43,18 @@ public:
         std::array<int64_t, BODY_COUNT> position {};
     };
 
+    /*
+    * Posición relativa de los encoders respecto
+    * del HOMING actual, recibida desde STM32
+    * mediante OPCODE 'O'.
+    *
+    * Unidad: pulsos.
+    */
+    struct encoder_relative_state
+    {
+        std::array<int64_t, BODY_COUNT> position {};
+    };
+
         /*
      * Estado de los sensores de límite
      * recibido desde STM32 mediante OPCODE 'N'.
@@ -54,6 +66,7 @@ public:
     {
         std::array<bool, BODY_COUNT> lower {};
         std::array<bool, BODY_COUNT> upper {};
+        std::array<bool, BODY_COUNT> referenced {};
     };
 
     struct config_ack
@@ -134,6 +147,9 @@ public:
     using encoder_raw_callback =
         std::function<void(const encoder_raw_state&)>;
 
+    using encoder_relative_callback =
+        std::function<void(const encoder_relative_state&)>;
+
     using limit_sensor_callback =
         std::function<void(const limit_sensor_state&)>;
 
@@ -186,6 +202,10 @@ public:
 
     void set_encoder_raw_callback(
         encoder_raw_callback callback
+    );
+
+    void set_encoder_relative_callback(
+        encoder_relative_callback callback
     );
 
     void set_limit_sensor_callback(
@@ -407,6 +427,8 @@ private:
     encoder_callback on_encoder;
 
     encoder_raw_callback on_encoder_raw;
+
+    encoder_relative_callback on_encoder_relative;
 
     limit_sensor_callback on_limit_sensor;
 

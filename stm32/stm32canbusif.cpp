@@ -119,6 +119,12 @@ void stm32canbus_serialif::set_encoder_raw_callback(
     on_encoder_raw = std::move(callback);
 }
 
+void stm32canbus_serialif::set_encoder_relative_callback(
+    encoder_relative_callback callback)
+{
+    on_encoder_relative = std::move(callback);
+}
+
 void stm32canbus_serialif::set_limit_sensor_callback(
     limit_sensor_callback callback)
 {
@@ -328,6 +334,56 @@ void stm32canbus_serialif::handle_packet(
             break;
         }
 
+                // ----------------------------------------------------
+        // 'O' - Posición relativa de los 6 encoders
+        //       respecto del HOMING actual
+        // ----------------------------------------------------
+
+        case 'O':
+        {
+            /*
+             * 1 byte opcode +
+             * 6 encoders x 8 bytes = 49 bytes.
+             */
+            if (n != 49)
+            {
+                return;
+            }
+
+            encoder_relative_state state;
+
+            for (std::size_t i = 0;
+                 i < BODY_COUNT;
+                 ++i)
+            {
+                const std::size_t index =
+                    1 + (i * 8);
+
+                uint64_t value = 0;
+
+                for (std::size_t byte = 0;
+                     byte < 8;
+                     ++byte)
+                {
+                    value =
+                        (value << 8) |
+                        static_cast<uint64_t>(
+                            payload[index + byte]
+                        );
+                }
+
+                state.position[i] =
+                    static_cast<int64_t>(value);
+            }
+
+            if (on_encoder_relative)
+            {
+                on_encoder_relative(state);
+            }
+
+            break;
+        }
+
 
                 // ----------------------------------------------------
         // 'N' - Sensores de límite de los 6 cuerpos
@@ -340,7 +396,7 @@ void stm32canbus_serialif::handle_packet(
              * [1] = sensores inferiores, bits 0..5
              * [2] = sensores superiores, bits 0..5
              */
-            if (n != 3)
+            if (n != 4)
             {
                 return;
             }
@@ -349,6 +405,7 @@ void stm32canbus_serialif::handle_packet(
 
             const uint8_t lowerMask = payload[1];
             const uint8_t upperMask = payload[2];
+            const uint8_t referencedMask = payload[3];
 
             for (std::size_t body = 0;
                  body < BODY_COUNT;
@@ -364,6 +421,8 @@ void stm32canbus_serialif::handle_packet(
 
                 state.upper[body] =
                     (upperMask & mask) != 0;
+                state.referenced[body] =
+                    (referencedMask & mask) != 0;    
             }
 
             if (on_limit_sensor)

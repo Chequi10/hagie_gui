@@ -1528,6 +1528,32 @@ void STM32Worker::configureCallbacks()
         }
     );
 
+        // --------------------------------------------------------
+    // ENCODERS - POSICIÓN RELATIVA AL HOMING
+    // --------------------------------------------------------
+
+    stm32->set_encoder_relative_callback(
+        [this](
+            const stm32canbus_serialif::encoder_relative_state&
+                encoderRelativeState)
+        {
+            if (state == nullptr)
+            {
+                return;
+            }
+
+            for (std::size_t body = 0;
+                 body < HagieState::BODY_COUNT;
+                 ++body)
+            {
+                state->setBodyEncoderRelativeCount(
+                    body,
+                    encoderRelativeState.position[body]
+                );
+            }
+        }
+    );
+
 
         // --------------------------------------------------------
     // SENSORES DE LÍMITE
@@ -1555,6 +1581,10 @@ void STM32Worker::configureCallbacks()
                 state->setBodyUpperLimitActive(
                     body,
                     limitState.upper[body]
+                );
+                state->setBodyEncoderReferenced(
+                    body,
+                    limitState.referenced[body]
                 );
             }
         }

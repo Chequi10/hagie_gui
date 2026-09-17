@@ -37,7 +37,15 @@ public:
          */
         int64_t encoder_raw_count = 0;
 
+        /*
+        * Posición del encoder relativa al HOMING
+        * realizado durante el encendido actual.
+        *
+        * Unidad: pulsos.
+        */
+        int64_t encoder_relative_count = 0;
 
+        
         /*
          * Final de carrera / sensor inductivo inferior.
          */
@@ -48,6 +56,12 @@ public:
          * Final de carrera / sensor inductivo superior.
          */
         bool upper_limit_active = false;
+
+        /*
+        * Referencia de posición válida durante
+        * el encendido actual de la STM32.
+        */
+        bool encoder_referenced = false;
 
 
         /*
@@ -190,9 +204,14 @@ public:
         uint16_t height_mm
     );
 
-        void setBodyEncoderRawCount(
+    void setBodyEncoderRawCount(
         std::size_t body,
         int64_t encoder_raw_count
+        );
+
+    void setBodyEncoderRelativeCount(
+        std::size_t body,
+        int64_t encoder_relative_count
     );
 
 
@@ -205,6 +224,11 @@ public:
     void setBodyUpperLimitActive(
         std::size_t body,
         bool active
+    );
+
+    void setBodyEncoderReferenced(
+        std::size_t body,
+        bool referenced
     );
 
 

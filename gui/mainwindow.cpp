@@ -6126,7 +6126,7 @@ QWidget *MainWindow::createConfigurationPage()
              * como referencia mecánica.
              */
             cal.encoderZero =
-                  bodyState.encoder_raw_count;
+                bodyState.encoder_relative_count;
 
             cal.referenced = true;
 
@@ -6196,7 +6196,7 @@ QWidget *MainWindow::createConfigurationPage()
                 state->getBodyState(body);
 
             const int64_t currentEncoder =
-                 bodyState.encoder_raw_count;
+                bodyState.encoder_relative_count;
 
             /*
             * El máximo debe estar por encima
@@ -6275,12 +6275,12 @@ QWidget *MainWindow::createConfigurationPage()
                 state->getBodyState(body);
 
             /*
-            * Posición relativa respecto del
-            * cero mecánico guardado.
+            * Posición relativa al HOMING actual.
+            * La STM32 ya entrega esta posición
+            * referenciada mediante OPCODE 'O'.
             */
             const int64_t encoderPosition =
-                bodyState.encoder_raw_count -
-                cal.encoderZero;
+                bodyState.encoder_relative_count;
 
             /*
             * Para guardar puntos necesitamos tener
@@ -6299,8 +6299,7 @@ QWidget *MainWindow::createConfigurationPage()
             * Recorrido mecánico calibrado.
             */
             const int64_t maximumTravel =
-                cal.encoderMaximum -
-                cal.encoderZero;
+                cal.encoderMaximum;
 
             /*
             * No permitir puntos fuera del
@@ -11602,9 +11601,20 @@ void MainWindow::updateDashboard()
                     "Encoder máximo: ---"
                 );
 
-                configCalibrationStateLabel->setText(
-                    "Estado: SIN CALIBRAR"
-                );
+                if (systemState.stm32_connected)
+                {
+                    configCalibrationStateLabel->setText(
+                        bodyState.encoder_referenced
+                            ? "Estado: SIN CALIBRAR - HOMING COMPLETADO"
+                            : "Estado: SIN CALIBRAR - HOMING REQUERIDO"
+                    );
+                }
+                else
+                {
+                    configCalibrationStateLabel->setText(
+                        "Estado: SIN CALIBRAR - STM32 SIN CONEXIÓN"
+                    );
+                }
 
                 configCalibrationCalculatedHeightLabel->setText(
                     "Altura calculada: --- mm"
@@ -11612,14 +11622,16 @@ void MainWindow::updateDashboard()
             }
 
             /*
-            * Estado REFERENCIADO pero todavía
-            * sin máximo guardado.
+            * Cero de calibración guardado,
+            * pero todavía sin máximo.
+            *
+            * El estado de HOMING actual proviene
+            * de la STM32.
             */
             else if (!cal.calibrated)
             {
                 const int64_t relativePosition =
-                    bodyState.encoder_raw_count -
-                    cal.encoderZero;
+                    bodyState.encoder_relative_count;
 
                 configCalibrationPositionLabel->setText(
                     QString(
@@ -11641,9 +11653,20 @@ void MainWindow::updateDashboard()
                     "Encoder máximo: ---"
                 );
 
-                configCalibrationStateLabel->setText(
-                    "Estado: REFERENCIADO"
-                );
+                if (systemState.stm32_connected)
+                {
+                    configCalibrationStateLabel->setText(
+                        bodyState.encoder_referenced
+                            ? "Estado: HOMING COMPLETADO"
+                            : "Estado: HOMING REQUERIDO"
+                    );
+                }
+                else
+                {
+                    configCalibrationStateLabel->setText(
+                        "Estado: STM32 SIN CONEXIÓN"
+                    );
+                }
 
                 configCalibrationCalculatedHeightLabel->setText(
                     "Altura calculada: --- mm"
@@ -11656,8 +11679,7 @@ void MainWindow::updateDashboard()
             else
             {
                 const int64_t relativePosition =
-                    bodyState.encoder_raw_count -
-                    cal.encoderZero;
+                    bodyState.encoder_relative_count;
 
                 configCalibrationPositionLabel->setText(
                     QString(
@@ -11708,9 +11730,20 @@ void MainWindow::updateDashboard()
                     )
                 );
 
-                configCalibrationStateLabel->setText(
-                    "Estado: CALIBRADO"
-                );
+                if (systemState.stm32_connected)
+                {
+                    configCalibrationStateLabel->setText(
+                        bodyState.encoder_referenced
+                            ? "Estado: CALIBRADO - HOMING COMPLETADO"
+                            : "Estado: CALIBRADO - HOMING REQUERIDO"
+                    );
+                }
+                else
+                {
+                    configCalibrationStateLabel->setText(
+                        "Estado: CALIBRADO - STM32 SIN CONEXIÓN"
+                    );
+                }
             }
         }
     }

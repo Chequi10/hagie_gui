@@ -48,6 +48,23 @@ void HagieState::setBodyEncoderRawCount(
         encoder_raw_count;
 }
 
+void HagieState::setBodyEncoderRelativeCount(
+    std::size_t body,
+    int64_t encoder_relative_count)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+    bodies[body].encoder_relative_count =
+        encoder_relative_count;
+}
+
 
 void HagieState::setBodyLowerLimitActive(
     std::size_t body,
@@ -86,6 +103,25 @@ void HagieState::setBodyUpperLimitActive(
 
     bodies[body].upper_limit_active =
         active;
+}
+
+void HagieState::setBodyEncoderReferenced(
+    std::size_t body,
+    bool referenced)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lock(
+        stateMutex
+    );
+
+
+    bodies[body].encoder_referenced =
+        referenced;
 }
 
 
