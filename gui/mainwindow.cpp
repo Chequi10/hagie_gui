@@ -6042,6 +6042,11 @@ QWidget *MainWindow::createConfigurationPage()
                     ->setText(
                         "Estado: REFERENCIADO"
                     );
+
+                /*
+                * Persistir inmediatamente la nueva referencia.
+                */
+                saveConfiguration();
             }
             else
             {
@@ -6125,8 +6130,7 @@ QWidget *MainWindow::createConfigurationPage()
              * Guardamos la posición actual
              * como referencia mecánica.
              */
-            cal.encoderZero =
-                bodyState.encoder_relative_count;
+            cal.encoderZero = 0;
 
             cal.referenced = true;
 
@@ -6159,6 +6163,10 @@ QWidget *MainWindow::createConfigurationPage()
             configCalibrationStateLabel->setText(
                 "Estado: REFERENCIADO"
             );
+            /*
+            * Persistir inmediatamente la nueva referencia.
+            */
+            saveConfiguration();
         }
     );
 
@@ -6195,6 +6203,24 @@ QWidget *MainWindow::createConfigurationPage()
             const HagieState::BodyState bodyState =
                 state->getBodyState(body);
 
+            const HagieState::SystemState systemState =
+                state->getSystemState();
+
+            /*
+            * Con la STM32 conectada, solamente se permite
+            * guardar el máximo cuando el sensor superior
+            * está físicamente activo.
+            */
+            if (systemState.stm32_connected &&
+                !bodyState.upper_limit_active)
+            {
+                configCalibrationMessageLabel->setText(
+                    "Mensaje: LLEVAR EL CUERPO AL SENSOR SUPERIOR"
+                );
+
+                return;
+            }
+
             const int64_t currentEncoder =
                 bodyState.encoder_relative_count;
 
@@ -6228,6 +6254,11 @@ QWidget *MainWindow::createConfigurationPage()
             configCalibrationStateLabel->setText(
                 "Estado: CALIBRADO"
             );
+            /*
+            * Guardar inmediatamente el máximo
+            * de calibración en el archivo INI.
+            */
+            saveConfiguration();
         }
     );
 
@@ -6390,6 +6421,12 @@ QWidget *MainWindow::createConfigurationPage()
                     realHeightMm
                 )
             );
+
+            /*
+            * Guardar inmediatamente el nuevo
+            * punto de calibración en el archivo INI.
+            */
+            saveConfiguration();
         }
     );
 
@@ -11681,14 +11718,39 @@ void MainWindow::updateDashboard()
                 const int64_t relativePosition =
                     bodyState.encoder_relative_count;
 
-                configCalibrationPositionLabel->setText(
-                    QString(
-                        "Posición relativa: %1 pulsos"
-                    ).arg(
-                        relativePosition
-                    )
-                );
+                /*
+                * La posición relativa solamente es válida
+                * cuando la STM32 completó el HOMING.
+                */
+                if (systemState.stm32_connected &&
+                    !bodyState.encoder_referenced)
+                {
+                    configCalibrationPositionLabel->setText(
+                        "Posición relativa: SIN REFERENCIA"
+                    );
 
+                    configCalibrationCalculatedHeightLabel->setText(
+                        "Altura calculada: --- mm"
+                    );
+                }
+                else
+                {
+                    configCalibrationPositionLabel->setText(
+                        QString(
+                            "Posición relativa: %1 pulsos"
+                        ).arg(
+                            relativePosition
+                        )
+                    );
+                }
+
+           /*
+            * Calcular altura solamente cuando existe
+            * una referencia válida del encoder.
+            */
+            if (!systemState.stm32_connected ||
+                bodyState.encoder_referenced)
+            {
                 double calculatedHeightMm = 0.0;
 
                 if (interpolateCalibrationHeight(
@@ -11713,6 +11775,7 @@ void MainWindow::updateDashboard()
                         "Altura calculada: --- mm"
                     );
                 }
+            }
 
                 configCalibrationMinLabel->setText(
                     QString(
