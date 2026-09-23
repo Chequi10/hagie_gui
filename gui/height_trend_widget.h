@@ -55,7 +55,7 @@ private:
 
     QElapsedTimer timer;
 
-    double visibleWindowSeconds = 30.0;
+    double visibleWindowSeconds = 15.0;
 
     static constexpr double MAX_HISTORY_SECONDS =
         1800.0; // 30 minutos

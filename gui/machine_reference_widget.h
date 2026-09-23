@@ -13,15 +13,15 @@ public:
 
     struct CameraPosition
     {
-        double xM = 0.0;
-        double yM = 0.0;
+        double xMm = 0.0;
+        double yMm = 0.0;
         bool enabled = false;
     };
 
     void setCameraPosition(
         int camera,
-        double xM,
-        double yM,
+        double xMm,
+        double yMm,
         bool enabled
     );
 

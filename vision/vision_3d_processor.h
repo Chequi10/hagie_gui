@@ -214,16 +214,21 @@ public:
      * Por ahora solamente se definen
      * límites laterales sobre el eje X normalizado.
      */
+
+     /*
+    * Todos los límites espaciales están
+    * expresados en milímetros.
+    */
     struct BodyRegion
     {
         float min_x = 0.0f;
         float max_x = 0.0f;
 
-        float min_y = -10.0f;
-        float max_y = 10.0f;
+        float min_y = -10000.0f;
+        float max_y = 10000.0f;
 
         float min_z = 0.0f;
-        float max_z = 5.0f;
+        float max_z = 5000.0f;
 
         std::size_t min_points = 1;
     };

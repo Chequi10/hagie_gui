@@ -19,23 +19,23 @@ Vision3DProcessor::Vision3DProcessor()
      * Por ahora dividimos el eje X
      * en seis regiones consecutivas.
      */
-    bodyRegions[0].min_x = -3.0f;
-    bodyRegions[0].max_x = -2.0f;
+    bodyRegions[0].min_x = -3000.0f;
+    bodyRegions[0].max_x = -2000.0f;
 
-    bodyRegions[1].min_x = -2.0f;
-    bodyRegions[1].max_x = -1.0f;
+    bodyRegions[1].min_x = -2000.0f;
+    bodyRegions[1].max_x = -1000.0f;
 
-    bodyRegions[2].min_x = -1.0f;
+    bodyRegions[2].min_x = -1000.0f;
     bodyRegions[2].max_x = 0.0f;
 
     bodyRegions[3].min_x = 0.0f;
-    bodyRegions[3].max_x = 1.0f;
+    bodyRegions[3].max_x = 1000.0f;
 
-    bodyRegions[4].min_x = 1.0f;
-    bodyRegions[4].max_x = 2.0f;
+    bodyRegions[4].min_x = 1000.0f;
+    bodyRegions[4].max_x = 2000.0f;
 
-    bodyRegions[5].min_x = 2.0f;
-    bodyRegions[5].max_x = 3.0f;
+    bodyRegions[5].min_x = 2000.0f;
+    bodyRegions[5].max_x = 3000.0f;
 }
 
 void Vision3DProcessor::setOrientation(
@@ -388,26 +388,15 @@ Vision3DProcessor::transformCameraToMachine(
 
     transformed.x =
         point.x +
-        (
-            geometry.position_x_mm
-            / 1000.0f
-        );
-
+        geometry.position_x_mm;
 
     transformed.y =
         point.y +
-        (
-            geometry.position_y_mm
-            / 1000.0f
-        );
-
+        geometry.position_y_mm;
 
     transformed.z =
         point.z +
-        (
-            geometry.position_z_mm
-            / 1000.0f
-        );
+        geometry.position_z_mm;
 
 
     return transformed;
@@ -920,11 +909,11 @@ Vision3DProcessor::calculateBodyHeight(
 
 
     /*
-     * La nube trabaja en metros.
-     * La salida del sistema está en milímetros.
-     */
+    * La nube y el sistema interno trabajan
+    * directamente en milímetros.
+    */
     float heightMm =
-        representativeZ * 1000.0f;
+        representativeZ;
 
 
     if (heightMm < 0.0f ||
@@ -1124,7 +1113,7 @@ Vision3DProcessor::calculateBodyHeight(
 
 
     float heightMm =
-        representativeZ * 1000.0f;
+        representativeZ;
 
 
     if (heightMm < 0.0f ||

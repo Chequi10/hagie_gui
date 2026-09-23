@@ -118,7 +118,7 @@ bool ZedGmslPointCloudSource::start()
      * actualmente con coordenadas en metros.
      */
     initParameters.coordinate_units =
-        sl::UNIT::METER;
+        sl::UNIT::MILLIMETER;
 
         /*
         * Sistema de coordenadas elegido para Hagie:

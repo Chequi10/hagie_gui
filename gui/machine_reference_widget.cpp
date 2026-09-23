@@ -86,8 +86,8 @@ void MachineReferenceWidget::clearAllRegions()
 
 void MachineReferenceWidget::setCameraPosition(
     int camera,
-    double xM,
-    double yM,
+    double xMm,
+    double yMm,
     bool enabled
 )
 {
@@ -102,8 +102,9 @@ void MachineReferenceWidget::setCameraPosition(
             static_cast<std::size_t>(camera)
         ];
 
-    position.xM = xM;
-    position.yM = yM;
+    position.xMm = xMm;
+    position.yMm = yMm;
+
     position.enabled = enabled;
 
     update();
@@ -420,6 +421,148 @@ void MachineReferenceWidget::paintEvent(
         "-Y"
     );
 
+        /*
+     * ========================================================
+     * Graduaciones de los ejes en milímetros
+     * ========================================================
+     */
+
+    const double tickStepMm = 1000.0;
+    const double tickSize = 5.0;
+
+    QFont tickFont =
+        painter.font();
+
+    tickFont.setPointSizeF(
+        std::max(
+            7.0,
+            tickFont.pointSizeF() - 1.0
+        )
+    );
+
+    painter.setFont(
+        tickFont
+    );
+
+    QFontMetrics tickMetrics(
+        tickFont
+    );
+
+
+    /*
+     * Graduaciones del eje X.
+     */
+    for (double xMm = tickStepMm;
+         xMm <= maxAbsX;
+         xMm += tickStepMm)
+    {
+        for (double sign : {-1.0, 1.0})
+        {
+            const double valueMm =
+                sign * xMm;
+
+            const QPointF point =
+                machineToScreen(
+                    valueMm,
+                    0.0
+                );
+
+            painter.drawLine(
+                QPointF(
+                    point.x(),
+                    origin.y() - tickSize
+                ),
+                QPointF(
+                    point.x(),
+                    origin.y() + tickSize
+                )
+            );
+
+            const QString text =
+                QString::number(
+                    static_cast<int>(valueMm)
+                );
+
+            const int textWidth =
+                tickMetrics.horizontalAdvance(
+                    text
+                );
+
+            painter.drawText(
+                QPointF(
+                    point.x() -
+                        textWidth * 0.5,
+                    origin.y() + 20.0
+                ),
+                text
+            );
+        }
+    }
+
+
+    /*
+     * Graduaciones del eje Y.
+     */
+    for (double yMm = tickStepMm;
+         yMm <= maxAbsY;
+         yMm += tickStepMm)
+    {
+        for (double sign : {-1.0, 1.0})
+        {
+            const double valueMm =
+                sign * yMm;
+
+            const QPointF point =
+                machineToScreen(
+                    0.0,
+                    valueMm
+                );
+
+            painter.drawLine(
+                QPointF(
+                    origin.x() - tickSize,
+                    point.y()
+                ),
+                QPointF(
+                    origin.x() + tickSize,
+                    point.y()
+                )
+            );
+
+            const QString text =
+                QString::number(
+                    static_cast<int>(valueMm)
+                );
+
+            const int textWidth =
+                tickMetrics.horizontalAdvance(
+                    text
+                );
+
+            painter.drawText(
+                QPointF(
+                    origin.x() -
+                        textWidth -
+                        8.0,
+                    point.y() + 4.0
+                ),
+                text
+            );
+        }
+    }
+
+
+    /*
+     * Unidad de los ejes.
+     */
+    painter.drawText(
+        QPointF(
+            graphRect.right() - 55.0,
+            origin.y() + 35.0
+        ),
+        "mm"
+    );
+
 
     /*
      * Origen.
@@ -593,10 +736,10 @@ void MachineReferenceWidget::paintEvent(
         }
 
         const QPointF cameraPoint =
-            machineToScreen(
-                position.xM,
-                position.yM
-            );
+        machineToScreen(
+            position.xMm,
+            position.yMm
+        );
 
         painter.setPen(
             QPen(

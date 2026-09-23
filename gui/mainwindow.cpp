@@ -2037,10 +2037,10 @@ QWidget *MainWindow::createDashboardPage()
     QComboBox *trendTimeCombo =
         new QComboBox();
 
-    trendTimeCombo->addItem("30 s", 30.0);
+    trendTimeCombo->addItem("15 s", 15.0);
     trendTimeCombo->addItem("1 min", 60.0);
     trendTimeCombo->addItem("5 min", 300.0);
-    trendTimeCombo->addItem("10 min", 600.0);
+    trendTimeCombo->addItem("15 min", 900.0);
     trendTimeCombo->addItem("30 min", 1800.0);
 
 
@@ -2163,7 +2163,7 @@ QWidget *MainWindow::createDashboardPage()
     );
 
     heightTrendWidget->setVisibleWindowSeconds(
-        30.0
+        5.0
     );
 
     mainLayout->addWidget(
@@ -5855,7 +5855,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     configCalibrationRealHeightSpin->setRange(
         0,
-        2000
+        3000
     );
 
     configCalibrationRealHeightSpin->setSuffix(
@@ -6135,13 +6135,10 @@ QWidget *MainWindow::createConfigurationPage()
             cal.referenced = true;
 
             /*
-             * Al establecer un nuevo cero,
-             * invalidamos cualquier máximo
-             * anterior.
+             * El HOMING de la STM32 define el cero físico.
+             * Reafirmar esta referencia no debe borrar
+             * una calibración existente.
              */
-            cal.calibrated = false;
-
-            cal.encoderMaximum = 0;
 
 
             configCalibrationMinLabel->setText(
@@ -6153,7 +6150,9 @@ QWidget *MainWindow::createConfigurationPage()
             );
 
             configCalibrationMaxLabel->setText(
-                "Encoder máximo: ---"
+                cal.calibrated
+                    ? QString("Encoder máximo: %1").arg(cal.encoderMaximum)
+                    : QString("Encoder máximo: ---")
             );
 
             configCalibrationPositionLabel->setText(
@@ -9671,24 +9670,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMinXLabel =
             new QLabel(
-                "X mínimo (m)"
+                "X mínimo (mm)"
             );
 
         configVisionRegionMinX[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMinX[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMinX[body]
             ->setRange(
-                -20.0,
-                20.0
+                -50000.0,
+                50000.0
             );
 
         configVisionRegionMinX[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9697,24 +9696,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMaxXLabel =
             new QLabel(
-                "X máximo (m)"
+                "X máximo (mm)"
             );
 
         configVisionRegionMaxX[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMaxX[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMaxX[body]
             ->setRange(
-                -20.0,
-                20.0
+                -50000.0,
+                50000.0
             );
 
         configVisionRegionMaxX[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9723,24 +9722,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMinYLabel =
             new QLabel(
-                "Y mínimo (m)"
+                "Y mínimo (mm)"
             );
 
         configVisionRegionMinY[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMinY[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMinY[body]
             ->setRange(
-                -50.0,
-                50.0
+                -50000.0,
+                50000.0
             );
 
         configVisionRegionMinY[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9749,24 +9748,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMaxYLabel =
             new QLabel(
-                "Y máximo (m)"
+                "Y máximo (mm)"
             );
 
         configVisionRegionMaxY[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMaxY[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMaxY[body]
             ->setRange(
-                -50.0,
-                50.0
+                -50000.0,
+                50000.0
             );
 
         configVisionRegionMaxY[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9775,24 +9774,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMinZLabel =
             new QLabel(
-                "Z mínimo (m)"
+                "Z mínimo (mm)"
             );
 
         configVisionRegionMinZ[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMinZ[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMinZ[body]
             ->setRange(
-                -5.0,
-                20.0
+                -5000.0,
+                20000.0
             );
 
         configVisionRegionMinZ[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9801,24 +9800,24 @@ QWidget *MainWindow::createConfigurationPage()
          */
         QLabel *visionMaxZLabel =
             new QLabel(
-                "Z máximo (m)"
+                "Z máximo (mm)"
             );
 
         configVisionRegionMaxZ[body] =
             new QDoubleSpinBox();
 
         configVisionRegionMaxZ[body]
-            ->setDecimals(2);
+            ->setDecimals(0);
 
         configVisionRegionMaxZ[body]
             ->setRange(
-                -5.0,
-                20.0
+                -5000.0,
+                20000.0
             );
 
         configVisionRegionMaxZ[body]
             ->setSingleStep(
-                0.10
+                10.0
             );
 
 
@@ -9845,13 +9844,13 @@ QWidget *MainWindow::createConfigurationPage()
          *
          * Coinciden con Vision3DProcessor.
          */
-        const double defaultMinX =
-            -3.0 +
-            static_cast<double>(body);
+                const double defaultMinX =
+            -3000.0 +
+            1000.0 * static_cast<double>(body);
 
         const double defaultMaxX =
-            -2.0 +
-            static_cast<double>(body);
+            -2000.0 +
+            1000.0 * static_cast<double>(body);
 
 
         configVisionRegionMinX[body]
@@ -9866,12 +9865,12 @@ QWidget *MainWindow::createConfigurationPage()
 
         configVisionRegionMinY[body]
             ->setValue(
-                -10.0
+                -10000.0
             );
 
         configVisionRegionMaxY[body]
             ->setValue(
-                10.0
+                10000.0
             );
 
         configVisionRegionMinZ[body]
@@ -9881,12 +9880,7 @@ QWidget *MainWindow::createConfigurationPage()
 
         configVisionRegionMaxZ[body]
             ->setValue(
-                5.0
-            );
-
-        configVisionRegionMinPoints[body]
-            ->setValue(
-                1
+                5000.0
             );
 
 
@@ -12720,20 +12714,20 @@ void MainWindow::updateMachineCameraReference()
         const Vision3DProcessor::CameraConfig &config =
             visionCameraConfigs[camera];
 
-        const double xM =
+        const double xMm =
             static_cast<double>(
                 config.geometry.position_x_mm
-            ) / 1000.0;
+            );
 
-        const double yM =
+        const double yMm =
             static_cast<double>(
                 config.geometry.position_y_mm
-            ) / 1000.0;
+            );
 
         machineReferenceWidget->setCameraPosition(
             static_cast<int>(camera),
-            xM,
-            yM,
+            xMm,
+            yMm,
             config.enabled
         );
     }
@@ -14463,7 +14457,7 @@ void MainWindow::loadConfiguration()
     int visionSourceMode =
         settings.value(
             "source_mode",
-            0
+            2
         ).toInt();
 
         int yoloOutputFormat =
