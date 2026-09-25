@@ -44,6 +44,8 @@
 #include "vision/vision_3d_worker.h"
 
 #include <memory>
+#include <array>
+#include <limits>
 
 #include "vision/simulated_point_cloud_source.h"
 #include "vision/zed_gmsl_point_cloud_source.h"
@@ -6242,6 +6244,22 @@ QWidget *MainWindow::createConfigurationPage()
             cal.calibrated =
                 true;
 
+            /*
+            * Actualizar el máximo que será sincronizado
+            * con el STM32.
+            */
+            stm32Worker->setEncoderMaximum(
+                static_cast<uint8_t>(body),
+                static_cast<uint32_t>(
+                    cal.encoderMaximum
+                )
+            );
+
+            /*
+            * Enviar nuevamente la configuración runtime.
+            */
+            stm32Worker->beginConfigurationSync();
+
             configCalibrationMaxLabel->setText(
                 QString(
                     "Encoder máximo: %1"
@@ -6289,12 +6307,25 @@ QWidget *MainWindow::createConfigurationPage()
                 bodyCalibration[body];
 
             /*
-            * Primero debe existir una referencia
-            * mecánica de 0 mm.
-            */
+             * La STM32 admite como máximo 15 puntos
+             * dentro del paquete K 0x09.
+             */
+            if (cal.points.size() >= 15)
+            {
+                configCalibrationMessageLabel->setText(
+                    "Mensaje: MÁXIMO 15 PUNTOS DE CALIBRACIÓN"
+                );
+
+                return;
+            }
+
+            /*
+             * Primero debe existir una referencia
+             * mecánica de 0 mm.
+             */
             if (!cal.referenced)
             {
-                configCalibrationStateLabel->setText(
+            configCalibrationStateLabel->setText(
                     "Estado: PRIMERO FIJAR 0 mm"
                 );
 
@@ -6368,6 +6399,12 @@ QWidget *MainWindow::createConfigurationPage()
             cal.points.push_back(
                 point
             );
+
+            updateEncoderCalibrationInWorker(
+                body
+            );
+
+            stm32Worker->beginConfigurationSync();
 
             /*
             * Actualizar mínimo y máximo
@@ -6462,11 +6499,28 @@ QWidget *MainWindow::createConfigurationPage()
             cal.encoderZero = 0;
             cal.encoderMaximum = 0;
 
+            /*
+            * Deshabilitar en el STM32 la protección superior
+            * por encoder para este cuerpo.
+            */
+            stm32Worker->setEncoderMaximum(
+                static_cast<uint8_t>(body),
+                0
+            );
+
+
+
             cal.realMinimumHeightMm = 0;
             cal.realMaximumHeightMm = 0;
             cal.currentRealHeightMm = 0;
 
             cal.points.clear();
+
+            updateEncoderCalibrationInWorker(
+                body
+            );
+
+            stm32Worker->beginConfigurationSync();
 
             /*
              * Actualizar la pantalla.
@@ -13294,6 +13348,69 @@ bool MainWindow::interpolateCalibrationHeight(
     return true;
 }
 
+void MainWindow::updateEncoderCalibrationInWorker(
+    std::size_t body)
+{
+    constexpr std::size_t MAX_POINTS =
+        15;
+
+    if (stm32Worker == nullptr ||
+        body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    std::array<int32_t, MAX_POINTS>
+        positions {};
+
+    std::array<uint16_t, MAX_POINTS>
+        heightsMm {};
+
+    uint8_t pointCount =
+        0;
+
+    for (const CalibrationPoint &point :
+         bodyCalibration[body].points)
+    {
+        if (pointCount >= MAX_POINTS)
+        {
+            break;
+        }
+
+        if (
+            point.encoderPosition <
+                std::numeric_limits<int32_t>::min() ||
+            point.encoderPosition >
+                std::numeric_limits<int32_t>::max() ||
+            point.realHeightMm < 0 ||
+            point.realHeightMm >
+                std::numeric_limits<uint16_t>::max()
+        )
+        {
+            continue;
+        }
+
+        positions[pointCount] =
+            static_cast<int32_t>(
+                point.encoderPosition
+            );
+
+        heightsMm[pointCount] =
+            static_cast<uint16_t>(
+                point.realHeightMm
+            );
+
+        ++pointCount;
+    }
+
+    stm32Worker->setEncoderCalibration(
+        static_cast<uint8_t>(body),
+        positions.data(),
+        heightsMm.data(),
+        pointCount
+    );
+}
+
 void MainWindow::saveConfiguration()
 {
     QSettings settings(
@@ -14927,6 +15044,29 @@ void MainWindow::syncConfigurationToWorker()
             static_cast<float>(
                 configEncoderScaleSpin[body]->value()
             )
+        );
+        uint32_t maximumCount =
+            0;
+
+        if (
+            bodyCalibration[body].calibrated &&
+            bodyCalibration[body].encoderMaximum > 0 &&
+            bodyCalibration[body].encoderMaximum <=
+                0xFFFFFFFFLL
+        )
+        {
+            maximumCount =
+                static_cast<uint32_t>(
+                    bodyCalibration[body].encoderMaximum
+                );
+        }
+
+        stm32Worker->setEncoderMaximum(
+            static_cast<uint8_t>(body),
+            maximumCount
+        );
+        updateEncoderCalibrationInWorker(
+            body
         );
     }
 

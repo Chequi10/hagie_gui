@@ -642,7 +642,11 @@ private:
         std::size_t body,
         int64_t encoderPosition,
         double &heightMm
-    ) const;    
+    ) const;
+
+    void updateEncoderCalibrationInWorker(
+        std::size_t body
+    );
 
 
     // ========================================================

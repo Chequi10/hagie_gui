@@ -142,6 +142,18 @@ public:
         float mm_per_pulse
     );
 
+    void setEncoderMaximum(
+        uint8_t body,
+        uint32_t maximum_count
+    );
+
+    void setEncoderCalibration(
+        uint8_t body,
+        const int32_t *positions,
+        const uint16_t *heights_mm,
+        uint8_t point_count
+    );
+
     void setHydraulicManagementMode(
         uint8_t mode
     );
@@ -195,7 +207,9 @@ private:
     // ========================================================
     // Copia de configuración para resincronizar al reconectar
     // ========================================================
-
+    static constexpr std::size_t
+        MAX_ENCODER_CALIBRATION_POINTS =
+            15;
     struct RuntimeConfiguration
     {
         bool valid = false;
@@ -223,6 +237,32 @@ private:
             float,
             HagieState::BODY_COUNT
         > encoder_scale {};
+
+        std::array<
+            uint32_t,
+            HagieState::BODY_COUNT
+        > encoder_maximum {};
+
+        std::array<
+            uint8_t,
+            HagieState::BODY_COUNT
+        > encoder_calibration_count {};
+
+        std::array<
+            std::array<
+                int32_t,
+                MAX_ENCODER_CALIBRATION_POINTS
+            >,
+            HagieState::BODY_COUNT
+        > encoder_calibration_position {};
+
+        std::array<
+            std::array<
+                uint16_t,
+                MAX_ENCODER_CALIBRATION_POINTS
+            >,
+            HagieState::BODY_COUNT
+        > encoder_calibration_height_mm {};
 
 
         uint16_t move_command_threshold =
@@ -286,8 +326,6 @@ private:
                 HagieState::BODY_COUNT
             > height_down_compensation_percent {};
     };
-
-
     RuntimeConfiguration runtimeConfig;
 
 
@@ -529,13 +567,16 @@ private:
     * 27      -> K15 Ki control altura
     * 28      -> K16 Kd control altura
     * 29      -> K17 banda muerta
-    *
-    * 30      -> terminada
+    * 30..35  -> K18 compensación subida cuerpos 0..5
+    * 36..41  -> K19 compensación bajada cuerpos 0..5
+    * 42..47  -> K08 máximo encoder cuerpos 0..5
+    * 48..53  -> K09 calibración encoder cuerpos 0..5
+    * 54      -> terminada
     */
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            42;
+            54;
 
 
     uint8_t configSyncStep =

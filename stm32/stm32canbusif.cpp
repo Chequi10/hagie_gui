@@ -1181,7 +1181,138 @@ void stm32canbus_serialif::set_encoder_scale(
 
     protocol::packet_encoder::send(7);
 }
+// ------------------------------------------------------------
+// K 0x08 - Máximo de recorrido relativo del encoder
+// ------------------------------------------------------------
 
+void stm32canbus_serialif::set_encoder_maximum(
+    uint8_t body,
+    uint32_t maximum_count)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x08;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (maximum_count >> 24) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            (maximum_count >> 16) & 0xFF
+        );
+
+    payload[5] =
+        static_cast<uint8_t>(
+            (maximum_count >> 8) & 0xFF
+        );
+
+    payload[6] =
+        static_cast<uint8_t>(
+            maximum_count & 0xFF
+        );
+
+    protocol::packet_encoder::send(7);
+}
+
+// ------------------------------------------------------------
+// K 0x09 - Tabla de calibración del encoder
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_encoder_calibration(
+    uint8_t body,
+    const int32_t *positions,
+    const uint16_t *heights_mm,
+    uint8_t point_count)
+{
+    constexpr uint8_t MAX_POINTS =
+        15;
+
+    if (body >= BODY_COUNT ||
+        point_count > MAX_POINTS)
+    {
+        return;
+    }
+
+    if (point_count > 0 &&
+        (positions == nullptr ||
+         heights_mm == nullptr))
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x09;
+    payload[2] = body;
+    payload[3] = point_count;
+
+    for (uint8_t point = 0;
+         point < point_count;
+         ++point)
+    {
+        const std::size_t index =
+            4U +
+            static_cast<std::size_t>(
+                point
+            ) * 6U;
+
+        const uint32_t rawPosition =
+            static_cast<uint32_t>(
+                positions[point]
+            );
+
+        payload[index] =
+            static_cast<uint8_t>(
+                (rawPosition >> 24) & 0xFF
+            );
+
+        payload[index + 1] =
+            static_cast<uint8_t>(
+                (rawPosition >> 16) & 0xFF
+            );
+
+        payload[index + 2] =
+            static_cast<uint8_t>(
+                (rawPosition >> 8) & 0xFF
+            );
+
+        payload[index + 3] =
+            static_cast<uint8_t>(
+                rawPosition & 0xFF
+            );
+
+        payload[index + 4] =
+            static_cast<uint8_t>(
+                (heights_mm[point] >> 8) & 0xFF
+            );
+
+        payload[index + 5] =
+            static_cast<uint8_t>(
+                heights_mm[point] & 0xFF
+            );
+    }
+
+    protocol::packet_encoder::send(
+        4U +
+        static_cast<std::size_t>(
+            point_count
+        ) * 6U
+    );
+}
 // ------------------------------------------------------------
 // K 0x10 - Modo gestión hidráulica
 // ------------------------------------------------------------

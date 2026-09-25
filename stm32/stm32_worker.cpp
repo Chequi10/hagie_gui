@@ -815,6 +815,98 @@ void STM32Worker::setEncoderScale(
         true;
 }
 
+void STM32Worker::setEncoderMaximum(
+    uint8_t body,
+    uint32_t maximum_count)
+{
+    if (body >=
+        HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.encoder_maximum[body] =
+        maximum_count;
+
+    runtimeConfig.valid =
+        true;
+}
+
+void STM32Worker::setEncoderCalibration(
+    uint8_t body,
+    const int32_t *positions,
+    const uint16_t *heights_mm,
+    uint8_t point_count)
+{
+    if (body >= HagieState::BODY_COUNT ||
+        point_count >
+            MAX_ENCODER_CALIBRATION_POINTS)
+    {
+        return;
+    }
+
+    if (point_count > 0 &&
+        (positions == nullptr ||
+         heights_mm == nullptr))
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    /*
+     * Invalidar temporalmente la tabla mientras
+     * se reemplazan sus puntos.
+     */
+    runtimeConfig
+        .encoder_calibration_count[body] =
+        0;
+
+    for (std::size_t point = 0;
+         point <
+            MAX_ENCODER_CALIBRATION_POINTS;
+         ++point)
+    {
+        runtimeConfig
+            .encoder_calibration_position
+                [body][point] =
+            0;
+
+        runtimeConfig
+            .encoder_calibration_height_mm
+                [body][point] =
+            0;
+    }
+
+    for (uint8_t point = 0;
+         point < point_count;
+         ++point)
+    {
+        runtimeConfig
+            .encoder_calibration_position
+                [body][point] =
+            positions[point];
+
+        runtimeConfig
+            .encoder_calibration_height_mm
+                [body][point] =
+            heights_mm[point];
+    }
+
+    runtimeConfig
+        .encoder_calibration_count[body] =
+        point_count;
+
+    runtimeConfig.valid =
+        true;
+}
+
 void STM32Worker::setHydraulicManagementMode(
     uint8_t mode)
 {
@@ -1375,7 +1467,8 @@ void STM32Worker::sendCurrentConfigurationCommand()
     /*
      * 36..41 -> K19
      * Compensación hidráulica BAJADA
-     */
+     * 42..47  -> K08 máximo encoder cuerpos 0..5
+    */
     else if (configSyncStep <= 41)
     {
         uint8_t body =
@@ -1385,6 +1478,43 @@ void STM32Worker::sendCurrentConfigurationCommand()
             body,
             configCopy
                 .height_down_compensation_percent[body]
+        );
+    }
+
+    /*
+    * 42..47 -> K08
+    * Máximo relativo del encoder.
+    */
+    else if (configSyncStep <= 47)
+    {
+        uint8_t body =
+            configSyncStep - 42;
+
+        stm32->set_encoder_maximum(
+            body,
+            configCopy.encoder_maximum[body]
+        );
+    }
+
+        /*
+     * 48..53 -> K09
+     * Tabla de calibración del encoder.
+     */
+    else if (configSyncStep <= 53)
+    {
+        const uint8_t body =
+            configSyncStep - 48;
+
+        stm32->set_encoder_calibration(
+            body,
+            configCopy
+                .encoder_calibration_position[body]
+                .data(),
+            configCopy
+                .encoder_calibration_height_mm[body]
+                .data(),
+            configCopy
+                .encoder_calibration_count[body]
         );
     }
 
@@ -2269,6 +2399,67 @@ void STM32Worker::configureCallbacks()
                         ack.subcommand == 0x19 &&
                         ack.body == body &&
                         ack.value1 == expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+                /*
+                * 42..47 -> ACK K08
+                * Máximo relativo del encoder.
+                */
+                case 42:
+                case 43:
+                case 44:
+                case 45:
+                case 46:
+                case 47:
+                {
+                    uint8_t body =
+                        configSyncStep - 42;
+
+                    uint32_t expectedValid =
+                        expected.encoder_maximum[body] > 0
+                            ? 1U
+                            : 0U;
+
+                    if (
+                        ack.subcommand == 0x08 &&
+                        ack.body == body &&
+                        ack.value1 ==
+                            expected.encoder_maximum[body] &&
+                        ack.value2 == expectedValid
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+                                /*
+                 * 48..53 -> ACK K09
+                 * Tabla de calibración del encoder.
+                 */
+                case 48:
+                case 49:
+                case 50:
+                case 51:
+                case 52:
+                case 53:
+                {
+                    const uint8_t body =
+                        configSyncStep - 48;
+
+                    if (
+                        ack.subcommand == 0x09 &&
+                        ack.body == body &&
+                        ack.value1 ==
+                            expected
+                                .encoder_calibration_count[body]
                     )
                     {
                         validAck = true;

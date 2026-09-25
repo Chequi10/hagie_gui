@@ -329,7 +329,24 @@ public:
         float mm_per_pulse
     );
 
-        // K 0x10
+    // K 0x08
+    // Máximo de recorrido relativo del encoder.
+    // maximum_count = 0 deshabilita la protección.
+    void set_encoder_maximum(
+        uint8_t body,
+        uint32_t maximum_count
+    );
+
+    // K 0x09
+    // Tabla de calibración posición relativa -> altura real.
+    void set_encoder_calibration(
+        uint8_t body,
+        const int32_t *positions,
+        const uint16_t *heights_mm,
+        uint8_t point_count
+    );
+
+    // K 0x10
     // 0 = NORMAL
     // 1 = BÁSICO
     void set_hydraulic_management_mode(
