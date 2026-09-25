@@ -13286,9 +13286,34 @@ bool MainWindow::interpolateCalibrationHeight(
     }
 
     /*
-     * Estamos fuera del rango realmente
-     * medido con puntos de calibración.
+     * Saturación fuera del intervalo calibrado.
+     *
+     * La protección de recorrido detiene la válvula,
+     * pero la altura visual permanece en el extremo
+     * calibrado y no cae artificialmente a cero.
      */
+    if (lowerPoint == nullptr &&
+        upperPoint != nullptr)
+    {
+        heightMm =
+            static_cast<double>(
+                upperPoint->realHeightMm
+            );
+
+        return true;
+    }
+
+    if (upperPoint == nullptr &&
+        lowerPoint != nullptr)
+    {
+        heightMm =
+            static_cast<double>(
+                lowerPoint->realHeightMm
+            );
+
+        return true;
+    }
+
     if (lowerPoint == nullptr ||
         upperPoint == nullptr)
     {
