@@ -89,6 +89,21 @@ private:
     std::array<bool, HagieState::BODY_COUNT>
         simulatedEncoderInitialized {};
 
+    /*
+     * Estado interno del PID utilizado solamente
+     * por la simulación de altura.
+     *
+     * No modifica el PID real de la STM32.
+     */
+    std::array<double, HagieState::BODY_COUNT>
+        simulatedPidIntegral {};
+
+    std::array<double, HagieState::BODY_COUNT>
+        simulatedPidPreviousError {};
+
+    std::array<bool, HagieState::BODY_COUNT>
+        simulatedPidInitialized {};
+
     int trendSelectedBody = 0;
 
 

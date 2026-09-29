@@ -1,5 +1,8 @@
 #include "mainwindow.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <QAction>
 #include <QApplication>
 #include <QFrame>
@@ -11490,27 +11493,118 @@ void MainWindow::updateDashboard()
 
 
             /*
-            * Diferentes velocidades de respuesta por cuerpo.
-            *
-            * Esto nos permite comprobar que los seis históricos
-            * son realmente independientes.
-            */
-            const double alpha =
-                0.055 +
-                static_cast<double>(body) *
-                    0.008;
-
+             * ====================================================
+             * PID DE ALTURA - SOLAMENTE PARA SIMULACIÓN
+             * ====================================================
+             *
+             * Utiliza los mismos Kp, Ki, Kd y banda muerta
+             * configurados desde CONTROL / SEGURIDAD.
+             *
+             * No modifica el PID real ejecutado por la STM32.
+             */
 
             const double error =
                 target -
                 simulatedEncoderHeightMm[body];
 
+            const double kp =
+                configHeightKpSpin->value();
+
+            const double ki =
+                configHeightKiSpin->value();
+
+            const double kd =
+                configHeightKdSpin->value();
+
+            const double deadbandMm =
+                configHeightDeadbandSpin->value();
 
             /*
-            * Modelo simple de respuesta hidráulica.
-            */
+             * El ciclo de actualización de la simulación
+             * es aproximadamente 100 ms.
+             */
+            constexpr double dt =
+                0.1;
+
+            double control =
+                0.0;
+
+            if (std::abs(error) > deadbandMm)
+            {
+                simulatedPidIntegral[body] +=
+                    error * dt;
+
+                /*
+                 * Anti-windup sencillo.
+                 */
+                simulatedPidIntegral[body] =
+                    std::clamp(
+                        simulatedPidIntegral[body],
+                        -500.0,
+                        500.0
+                    );
+
+                double derivative =
+                    0.0;
+
+                if (simulatedPidInitialized[body])
+                {
+                    derivative =
+                        (
+                            error -
+                            simulatedPidPreviousError[body]
+                        ) / dt;
+                }
+
+                control =
+                    kp * error +
+                    ki * simulatedPidIntegral[body] +
+                    kd * derivative;
+
+                /*
+                 * El comando final tiene el mismo rango
+                 * conceptual que el control real.
+                 */
+                control =
+                    std::clamp(
+                        control,
+                        -1000.0,
+                        1000.0
+                    );
+            }
+            else
+            {
+                /*
+                 * Dentro de la banda muerta no mover.
+                 */
+                control =
+                    0.0;
+            }
+
+            simulatedPidPreviousError[body] =
+                error;
+
+            simulatedPidInitialized[body] =
+                true;
+
+
+            /*
+             * Modelo hidráulico simplificado.
+             *
+             * Un comando de +/-1000 produce aproximadamente
+             * 300 mm/s.
+             */
+            constexpr double maxSpeedMmPerSecond =
+                300.0;
+
+            const double simulatedSpeed =
+                (
+                    control / 1000.0
+                ) *
+                maxSpeedMmPerSecond;
+
             simulatedEncoderHeightMm[body] +=
-                alpha * error;
+                simulatedSpeed * dt;
 
 
             /*
