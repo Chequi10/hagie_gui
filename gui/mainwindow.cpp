@@ -6309,6 +6309,26 @@ QWidget *MainWindow::createConfigurationPage()
             BodyCalibration &cal =
                 bodyCalibration[body];
 
+            const HagieState::BodyState bodyState =
+                state->getBodyState(body);
+
+            const HagieState::SystemState systemState =
+                state->getSystemState();
+
+            /*
+             * Para guardar una calibración real necesitamos
+             * obligatoriamente comunicación con la STM32.
+             * Esta comprobación tiene prioridad sobre las demás.
+             */
+            if (!systemState.stm32_connected)
+            {
+                configCalibrationMessageLabel->setText(
+                    "Mensaje: STM32 DESCONECTADA - NO SE PUEDE GUARDAR"
+                );
+
+                return;
+            }
+
             /*
              * La STM32 admite como máximo 15 puntos
              * dentro del paquete K 0x09.
@@ -6328,15 +6348,21 @@ QWidget *MainWindow::createConfigurationPage()
              */
             if (!cal.referenced)
             {
-            configCalibrationStateLabel->setText(
+                configCalibrationStateLabel->setText(
                     "Estado: PRIMERO FIJAR 0 mm"
                 );
 
                 return;
             }
 
-            const HagieState::BodyState bodyState =
-                state->getBodyState(body);
+            if (!bodyState.encoder_referenced)
+            {
+                configCalibrationMessageLabel->setText(
+                    "Mensaje: HOMING REQUERIDO - LLEVAR AL SENSOR INFERIOR"
+                );
+
+                return;
+            }
 
             /*
             * Posición relativa al HOMING actual.
@@ -9631,13 +9657,13 @@ QWidget *MainWindow::createConfigurationPage()
         configEncoderDirectionCombo[body]
             ->addItem(
                 "Normal",
-                1
+                -1
             );
 
         configEncoderDirectionCombo[body]
             ->addItem(
                 "Invertido",
-                -1
+                1
             );
 
 
