@@ -9644,13 +9644,13 @@ QWidget *MainWindow::createConfigurationPage()
 
 
         /*
-         * Sentido encoder.
+         * Sentido fijo del encoder.
+         *
+         * Todos los cuerpos utilizan sentido NORMAL.
+         * El combo se mantiene internamente porque forma parte
+         * de la configuración existente, pero no se muestra
+         * al usuario.
          */
-        QLabel *directionLabel =
-            new QLabel(
-                "Sentido encoder"
-            );
-
         configEncoderDirectionCombo[body] =
             new QComboBox();
 
@@ -9658,12 +9658,6 @@ QWidget *MainWindow::createConfigurationPage()
             ->addItem(
                 "Normal",
                 -1
-            );
-
-        configEncoderDirectionCombo[body]
-            ->addItem(
-                "Invertido",
-                1
             );
 
 
@@ -9691,11 +9685,6 @@ QWidget *MainWindow::createConfigurationPage()
             configEncoderScaleSpin[body]
         );
 
-        bodyLayout->addWidget(
-            directionLabel
-        );
-
-
         QLabel *visionOffsetLabel =
             new QLabel(
                 "Offset visión 3D (mm)"
@@ -9719,10 +9708,6 @@ QWidget *MainWindow::createConfigurationPage()
             ->setValue(
                 0
             );
-
-        bodyLayout->addWidget(
-            configEncoderDirectionCombo[body]
-        );
 
         bodyLayout->addWidget(
             visionOffsetLabel
