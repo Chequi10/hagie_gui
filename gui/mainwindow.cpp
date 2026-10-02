@@ -434,6 +434,30 @@ MainWindow::MainWindow(
     loadConfiguration();
 
     /*
+     * ========================================================
+     * Escala inicial del Trend
+     * ========================================================
+     *
+     * La configuración ya fue cargada desde el INI.
+     * Inicializar la escala fija con los límites reales
+     * del cuerpo actualmente seleccionado.
+     */
+    if (heightTrendWidget != nullptr &&
+        trendSelectedBody >= 0 &&
+        trendSelectedBody <
+            static_cast<int>(HagieState::BODY_COUNT))
+    {
+        heightTrendWidget->setFixedRange(
+            static_cast<double>(
+                configMinHeightSpin[trendSelectedBody]->value()
+            ),
+            static_cast<double>(
+                configMaxHeightSpin[trendSelectedBody]->value()
+            )
+        );
+    }
+
+    /*
     * ========================================================
     * DETECCIÓN INICIAL DE CÁMARAS ZED
     * ========================================================
@@ -2162,6 +2186,42 @@ QWidget *MainWindow::createDashboardPage()
             {
                 heightTrendWidget->setSelectedBody(
                     index
+                );
+
+                /*
+                 * Escala FIJA específica del cuerpo.
+                 *
+                 * Utiliza los límites de altura guardados
+                 * en la configuración del cuerpo seleccionado.
+                 */
+                QSettings settings(
+                    configurationFilePath(),
+                    QSettings::IniFormat
+                );
+
+                const QString group =
+                    QString("Body%1")
+                        .arg(index + 1);
+
+                settings.beginGroup(group);
+
+                const double minHeight =
+                    settings.value(
+                        "min_height_mm",
+                        50
+                    ).toDouble();
+
+                const double maxHeight =
+                    settings.value(
+                        "max_height_mm",
+                        700
+                    ).toDouble();
+
+                settings.endGroup();
+
+                heightTrendWidget->setFixedRange(
+                    minHeight,
+                    maxHeight
                 );
             }
         }
@@ -9580,7 +9640,7 @@ QWidget *MainWindow::createConfigurationPage()
         configMinHeightSpin[body]
             ->setRange(
                 0,
-                2000
+                3000
             );
 
         configMinHeightSpin[body]
@@ -9603,7 +9663,7 @@ QWidget *MainWindow::createConfigurationPage()
         configMaxHeightSpin[body]
             ->setRange(
                 0,
-                2000
+                3000
             );
 
         configMaxHeightSpin[body]
@@ -14172,6 +14232,30 @@ void MainWindow::saveConfiguration()
     }
     applyVisionBodyRegions();
     settings.sync();
+
+    /*
+     * ========================================================
+     * Actualizar inmediatamente la escala fija del Trend
+     * ========================================================
+     *
+     * Al guardar una nueva altura mínima/máxima, actualizar
+     * el cuerpo que actualmente está seleccionado en el Trend.
+     * No es necesario volver a seleccionar el cuerpo.
+     */
+    if (heightTrendWidget != nullptr &&
+        trendSelectedBody >= 0 &&
+        trendSelectedBody <
+            static_cast<int>(HagieState::BODY_COUNT))
+    {
+        heightTrendWidget->setFixedRange(
+            static_cast<double>(
+                configMinHeightSpin[trendSelectedBody]->value()
+            ),
+            static_cast<double>(
+                configMaxHeightSpin[trendSelectedBody]->value()
+            )
+        );
+    }
 }
 
 void MainWindow::loadConfiguration()
