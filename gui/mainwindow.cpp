@@ -4113,7 +4113,7 @@ QWidget *MainWindow::createTestsPage()
         testTargetHeightSpin[body]
             ->setRange(
                 0,
-                2000
+                3000
             );
 
         testTargetHeightSpin[body]
