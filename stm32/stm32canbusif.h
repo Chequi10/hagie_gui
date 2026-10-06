@@ -416,6 +416,14 @@ public:
         int8_t percent
     );
 
+
+    // K 0x1A
+    // Habilitación individual de cuerpo.
+    void set_body_enabled(
+        uint8_t body,
+        bool enabled
+    );
+
 private:
 
     // ============================================================

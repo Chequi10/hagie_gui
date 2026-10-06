@@ -681,7 +681,17 @@ private:
 
 
     QSpinBox *configTargetTimeoutSpin =
-    nullptr;
+        nullptr;
+
+
+    // ========================================================
+    // HABILITACIÓN INDIVIDUAL DE CUERPOS
+    // ========================================================
+
+    std::array<
+        QCheckBox *,
+        HagieState::BODY_COUNT
+    > configBodyEnabledCheck {};
 
         // ========================================================
     // GESTIÓN HIDRÁULICA

@@ -10400,6 +10400,65 @@ QWidget *MainWindow::createConfigurationPage()
     );
 
 
+    /*
+     * ========================================================
+     * K 0x1A
+     * Habilitación individual de cuerpos.
+     *
+     * Etapa actual:
+     * cuerpos 1..3 habilitados
+     * cuerpos 4..6 deshabilitados
+     * ========================================================
+     */
+
+    QLabel *bodyEnableTitle =
+        new QLabel(
+            "HABILITACIÓN DE CUERPOS"
+        );
+
+    bodyEnableTitle->setStyleSheet(
+        "font-weight: bold;"
+    );
+
+    controlLayout->addWidget(
+        bodyEnableTitle,
+        3,
+        0,
+        1,
+        4
+    );
+
+
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        configBodyEnabledCheck[body] =
+            new QCheckBox(
+                QString("Cuerpo %1")
+                    .arg(body + 1)
+            );
+
+        configBodyEnabledCheck[body]
+            ->setChecked(
+                body < 3
+            );
+
+        const int row =
+            4 +
+            static_cast<int>(body / 3);
+
+        const int column =
+            static_cast<int>(body % 3);
+
+        controlLayout->addWidget(
+            configBodyEnabledCheck[body],
+            row,
+            column
+        );
+    }
+
+
     controlPageLayout->addWidget(
         controlFrame
     );
@@ -13842,6 +13901,22 @@ void MainWindow::saveConfiguration()
         configTargetTimeoutSpin->value()
     );
 
+
+    /*
+     * Habilitación individual de cuerpos.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        settings.setValue(
+            QString("body_enabled_%1")
+                .arg(body + 1),
+            configBodyEnabledCheck[body]
+                ->isChecked()
+        );
+    }
+
     settings.endGroup();
 
 
@@ -14519,6 +14594,31 @@ void MainWindow::loadConfiguration()
             1000
         ).toInt()
     );
+
+
+    /*
+     * Habilitación individual de cuerpos.
+     *
+     * Defaults:
+     * cuerpos 1..3 ON
+     * cuerpos 4..6 OFF
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        const bool defaultEnabled =
+            body < 3;
+
+        configBodyEnabledCheck[body]
+            ->setChecked(
+                settings.value(
+                    QString("body_enabled_%1")
+                        .arg(body + 1),
+                    defaultEnabled
+                ).toBool()
+            );
+    }
 
     settings.endGroup();
 
@@ -15400,9 +15500,25 @@ void MainWindow::syncConfigurationToWorker()
         );
     }
     /*
-    * Ya cargamos toda la configuración en runtimeConfig.
-    * Ahora comenzar el envío secuencial K -> ACK -> K.
-    */
+     * K 0x1A
+     * Habilitación individual de cuerpos.
+     */
+    for (std::size_t body = 0;
+         body < HagieState::BODY_COUNT;
+         ++body)
+    {
+        stm32Worker->setBodyEnabled(
+            static_cast<uint8_t>(body),
+            configBodyEnabledCheck[body]
+                ->isChecked()
+        );
+    }
+
+
+    /*
+     * Ya cargamos toda la configuración en runtimeConfig.
+     * Ahora comenzar el envío secuencial K -> ACK -> K.
+     */
     stm32Worker->beginConfigurationSync();
 
 }

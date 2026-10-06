@@ -1152,6 +1152,24 @@ void STM32Worker::enqueueRuntimeConfiguration()
 }
 
 
+void STM32Worker::setBodyEnabled(
+    uint8_t body,
+    bool enabled)
+{
+    if (body >= HagieState::BODY_COUNT)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig.body_enabled[body] =
+        enabled;
+}
+
+
 void STM32Worker::beginConfigurationSync()
 {
     {
@@ -1515,6 +1533,22 @@ void STM32Worker::sendCurrentConfigurationCommand()
                 .data(),
             configCopy
                 .encoder_calibration_count[body]
+        );
+    }
+
+
+    /*
+     * 54..59 -> K1A
+     * Habilitación individual de cuerpos.
+     */
+    else if (configSyncStep <= 59)
+    {
+        const uint8_t body =
+            configSyncStep - 54;
+
+        stm32->set_body_enabled(
+            body,
+            configCopy.body_enabled[body]
         );
     }
 
@@ -2460,6 +2494,38 @@ void STM32Worker::configureCallbacks()
                         ack.value1 ==
                             expected
                                 .encoder_calibration_count[body]
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                /*
+                 * 54..59 -> ACK K1A
+                 * Habilitación individual de cuerpos.
+                 */
+                case 54:
+                case 55:
+                case 56:
+                case 57:
+                case 58:
+                case 59:
+                {
+                    const uint8_t body =
+                        configSyncStep - 54;
+
+                    const uint32_t expectedValue =
+                        expected.body_enabled[body]
+                            ? 1U
+                            : 0U;
+
+                    if (
+                        ack.subcommand == 0x1A &&
+                        ack.body == body &&
+                        ack.value1 == expectedValue
                     )
                     {
                         validAck = true;

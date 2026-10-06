@@ -1655,6 +1655,33 @@ void stm32canbus_serialif::set_height_down_compensation_percent(
     protocol::packet_encoder::send(4);
 }
 
+// ------------------------------------------------------------
+// K 0x1A - Habilitación individual de cuerpo
+// ------------------------------------------------------------
+
+void stm32canbus_serialif::set_body_enabled(
+    uint8_t body,
+    bool enabled)
+{
+    if (body >= BODY_COUNT)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x1A;
+    payload[2] = body;
+    payload[3] =
+        enabled ? 1 : 0;
+
+    protocol::packet_encoder::send(4);
+}
+
+
 // ============================================================
 // Envío físico por Boost.Asio
 // ============================================================

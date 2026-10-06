@@ -199,6 +199,18 @@ public:
     ConfigSyncStatus getConfigSyncStatus() const;
 
 
+    /*
+     * Habilitación individual de cuerpo.
+     *
+     * El valor se guarda en runtimeConfig.
+     * K 0x1A se enviará durante la sincronización.
+     */
+    void setBodyEnabled(
+        uint8_t body,
+        bool enabled
+    );
+
+
     void beginConfigurationSync();
 
 
@@ -325,6 +337,19 @@ private:
                 int8_t,
                 HagieState::BODY_COUNT
             > height_down_compensation_percent {};
+
+
+            // ----------------------------------------------------
+            // Habilitación individual de cuerpos
+            // ----------------------------------------------------
+
+            std::array<
+                bool,
+                HagieState::BODY_COUNT
+            > body_enabled {
+                true, true, true,
+                false, false, false
+            };
     };
     RuntimeConfiguration runtimeConfig;
 
@@ -571,12 +596,13 @@ private:
     * 36..41  -> K19 compensación bajada cuerpos 0..5
     * 42..47  -> K08 máximo encoder cuerpos 0..5
     * 48..53  -> K09 calibración encoder cuerpos 0..5
-    * 54      -> terminada
+    * 54..59  -> K1A habilitación cuerpos 0..5
+    * 60      -> terminada
     */
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            54;
+            60;
 
 
     uint8_t configSyncStep =
