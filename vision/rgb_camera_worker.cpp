@@ -107,6 +107,7 @@ bool RgbCameraWorker::start()
 
 void RgbCameraWorker::stop()
 {
+    std::lock_guard<std::mutex> lock(mutex);
     for (auto& source : sources)
     {
         if (source != nullptr)
@@ -123,6 +124,7 @@ void RgbCameraWorker::stop()
 
 bool RgbCameraWorker::isRunning() const
 {
+    std::lock_guard<std::mutex> lock(mutex);
     return running;
 }
 
@@ -131,6 +133,7 @@ bool RgbCameraWorker::getFrame(
     std::size_t cameraIndex,
     RgbFrameSource::Frame& frame)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     if (!running ||
         cameraIndex >= CAMERA_COUNT)
     {
@@ -150,7 +153,14 @@ bool RgbCameraWorker::getFrame(
     }
 
 
+    frame = RgbFrameSource::Frame{};
     return sources[cameraIndex]->getFrame(
         frame
     );
+}
+void RgbCameraWorker::frameProcessed(std::size_t cameraIndex, std::uint64_t timestamp)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    if (cameraIndex < CAMERA_COUNT && sources[cameraIndex])
+        sources[cameraIndex]->frameProcessed(timestamp);
 }

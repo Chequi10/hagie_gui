@@ -1643,6 +1643,23 @@ void STM32Worker::configureCallbacks()
     // ENCODERS
     // --------------------------------------------------------
 
+    stm32->set_speed_pulse_callback(
+        [this](const stm32canbus_serialif::speed_pulse_state& speed)
+        {
+            if (state == nullptr)
+            {
+                return;
+            }
+
+            HagieState::SpeedState value;
+            value.valid = speed.valid;
+            value.total_pulses = speed.total_pulses;
+            value.frequency_millihz = speed.frequency_millihz;
+            value.uptime_ms = speed.uptime_ms;
+            state->setSpeedState(value);
+        }
+    );
+
     stm32->set_encoder_callback(
         [this](
             const stm32canbus_serialif::encoder_state&

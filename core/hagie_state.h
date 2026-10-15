@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <chrono>
+
 
 
 class HagieState
@@ -194,6 +196,33 @@ public:
 
     HagieState();
 
+    struct SpeedState
+    {
+        bool valid = false;
+        uint64_t total_pulses = 0;
+        uint32_t frequency_millihz = 0;
+        uint32_t uptime_ms = 0;
+        uint64_t received_ms = 0;
+    };
+
+    void setSpeedState(SpeedState value)
+    {
+        value.received_ms = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()
+            ).count()
+        );
+        std::lock_guard<std::mutex> lock(stateMutex);
+        speedState = value;
+    }
+
+    SpeedState getSpeedState() const
+    {
+        std::lock_guard<std::mutex> lock(stateMutex);
+        return speedState;
+    }
+
+
 
     // ============================================================
     // Estado de cuerpos
@@ -323,6 +352,9 @@ private:
 
 
     SystemState systemState {};
+
+    SpeedState speedState {};
+
 
 
     ImuState imuState {};

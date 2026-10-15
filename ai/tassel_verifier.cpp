@@ -24,7 +24,7 @@ void TasselVerifier::setVerificationWindow(
 void TasselVerifier::processFrontDetections(
     const TasselDetector::Result& result)
 {
-    if (!result.valid)
+    if (!enabled || !result.valid)
     {
         return;
     }
@@ -72,7 +72,7 @@ void TasselVerifier::processFrontDetections(
 void TasselVerifier::processRearDetections(
     const TasselDetector::Result& result)
 {
-    if (!result.valid)
+    if (!enabled || !result.valid)
     {
         return;
     }
@@ -213,6 +213,8 @@ void TasselVerifier::processRearDetections(
 void TasselVerifier::update(
     std::uint64_t currentTimestampMs)
 {
+    if (!enabled) return;
+
     for (auto it =
              pendingTassels.begin();
          it != pendingTassels.end();)
@@ -263,4 +265,16 @@ TasselVerifier::State
 TasselVerifier::getState() const
 {
     return state;
+}
+
+void TasselVerifier::discardPending()
+{
+    pendingTassels.clear();
+    state.pending = 0;
+}
+
+void TasselVerifier::setEnabled(bool value)
+{
+    enabled = value;
+    if (!enabled) discardPending();
 }

@@ -22,6 +22,28 @@ public:
     static constexpr std::size_t BODY_COUNT = 6;
     static constexpr std::size_t BUFSIZE = 64;
 
+    /*
+     * Mensaje propuesto 'P': 18 bytes, big-endian.
+     * [0]     opcode
+     * [1]     válido: 0 o 1
+     * [2..9]  contador acumulado de pulsos
+     * [10..13] frecuencia en milihertz
+     * [14..17] tiempo STM32 en milisegundos
+     */
+    struct speed_pulse_state
+    {
+        bool valid = false;
+        uint64_t total_pulses = 0;
+        uint32_t frequency_millihz = 0;
+        uint32_t uptime_ms = 0;
+    };
+
+    using speed_pulse_callback =
+        std::function<void(const speed_pulse_state&)>;
+
+    void set_speed_pulse_callback(speed_pulse_callback callback);
+
+
 
     // ============================================================
     // Estados recibidos desde STM32
@@ -450,6 +472,9 @@ private:
     // ============================================================
 
     encoder_callback on_encoder;
+
+    speed_pulse_callback on_speed_pulse;
+
 
     encoder_raw_callback on_encoder_raw;
 

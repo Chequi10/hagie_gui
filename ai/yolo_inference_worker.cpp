@@ -2,6 +2,9 @@
 #include "vision/vision_3d_worker.h"
 
 #include <chrono>
+#include <algorithm>
+#include <memory>
+#include "ai/onnx_tassel_detector.h"
 
 
 YoloInferenceWorker::YoloInferenceWorker(
@@ -29,6 +32,10 @@ bool YoloInferenceWorker::initialize(
     float confidenceThreshold,
     float nmsThreshold)
 {
+    stop();
+    resetResults();
+    useOnnx = false;
+    setThresholds(confidenceThreshold, nmsThreshold);
     detector.setConfidenceThreshold(
         confidenceThreshold
     );
@@ -52,7 +59,7 @@ bool YoloInferenceWorker::start()
     }
 
 
-    if (!detector.isInitialized())
+    if (!useOnnx && !detector.isInitialized())
     {
         return false;
     }
@@ -176,14 +183,23 @@ void YoloInferenceWorker::workerLoop()
     };
 
 
-    std::size_t scheduleIndex =
-        0;
+    std::size_t scheduleIndex = 0;
+    std::unique_ptr<OnnxTasselDetector> cpu;
+    if (useOnnx) {
+        cpu = std::make_unique<OnnxTasselDetector>();
+        if (!cpu->initialize(onnxPython, onnxHelper, onnxModel, running)) {
+            std::lock_guard<std::mutex> lock(resultMutex);
+            lastError = cpu->error();
+            running.store(false);
+            return;
+        }
+    }
 
 
     while (running.load())
     {
         const std::size_t cameraIndex =
-            schedule[scheduleIndex];
+            useOnnx ? onnxCamera : schedule[scheduleIndex];
 
 
         scheduleIndex =
@@ -216,7 +232,7 @@ void YoloInferenceWorker::workerLoop()
         if (frame.timestamp_ms ==
             lastProcessedTimestamp[cameraIndex])
         {
-            std::this_thread::yield();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             continue;
         }
@@ -244,7 +260,7 @@ void YoloInferenceWorker::workerLoop()
             false;
 
 
-        if (cameraIndex <
+        if (!frame.rgb_only && cameraIndex <
                 Vision3DWorker::CAMERA_COUNT)
         {
             if (vision3DWorker == nullptr)
@@ -297,6 +313,7 @@ void YoloInferenceWorker::workerLoop()
         {
             lastProcessedTimestamp[cameraIndex] =
                 frame.timestamp_ms;
+            rgbCameraWorker.frameProcessed(cameraIndex, frame.timestamp_ms);
 
             continue;
         }
@@ -306,15 +323,24 @@ void YoloInferenceWorker::workerLoop()
             0;
 
 
-        if (!detector.processFrame(
-                cameraIndex,
-                frame,
-                result
-            ))
-        {
+        bool processed = false;
+        if (cpu) {
+            processed = cpu->processFrame(cameraIndex, frame, result,
+                confidence.load(), nms.load(), running);
+        } else {
+            detector.setConfidenceThreshold(confidence.load());
+            detector.setNmsThreshold(nms.load());
+            processed = detector.processFrame(cameraIndex, frame, result);
+        }
+        if (!processed) {
+            if (cpu) {
+                std::lock_guard<std::mutex> lock(resultMutex);
+                lastError = cpu->error();
+                running.store(false);
+                return;
+            }
             continue;
         }
-
 
         lastProcessedTimestamp[cameraIndex] =
             frame.timestamp_ms;
@@ -327,6 +353,9 @@ void YoloInferenceWorker::workerLoop()
 
 
             Result cachedResult;
+            if (frame.rgb_only) cachedResult.rgbFrame = frame;
+            cachedResult.rgbOnly = frame.rgb_only;
+            cachedResult.inferenceMs = cpu ? cpu->inferenceMs() : 0;
 
             cachedResult.detectionResult =
                 std::move(
@@ -350,5 +379,37 @@ void YoloInferenceWorker::workerLoop()
                     cachedResult
                 );
         }
+        rgbCameraWorker.frameProcessed(cameraIndex, frame.timestamp_ms);
     }
+}
+void YoloInferenceWorker::resetResults()
+{
+    std::lock_guard<std::mutex> lock(resultMutex);
+    latestResults = {};
+    lastProcessedTimestamp = {};
+    frameCounters = {};
+    lastError.clear();
+}
+bool YoloInferenceWorker::initializeOnnx(const std::string& model, const std::string& python,
+                                        const std::string& helper, std::size_t camera,
+                                        float score, float iou)
+{
+    stop();
+    resetResults();
+    if (camera >= CAMERA_COUNT || model.empty() || python.empty() || helper.empty()) return false;
+    useOnnx = true;
+    onnxCamera = camera;
+    onnxModel = model; onnxPython = python; onnxHelper = helper;
+    setThresholds(score, iou);
+    return true;
+}
+void YoloInferenceWorker::setThresholds(float score, float iou)
+{
+    confidence.store(std::clamp(score, 0.0f, 1.0f));
+    nms.store(std::clamp(iou, 0.0f, 1.0f));
+}
+std::string YoloInferenceWorker::error() const
+{
+    std::lock_guard<std::mutex> lock(resultMutex);
+    return lastError;
 }

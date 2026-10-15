@@ -34,6 +34,9 @@ public:
         std::uint64_t timestamp_ms = 0;
 
         bool valid = false;
+
+        // RGB-only sources have no matching physical depth frame.
+        bool rgb_only = false;
     };
 
 
@@ -53,4 +56,6 @@ public:
 
 
     virtual std::size_t getCameraIndex() const = 0;
+
+    virtual void frameProcessed(std::uint64_t) {}
 };

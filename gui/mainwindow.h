@@ -16,6 +16,8 @@
 #include "vision/vision_3d_processor.h"
 #include "vision/rgb_camera_worker.h"
 #include "vision/simulated_rgb_frame_source.h"
+#include "vision/video_rgb_frame_source.h"
+#include "gui/video_rgb_controls.h"
 #include "ai/tassel_detector.h"
 #include "ai/tassel_counter.h"
 #include "ai/tassel_verifier.h"
@@ -808,6 +810,9 @@ private:
 
     QDoubleSpinBox *configTasselSpeedSpin =
         nullptr;
+    QDoubleSpinBox *configSpeedPulsesPerMeterSpin = nullptr;
+    QDoubleSpinBox *configSpeedCalibrationDistanceSpin = nullptr;
+
 
     QSpinBox *configTasselCameraDistanceSpin =
         nullptr;
@@ -831,6 +836,9 @@ private:
 
     QComboBox *configYoloFormatCombo =
         nullptr;
+
+    QLineEdit *configYoloOnnxEdit = nullptr;
+    QLineEdit *configYoloPythonEdit = nullptr;
 
     QLineEdit *configYoloEngineEdit =
         nullptr;
@@ -925,6 +933,11 @@ private:
     std::size_t selectedRgbCamera =
         0;
 
+    VideoRgbControls *videoRgbControls = nullptr;
+    bool videoRgbActive = false;
+    std::size_t videoCameraIndex = 0;
+    std::shared_ptr<VideoRgbFrameSource::Cache> videoFrameCache;
+
     TasselDetector tasselDetector;
     TasselCounter tasselCounter;
 
@@ -957,6 +970,24 @@ private:
     * rueda dentada + sensor inductivo.
     */
     double getForwardSpeedKmh() const;
+    bool speedTelemetryFresh() const;
+    void updateSpeedUi();
+    void startSpeedCalibration();
+    void finishSpeedCalibration();
+    void cancelSpeedCalibration(const QString& reason);
+
+    QComboBox *configSpeedSourceCombo = nullptr;
+    QLabel *configCurrentSpeedLabel = nullptr;
+    QLabel *dashboardSpeedValueLabel = nullptr;
+    QLabel *dashboardSpeedSourceLabel = nullptr;
+    QLabel *configSpeedCalibrationStatusLabel = nullptr;
+    QPushButton *configSpeedCalibrationStartButton = nullptr;
+    QPushButton *configSpeedCalibrationFinishButton = nullptr;
+    bool speedCalibrationActive = false;
+    uint64_t speedCalibrationStartPulses = 0;
+    uint64_t speedCalibrationLastPulses = 0;
+    uint32_t speedCalibrationLastUptime = 0;
+    double speedCalibrationDistanceM = 0.0;
 
     VisionHeightSample getDelayedVisionSample(
         std::size_t body,

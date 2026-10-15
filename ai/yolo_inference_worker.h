@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <mutex>
 #include <thread>
+#include <string>
 
 #include "ai/tassel_detector.h"
 #include "ai/tensorrt_tassel_detector.h"
@@ -24,6 +25,9 @@ public:
     struct Result
     {
         TasselDetector::Result detectionResult;
+        RgbFrameSource::Frame rgbFrame;
+        bool rgbOnly = false;
+        double inferenceMs = 0;
 
         Vision3DProcessor::PointCloud pointCloud;
 
@@ -52,6 +56,12 @@ public:
     );
 
 
+    bool initializeOnnx(const std::string& model, const std::string& python,
+                        const std::string& helper, std::size_t camera,
+                        float confidence, float nms);
+    void setThresholds(float confidence, float nms);
+    std::string error() const;
+
     bool start();
 
     void stop();
@@ -72,6 +82,13 @@ public:
 private:
 
     void workerLoop();
+    void resetResults();
+    bool useOnnx = false;
+    std::size_t onnxCamera = 0;
+    std::string onnxModel, onnxPython, onnxHelper;
+    std::string lastError;
+    std::atomic<float> confidence {0.25f};
+    std::atomic<float> nms {0.45f};
 
 
     RgbCameraWorker& rgbCameraWorker;

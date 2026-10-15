@@ -34,6 +34,8 @@ public:
 
 
     void reset();
+    void discardPending();
+    void setEnabled(bool value);
 
     void setVerificationWindow(
         std::uint64_t minDelayMs,
@@ -83,4 +85,5 @@ private:
 
 
     State state;
+    bool enabled = true;
 };

@@ -29,6 +29,15 @@ option(
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+# Acquisition and CPU backend helpers, beside the executable.
+foreach(helper video_rgb_source onnx_inference)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/${helper}.py
+                   ${CMAKE_CURRENT_BINARY_DIR}/${helper}.py COPYONLY)
+endforeach()
+# Remove the obsolete video+detector helper from previous builds.
+file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/rgb_video_inference.py)
+
+
 
 # ============================================================
 # EJECUTABLE PRINCIPAL
@@ -41,6 +50,8 @@ add_executable(
 
     gui/mainwindow.cpp
     gui/mainwindow.h
+    gui/video_rgb_controls.cpp
+    gui/video_rgb_controls.h
 
     gui/height_trend_widget.cpp
     gui/height_trend_widget.h
@@ -72,6 +83,7 @@ add_executable(
     vision/rgb_camera_worker.cpp
     vision/rgb_camera_worker.h
     vision/rgb_frame_source.h
+    vision/video_rgb_frame_source.h
     vision/simulated_rgb_frame_source.cpp
     vision/simulated_rgb_frame_source.h
 
@@ -91,6 +103,9 @@ add_executable(
     ai/tensorrt_tassel_detector.cpp
     ai/tensorrt_tassel_detector.h
     ai/tensorrt_compat.h
+
+    ai/onnx_tassel_detector.cpp
+    ai/onnx_tassel_detector.h
 
     ai/yolo_inference_worker.cpp
     ai/yolo_inference_worker.h
@@ -407,3 +422,25 @@ target_link_libraries(
     PRIVATE
     Qt6::Widgets
 )
+# RGB video source replacement and restoration.
+add_executable(video_rgb_frame_source_test
+    tests/video_rgb_frame_source_test.cpp
+    vision/rgb_camera_worker.cpp
+    vision/simulated_rgb_frame_source.cpp)
+target_include_directories(video_rgb_frame_source_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Common inference worker: RGB-only input, frame interval and lifecycle.
+find_package(Threads REQUIRED)
+add_executable(yolo_rgb_pipeline_test
+    tests/yolo_rgb_pipeline_test.cpp tests/onnx_detector_stub.cpp
+    ai/yolo_inference_worker.cpp ai/tensorrt_tassel_detector.cpp ai/tassel_detector.cpp
+    vision/rgb_camera_worker.cpp vision/vision_3d_worker.cpp
+    vision/vision_3d_processor.cpp vision/vision_height_source.cpp core/hagie_state.cpp)
+target_include_directories(yolo_rgb_pipeline_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(yolo_rgb_pipeline_test PRIVATE Threads::Threads)
+
+# Exercise the real QProcess transport with a tiny deterministic detector.
+add_executable(onnx_transport_test tests/onnx_transport_test.cpp
+    ai/onnx_tassel_detector.cpp ai/tassel_detector.cpp)
+target_include_directories(onnx_transport_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(onnx_transport_test PRIVATE Qt6::Core)

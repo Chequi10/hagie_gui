@@ -1,10 +1,12 @@
 #include "mainwindow.h"
+#include "video_rgb_controls.h"
 
 #include <algorithm>
 #include <cmath>
 
 #include <QAction>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -155,61 +157,57 @@ MainWindow::MainWindow(
     centralStack =
         new QStackedWidget(this);
 
+    auto addScrollablePage = [this](QWidget *page)
+    {
+        QScrollArea *scroll = new QScrollArea();
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setWidget(page);
+        centralStack->addWidget(scroll);
+    };
+
+
 
     /*
      * Página 0
      */
-    centralStack->addWidget(
-        createDashboardPage()
-    );
+    addScrollablePage(createDashboardPage());
 
 
     /*
      * Página 1
      */
-    centralStack->addWidget(
-        createCamerasPage()
-    );
+    addScrollablePage(createCamerasPage());
 
 
     /*
      * Página 2
      */
-    centralStack->addWidget(
-        createFaultsPage()
-    );
+    addScrollablePage(createFaultsPage());
 
 
     /*
      * Página 3
      */
-    centralStack->addWidget(
-        createTestsPage()
-    );
+    addScrollablePage(createTestsPage());
 
 
     /*
      * Página 4
      */
-    centralStack->addWidget(
-        createConfigurationPage()
-    );
+    addScrollablePage(createConfigurationPage());
 
     /*
     * Página 5
     * Comunicaciones
     */
-    centralStack->addWidget(
-        createCommunicationsPage()
-    );
+    addScrollablePage(createCommunicationsPage());
 
     /*
     * Página 6
     * Logs
     */
-    centralStack->addWidget(
-        createLogsPage()
-    );
+    addScrollablePage(createLogsPage());
 
 
     setCentralWidget(
@@ -1087,6 +1085,15 @@ void MainWindow::updateTestPage()
 
 MainWindow::~MainWindow()
 {
+    if (videoRgbControls) {
+        videoRgbControls->stopVideo();
+        videoRgbControls->onStarted = {};
+        videoRgbControls->onFrame = {};
+        videoRgbControls->onStopped = {};
+        videoRgbControls->frameConsumed = {};
+        videoRgbControls->detectorError = {};
+        videoRgbControls->pythonPath = {};
+    }
      yoloInferenceWorker.stop();
 }
 
@@ -1790,9 +1797,7 @@ QWidget *MainWindow::createDashboardPage()
         8
     );
 
-    mainLayout->setSpacing(
-        6
-    );    
+    mainLayout->setSpacing(4);
 
 
     QLabel *title =
@@ -1809,7 +1814,41 @@ QWidget *MainWindow::createDashboardPage()
         "font-weight: bold;"
     );
 
-    mainLayout->addWidget(title);
+    QHBoxLayout *dashboardHeaderLayout = new QHBoxLayout();
+    dashboardHeaderLayout->addWidget(title, 1);
+
+    QFrame *dashboardSpeedFrame = new QFrame();
+    dashboardSpeedFrame->setObjectName("dashboardSpeedFrame");
+    dashboardSpeedFrame->setMinimumWidth(380);
+    dashboardSpeedFrame->setFixedHeight(44);
+    dashboardSpeedFrame->setStyleSheet(
+        "QFrame#dashboardSpeedFrame {"
+        "background-color: #f3f6f8; border: 2px solid #708090;"
+        "border-radius: 8px; }"
+    );
+    QHBoxLayout *dashboardSpeedLayout = new QHBoxLayout(dashboardSpeedFrame);
+    dashboardSpeedLayout->setContentsMargins(8, 2, 8, 2);
+    dashboardSpeedLayout->setSpacing(8);
+    QLabel *dashboardSpeedTitle = new QLabel("VELOCIDAD");
+    dashboardSpeedTitle->setAlignment(Qt::AlignCenter);
+    dashboardSpeedTitle->setStyleSheet(
+        "font-size: 10px; font-weight: bold; color: #344454;"
+    );
+    dashboardSpeedValueLabel = new QLabel("--- km/h");
+    dashboardSpeedValueLabel->setAlignment(Qt::AlignCenter);
+    dashboardSpeedValueLabel->setStyleSheet(
+        "font-size: 24px; font-weight: bold; color: #344454;"
+    );
+    dashboardSpeedSourceLabel = new QLabel("FUENTE: ---");
+    dashboardSpeedSourceLabel->setAlignment(Qt::AlignCenter);
+    dashboardSpeedSourceLabel->setStyleSheet(
+        "font-size: 10px; font-weight: bold; color: #344454;"
+    );
+    dashboardSpeedLayout->addWidget(dashboardSpeedTitle);
+    dashboardSpeedLayout->addWidget(dashboardSpeedValueLabel);
+    dashboardSpeedLayout->addWidget(dashboardSpeedSourceLabel);
+    dashboardHeaderLayout->addWidget(dashboardSpeedFrame);
+    mainLayout->addLayout(dashboardHeaderLayout);
 
 
     QLabel *subtitle =
@@ -1849,6 +1888,8 @@ QWidget *MainWindow::createDashboardPage()
 
         QVBoxLayout *layout =
             new QVBoxLayout(frame);
+        layout->setContentsMargins(6, 6, 6, 6);
+        layout->setSpacing(3);
 
 
         QLabel *bodyTitle =
@@ -2122,6 +2163,7 @@ QWidget *MainWindow::createDashboardPage()
 
     heightTrendWidget =
         new HeightTrendWidget();
+    heightTrendWidget->setMinimumHeight(120);
 
     heightTrendWidget->setAutoScale(
         false
@@ -2470,6 +2512,7 @@ void MainWindow::updateCameraPage()
     const bool realYoloMode =
         configVisionSourceCombo != nullptr &&
         configVisionSourceCombo->currentIndex() == 2;
+    const bool inferenceMode = realYoloMode || videoRgbActive;
 
 
     for (std::size_t camera = 0;
@@ -2486,6 +2529,7 @@ void MainWindow::updateCameraPage()
 
         bool cloud3DValid =
             false;
+        bool rgbOnlyResult = false;
 
 
         /*
@@ -2493,14 +2537,10 @@ void MainWindow::updateCameraPage()
         * OBTENCIÓN DEL RESULTADO DE IA
         * =====================================================
         *
-        * SIMULACIÓN:
-        * TasselDetector continúa ejecutándose directamente.
-        *
-        * MODO REAL:
-        * La GUI solamente consume resultados ya procesados
-        * por YoloInferenceWorker.
+        * Cámaras reales y RGB de video: resultados de YoloInferenceWorker.
+        * Sin video, la simulación conserva el detector sintético.
         */
-        if (realYoloMode)
+        if (inferenceMode)
         {
             YoloInferenceWorker::Result yoloResult;
 
@@ -2531,6 +2571,7 @@ void MainWindow::updateCameraPage()
             }
 
 
+            rgbOnlyResult = yoloResult.rgbOnly;
             cameraResult =
                 std::move(
                     yoloResult.detectionResult
@@ -2543,7 +2584,7 @@ void MainWindow::updateCameraPage()
             * correspondiente exactamente al mismo
             * frame RGB utilizado por TensorRT.
             */
-            if (camera < Vision3DWorker::CAMERA_COUNT)
+            if (!yoloResult.rgbOnly && camera < Vision3DWorker::CAMERA_COUNT)
             {
                 if (!yoloResult.pointCloudValid)
                 {
@@ -2678,7 +2719,7 @@ void MainWindow::updateCameraPage()
         * Solo las cámaras frontales 0..4
         * disponen de nube de puntos.
         */
-        if (camera < Vision3DWorker::CAMERA_COUNT)
+        if (!rgbOnlyResult && camera < Vision3DWorker::CAMERA_COUNT)
         {
             std::vector<
                 TasselDetector::Detection
@@ -2766,10 +2807,10 @@ void MainWindow::updateCameraPage()
         {
             /*
             * =====================================================
-            * ASIGNACIÓN DE CUERPO PARA CÁMARAS TRASERAS
+            * ASIGNACIÓN DE CUERPO POR POSICIÓN RGB
             * =====================================================
             *
-            * Las cámaras 5 y 6 no utilizan nube 3D.
+            * Las cámaras traseras y el video RGB no utilizan nube 3D.
             *
             * El cuerpo se determina por la posición horizontal
             * del centro del bounding box dentro de la imagen.
@@ -2822,7 +2863,9 @@ void MainWindow::updateCameraPage()
         /*
          * No apareció ninguna panoja nueva.
          */
-        if (newDetections.empty())
+        // El video cuenta con el tracker 2D existente. No aporta
+        // observaciones físicas para verificar la remoción de panojas.
+        if (newDetections.empty() || rgbOnlyResult)
         {
             continue;
         }
@@ -2847,6 +2890,7 @@ void MainWindow::updateCameraPage()
         */
         if (camera < 5)
         {
+            updateTasselVerificationTiming();
             tasselVerifier.processFrontDetections(
                 uniqueResult
             );
@@ -2860,6 +2904,7 @@ void MainWindow::updateCameraPage()
         */
         else
         {
+            updateTasselVerificationTiming();
             tasselVerifier.processRearDetections(
                 uniqueResult
             );
@@ -2871,23 +2916,20 @@ void MainWindow::updateCameraPage()
     * ESTADO DEL MÓDULO DE IA
     * ========================================================
     *
-    * La IA se considera activa cuando el detector
-    * pudo procesar al menos un frame RGB válido
-    * durante este ciclo de actualización.
-    *
-    * Actualmente TasselDetector utiliza detecciones
-    * simuladas. Más adelante YOLO reemplazará solamente
-    * esa etapa de detección.
+    * El worker sigue activo entre resultados de inferencia.
+    * La simulación sintética conserva su estado por frame.
     */
     if (state != nullptr)
     {
         HagieState::SystemState system =
             state->getSystemState();
 
-        if (system.ai_running != aiProcessedFrame)
+        const bool aiActive = inferenceMode
+            ? yoloInferenceWorker.isRunning()
+            : aiProcessedFrame;
+        if (system.ai_running != aiActive)
         {
-            system.ai_running =
-                aiProcessedFrame;
+            system.ai_running = aiActive;
 
             state->setSystemState(
                 system
@@ -2902,7 +2944,8 @@ void MainWindow::updateCameraPage()
     */
     if (latestTimestampMs != 0)
     {
-        tasselVerifier.update(
+        updateTasselVerificationTiming();
+            tasselVerifier.update(
             latestTimestampMs
         );
     }
@@ -2974,42 +3017,26 @@ void MainWindow::updateCameraPage()
     * RESULTADO PARA VISUALIZACIÓN
     * ========================================================
     *
-    * En simulación ejecutamos el detector simulado.
-    *
-    * En modo real reutilizamos exclusivamente el resultado
-    * producido por YoloInferenceWorker.
+    * Video y cámaras reales reutilizan el resultado del mismo worker.
+    * La simulación sin video conserva el detector sintético.
     *
     * La GUI nunca ejecuta TensorRT.
     */
-    if (realYoloMode)
+    if (inferenceMode)
     {
         YoloInferenceWorker::Result yoloDisplayResult;
-
-
-        if (yoloInferenceWorker.getLatestResult(
-                selectedRgbCamera,
-                yoloDisplayResult
-            ))
+        if (yoloInferenceWorker.getLatestResult(selectedRgbCamera, yoloDisplayResult) &&
+            yoloDisplayResult.detectionResult.valid)
         {
-            /*
-            * Solo dibujamos bounding boxes cuando el resultado
-            * corresponde exactamente al frame que estamos
-            * mostrando.
-            *
-            * Esto evita dibujar cajas viejas sobre una imagen
-            * RGB más nueva.
-            */
-            if (yoloDisplayResult.detectionResult.valid &&
-                yoloDisplayResult.detectionResult.timestamp_ms ==
-                    frame.timestamp_ms)
-            {
-                detectionResult =
-                    std::move(
-                        yoloDisplayResult.detectionResult
-                    );
-
-                detectionResultValid =
-                    true;
+            if (yoloDisplayResult.rgbOnly) {
+                frame = std::move(yoloDisplayResult.rgbFrame);
+                QImage rgb(frame.data.data(), static_cast<int>(frame.width),
+                    static_cast<int>(frame.height), static_cast<int>(frame.width * 3), QImage::Format_RGB888);
+                displayImage = rgb.copy();
+            }
+            if (yoloDisplayResult.detectionResult.timestamp_ms == frame.timestamp_ms) {
+                detectionResult = std::move(yoloDisplayResult.detectionResult);
+                detectionResultValid = true;
             }
         }
     }
@@ -3032,9 +3059,10 @@ void MainWindow::updateCameraPage()
 
 
         QPen pen;
+        pen.setColor(QColor(57, 255, 20));
 
         pen.setWidth(
-            3
+            4
         );
 
         painter.setPen(
@@ -3061,6 +3089,14 @@ void MainWindow::updateCameraPage()
             tasselVerifier.getState();
 
 
+        const double textScale = std::max(1.0, displayImage.height() / 600.0);
+        painter.scale(textScale, textScale);
+        QFont textFont = painter.font();
+        textFont.setPixelSize(18);
+        textFont.setBold(true);
+        painter.setFont(textFont);
+        painter.setPen(QColor(255, 20, 147));
+
         painter.drawText(
             10,
             25,
@@ -3072,59 +3108,14 @@ void MainWindow::updateCameraPage()
         );
 
 
-        painter.drawText(
-            10,
-            50,
-            QString(
-                "Frontal acumulado: %1"
-            ).arg(
-                counterState.front_count
-            )
-        );
+        painter.drawText(10, 50, QString("Frontal acumulado: %1").arg(counterState.front_count));
+        painter.drawText(10, 75, QString("Trasero acumulado: %1").arg(counterState.rear_count));
+        painter.drawText(10, 100, QString("Pendientes: %1").arg(verifierState.pending));
+        painter.drawText(10, 125, QString("Removidas: %1").arg(verifierState.verified_removed));
+        painter.drawText(10, 150, QString("Siguen presentes: %1").arg(verifierState.verified_remaining));
+        if (frame.rgb_only)
+            painter.drawText(10, 175, "CONTEO RGB 2D — SIN VERIFICACIÓN 3D");
 
-
-        painter.drawText(
-            10,
-            75,
-            QString(
-                "Trasero acumulado: %1"
-            ).arg(
-                counterState.rear_count
-            )
-        );
-
-
-        painter.drawText(
-            10,
-            100,
-            QString(
-                "Pendientes: %1"
-            ).arg(
-                verifierState.pending
-            )
-        );
-
-
-        painter.drawText(
-            10,
-            125,
-            QString(
-                "Removidas: %1"
-            ).arg(
-                verifierState.verified_removed
-            )
-        );
-
-
-        painter.drawText(
-            10,
-            150,
-            QString(
-                "Siguen presentes: %1"
-            ).arg(
-                verifierState.verified_remaining
-            )
-        );
     }
 
 
@@ -6970,7 +6961,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *tasselVerificationTitle =
         new QLabel(
-            "VERIFICACIÓN DE PANOJAS"
+            "VELOCIDAD DE AVANCE"
         );
 
     tasselVerificationTitle->setAlignment(
@@ -6990,19 +6981,31 @@ QWidget *MainWindow::createConfigurationPage()
     /*
      * Velocidad estimada.
      */
+    QHBoxLayout *speedSourceLayout = new QHBoxLayout();
+    configSpeedSourceCombo = new QComboBox();
+    configSpeedSourceCombo->addItem("MANUAL / PRUEBAS", 0);
+    configSpeedSourceCombo->addItem("SENSOR STM32", 1);
+    configCurrentSpeedLabel = new QLabel("Velocidad actual: --- km/h");
+    configCurrentSpeedLabel->setStyleSheet("font-weight: bold;");
+    speedSourceLayout->addWidget(new QLabel("Fuente de velocidad:"));
+    speedSourceLayout->addWidget(configSpeedSourceCombo);
+    speedSourceLayout->addWidget(configCurrentSpeedLabel);
+    speedSourceLayout->addStretch();
+    tasselVerificationPageLayout->addLayout(speedSourceLayout);
+
     QHBoxLayout *tasselSpeedLayout =
         new QHBoxLayout();
 
     QLabel *tasselSpeedLabel =
         new QLabel(
-            "Velocidad de trabajo estimada (km/h):"
+            "Velocidad manual (km/h):"
         );
 
     configTasselSpeedSpin =
         new QDoubleSpinBox();
 
     configTasselSpeedSpin->setRange(
-        0.1,
+        0.0,
         30.0
     );
 
@@ -7032,10 +7035,107 @@ QWidget *MainWindow::createConfigurationPage()
         tasselSpeedLayout
     );
 
+    /*
+     * Calibración del sensor de velocidad.
+     */
+    QHBoxLayout *speedCalibrationLayout = new QHBoxLayout();
+
+    configSpeedPulsesPerMeterSpin = new QDoubleSpinBox();
+    configSpeedPulsesPerMeterSpin->setRange(0.0, 1000000.0);
+    configSpeedPulsesPerMeterSpin->setDecimals(3);
+    configSpeedPulsesPerMeterSpin->setSingleStep(1.0);
+    configSpeedPulsesPerMeterSpin->setSpecialValueText(
+        "SIN CALIBRAR"
+    );
+    configSpeedPulsesPerMeterSpin->setToolTip(
+        "Pulsos contados divididos por la distancia "
+        "recorrida en metros."
+    );
+
+    speedCalibrationLayout->addWidget(
+        new QLabel("Pulsos por metro:")
+    );
+    speedCalibrationLayout->addWidget(
+        configSpeedPulsesPerMeterSpin
+    );
+
+    configSpeedCalibrationDistanceSpin = new QDoubleSpinBox();
+    configSpeedCalibrationDistanceSpin->setRange(1.0, 1000.0);
+    configSpeedCalibrationDistanceSpin->setDecimals(2);
+    configSpeedCalibrationDistanceSpin->setSingleStep(5.0);
+    configSpeedCalibrationDistanceSpin->setSuffix(" m");
+    configSpeedCalibrationDistanceSpin->setValue(20.0);
+
+    speedCalibrationLayout->addWidget(
+        new QLabel("Distancia de calibración:")
+    );
+    speedCalibrationLayout->addWidget(
+        configSpeedCalibrationDistanceSpin
+    );
+    speedCalibrationLayout->addStretch();
+
+    tasselVerificationPageLayout->addLayout(
+        speedCalibrationLayout
+    );
+
+    QHBoxLayout *speedButtonsLayout = new QHBoxLayout();
+    configSpeedCalibrationStartButton = new QPushButton("INICIAR CALIBRACIÓN");
+    configSpeedCalibrationFinishButton = new QPushButton("FINALIZAR CALIBRACIÓN");
+    QPushButton *cancelSpeedButton = new QPushButton("CANCELAR");
+    configSpeedCalibrationFinishButton->setEnabled(false);
+    configSpeedCalibrationStatusLabel = new QLabel(
+        "Medí la distancia, iniciá, recorré el tramo y finalizá."
+    );
+    configSpeedCalibrationStatusLabel->setWordWrap(true);
+    speedButtonsLayout->addWidget(configSpeedCalibrationStartButton);
+    speedButtonsLayout->addWidget(configSpeedCalibrationFinishButton);
+    speedButtonsLayout->addWidget(cancelSpeedButton);
+    speedButtonsLayout->addStretch();
+    tasselVerificationPageLayout->addLayout(speedButtonsLayout);
+    tasselVerificationPageLayout->addWidget(configSpeedCalibrationStatusLabel);
+
+    connect(configSpeedCalibrationStartButton, &QPushButton::clicked,
+            this, &MainWindow::startSpeedCalibration);
+    connect(configSpeedCalibrationFinishButton, &QPushButton::clicked,
+            this, &MainWindow::finishSpeedCalibration);
+    connect(cancelSpeedButton, &QPushButton::clicked, this, [this]() {
+        cancelSpeedCalibration("Calibración cancelada; se conserva el valor anterior.");
+    });
+    connect(configSpeedSourceCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+        tasselVerifier.discardPending();
+        for (auto& history : visionHeightHistory) history.clear();
+        updateSpeedUi();
+    });
+    connect(configSpeedPulsesPerMeterSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) {
+        tasselVerifier.discardPending();
+        for (auto& history : visionHeightHistory) history.clear();
+        updateSpeedUi();
+    });
+
+
 
     /*
      * Distancia entre cámaras delanteras y traseras.
      */
+
+    tasselVerificationPageLayout->addSpacing(16);
+
+    QFrame *speedPanojasSeparator = new QFrame();
+    speedPanojasSeparator->setFrameShape(QFrame::HLine);
+    speedPanojasSeparator->setFrameShadow(QFrame::Sunken);
+    tasselVerificationPageLayout->addWidget(speedPanojasSeparator);
+
+    QLabel *panojasSectionTitle = new QLabel(
+        "VERIFICACIÓN DE PANOJAS"
+    );
+    panojasSectionTitle->setAlignment(Qt::AlignCenter);
+    panojasSectionTitle->setStyleSheet(
+        "font-size: 16px; font-weight: bold;"
+    );
+    tasselVerificationPageLayout->addWidget(panojasSectionTitle);
+
     QHBoxLayout *tasselDistanceLayout =
         new QHBoxLayout();
 
@@ -7131,7 +7231,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     configTasselVerificationWindowLabel =
         new QLabel(
-            "Ventana de verificación: --- ms"
+            "Verificación suspendida: sin velocidad válida o máquina detenida."
         );
 
     configTasselExpectedTimeLabel->setStyleSheet(
@@ -7254,12 +7354,12 @@ QWidget *MainWindow::createConfigurationPage()
 
     QPushButton *controlButton =
         new QPushButton(
-            "CONTROL / SEGURIDAD"
+            "HIDRÁULICA / CONTROL"
         );
 
     QPushButton *tasselVerificationButton =
         new QPushButton(
-            "VERIFICACIÓN PANOJAS"
+            "VELOCIDAD / PANOJAS"
         );
 
     QPushButton *calibrationButton =
@@ -7775,6 +7875,7 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this](int index)
         {
+            if (videoRgbControls) videoRgbControls->stopVideo();
             /*
             * Detener inferencia antes de reemplazar
             * cualquier fuente RGB.
@@ -8577,6 +8678,58 @@ QWidget *MainWindow::createConfigurationPage()
         visionSourceFrame
     );
 
+    videoRgbControls = new VideoRgbControls(generalPage);
+    generalPageLayout->addWidget(videoRgbControls);
+    videoRgbControls->setVisible(configVisionSourceCombo->currentIndex() == 1);
+    videoRgbControls->pythonPath = [this]() { return configYoloPythonEdit->text(); };
+    videoRgbControls->onStarted = [this](std::size_t camera) {
+        if (!QFileInfo(configYoloOnnxEdit->text()).isFile()) return false;
+        saveConfiguration();
+        yoloInferenceWorker.stop();
+        lastConsumedYoloTimestamp.fill(0);
+        tasselCounter.reset();
+        tasselVerifier.reset();
+        videoCameraIndex = camera;
+        videoFrameCache = std::make_shared<VideoRgbFrameSource::Cache>();
+        rgbCameraWorker.setFrameSource(camera,
+            std::make_unique<VideoRgbFrameSource>(camera, videoFrameCache));
+        videoRgbActive = true;
+        const bool initialized = yoloInferenceWorker.initializeOnnx(
+            configYoloOnnxEdit->text().toStdString(), configYoloPythonEdit->text().toStdString(),
+            (QCoreApplication::applicationDirPath() + "/onnx_inference.py").toStdString(), camera,
+            static_cast<float>(configYoloConfidenceSpin->value()),
+            static_cast<float>(configYoloNmsSpin->value()));
+        yoloInferenceWorker.setFrameInterval(static_cast<std::size_t>(configAiFrameIntervalSpin->value()));
+        if (initialized && yoloInferenceWorker.start()) return true;
+        videoRgbControls->onStopped();
+        return false;
+    };
+    videoRgbControls->onFrame = [this](const RgbFrameSource::Frame& frame) {
+        if (videoRgbActive && videoFrameCache) videoFrameCache->publish(frame);
+    };
+    videoRgbControls->frameConsumed = [this]() {
+        return videoFrameCache && videoFrameCache->isConsumed();
+    };
+    videoRgbControls->detectorError = [this]() {
+        return QString::fromStdString(yoloInferenceWorker.error());
+    };
+    videoRgbControls->onStopped = [this]() {
+        if (!videoRgbActive) return;
+        yoloInferenceWorker.stop();
+        rgbCameraWorker.setFrameSource(videoCameraIndex,
+            std::make_unique<SimulatedRgbFrameSource>(videoCameraIndex));
+        videoRgbActive = false;
+        videoFrameCache.reset();
+        lastConsumedYoloTimestamp.fill(0);
+        tasselCounter.reset();
+        tasselVerifier.reset();
+    };
+    connect(configVisionSourceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            videoRgbControls, [this](int index) {
+        videoRgbControls->setVisible(index == 1);
+    });
+
+
         /*
      * ========================================================
      * DETECTOR DE PANOJAS - TENSORRT
@@ -8623,7 +8776,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *yoloFormatLabel =
         new QLabel(
-            "Formato del modelo:"
+            "Formato de salida TensorRT:"
         );
 
     configYoloFormatCombo =
@@ -8802,6 +8955,29 @@ QWidget *MainWindow::createConfigurationPage()
         yoloNmsLayout
     );
 
+
+    const auto detectorPathRow = [this, yoloConfigLayout](const QString& label, const QString& filter) {
+        auto *row = new QHBoxLayout();
+        row->addWidget(new QLabel(label));
+        auto *edit = new QLineEdit();
+        row->addWidget(edit, 1);
+        auto *browse = new QPushButton("Elegir…");
+        row->addWidget(browse);
+        connect(browse, &QPushButton::clicked, this, [this, edit, filter]() {
+            const auto path = QFileDialog::getOpenFileName(this, "Detector de panojas", edit->text(), filter);
+            if (!path.isEmpty()) edit->setText(path);
+        });
+        yoloConfigLayout->addLayout(row);
+        return edit;
+    };
+    configYoloOnnxEdit = detectorPathRow("Modelo ONNX (CPU):", "Modelo ONNX (*.onnx)");
+    configYoloPythonEdit = detectorPathRow("Python CPU:", "Todos (*)");
+    const auto applyThresholds = [this](double) {
+        yoloInferenceWorker.setThresholds(static_cast<float>(configYoloConfidenceSpin->value()),
+                                         static_cast<float>(configYoloNmsSpin->value()));
+    };
+    connect(configYoloConfidenceSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, applyThresholds);
+    connect(configYoloNmsSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, applyThresholds);
 
     generalPageLayout->addWidget(
         yoloConfigFrame
@@ -10223,7 +10399,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *controlTitle =
         new QLabel(
-            "PARÁMETROS DE CONTROL Y SEGURIDAD"
+            "CONTROL HIDRÁULICO Y SEGURIDAD"
         );
 
     controlTitle->setStyleSheet(
@@ -10246,7 +10422,7 @@ QWidget *MainWindow::createConfigurationPage()
     */
     QLabel *moveThresholdLabel =
         new QLabel(
-            "Umbral comando movimiento"
+            "Comando mínimo para detectar movimiento"
         );
 
     configMoveThresholdSpin =
@@ -10268,7 +10444,7 @@ QWidget *MainWindow::createConfigurationPage()
     */
     QLabel *minMovementLabel =
         new QLabel(
-            "Movimiento mínimo (mm)"
+            "Desplazamiento mínimo esperado (mm)"
         );
 
     configMinMovementSpin =
@@ -10298,7 +10474,7 @@ QWidget *MainWindow::createConfigurationPage()
     */
     QLabel *noMovementTimeoutLabel =
         new QLabel(
-            "Timeout NO_MOVEMENT (ms)"
+            "Tiempo máximo sin movimiento (ms)"
         );
 
     configNoMovementTimeoutSpin =
@@ -10324,7 +10500,7 @@ QWidget *MainWindow::createConfigurationPage()
     */
     QLabel *targetTimeoutLabel =
         new QLabel(
-            "Timeout consigna AUTO (ms)"
+            "Tiempo máximo sin nueva consigna AUTO (ms)"
         );
 
     configTargetTimeoutSpin =
@@ -10482,7 +10658,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *hydraulicTitle =
         new QLabel(
-            "GESTIÓN HIDRÁULICA"
+            "DISTRIBUCIÓN DE DEMANDA HIDRÁULICA"
         );
 
     hydraulicTitle->setStyleSheet(
@@ -10538,7 +10714,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *hydraulicMaxBodiesLabel =
         new QLabel(
-            "Máx. cuerpos alta demanda"
+            "Máximo de cuerpos con demanda fuerte"
         );
 
     configHydraulicMaxBodiesSpin =
@@ -10558,7 +10734,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *hydraulicSecondaryLabel =
         new QLabel(
-            "Demanda secundaria (%)"
+            "Comando para cuerpos secundarios (%)"
         );
 
     configHydraulicSecondaryPercentSpin =
@@ -10773,7 +10949,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     QLabel *heightTuningTitle =
         new QLabel(
-            "SINTONÍA CONTROL DE ALTURA"
+            "AJUSTE PID DE ALTURA"
         );
 
     heightTuningTitle->setStyleSheet(
@@ -11361,6 +11537,9 @@ QWidget *MainWindow::createConfigurationPage()
     
 
 
+    connect(saveButton, &QPushButton::clicked, videoRgbControls,
+        [this]() { videoRgbControls->saveSettings(); });
+
     /*
     * Contenedor exterior:
     * - contenido desplazable arriba
@@ -11444,6 +11623,7 @@ void MainWindow::createStatusBar()
 
 void MainWindow::updateDashboard()
 {
+    updateSpeedUi();
     if (state == nullptr)
     {
         return;
@@ -13224,14 +13404,145 @@ void MainWindow::applyVisionBodyRegions()
     }
 }
 
+bool MainWindow::speedTelemetryFresh() const
+{
+    if (!state || !state->getSystemState().stm32_connected) return false;
+    const auto speed = state->getSpeedState();
+    const uint64_t now = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    return speed.valid && speed.received_ms != 0 &&
+           now >= speed.received_ms && now - speed.received_ms <= 500;
+}
+
 double MainWindow::getForwardSpeedKmh() const
 {
-    if (configTasselSpeedSpin == nullptr)
+    if (!configSpeedSourceCombo || configSpeedSourceCombo->currentData().toInt() == 0)
+        return configTasselSpeedSpin ? configTasselSpeedSpin->value() : 0.0;
+    if (!speedTelemetryFresh() || !configSpeedPulsesPerMeterSpin) return 0.0;
+    const double pulsesPerMeter = configSpeedPulsesPerMeterSpin->value();
+    if (pulsesPerMeter <= 0.0) return 0.0;
+    return (state->getSpeedState().frequency_millihz / 1000.0) *
+           3.6 / pulsesPerMeter;
+}
+
+void MainWindow::cancelSpeedCalibration(const QString& reason)
+{
+    speedCalibrationActive = false;
+    if (configSpeedCalibrationDistanceSpin)
+        configSpeedCalibrationDistanceSpin->setEnabled(true);
+    if (configSpeedPulsesPerMeterSpin)
+        configSpeedPulsesPerMeterSpin->setEnabled(true);
+    if (configSpeedCalibrationStatusLabel)
+        configSpeedCalibrationStatusLabel->setText(reason);
+    if (configSpeedCalibrationFinishButton)
+        configSpeedCalibrationFinishButton->setEnabled(false);
+}
+
+void MainWindow::startSpeedCalibration()
+{
+    if (!speedTelemetryFresh()) {
+        cancelSpeedCalibration("SIN DATO del STM32: no se puede iniciar.");
+        return;
+    }
+    const auto speed = state->getSpeedState();
+    speedCalibrationStartPulses = speed.total_pulses;
+    speedCalibrationLastPulses = speed.total_pulses;
+    speedCalibrationLastUptime = speed.uptime_ms;
+    speedCalibrationDistanceM = configSpeedCalibrationDistanceSpin->value();
+    speedCalibrationActive = true;
+    configSpeedCalibrationDistanceSpin->setEnabled(false);
+    configSpeedPulsesPerMeterSpin->setEnabled(false);
+    configSpeedCalibrationStatusLabel->setText("Calibrando: 0 pulsos.");
+    updateSpeedUi();
+}
+
+void MainWindow::finishSpeedCalibration()
+{
+    updateSpeedUi();
+    if (!speedCalibrationActive) return;
+    const auto speed = state->getSpeedState();
+    const uint64_t pulses = speed.total_pulses - speedCalibrationStartPulses;
+    if (pulses == 0) {
+        cancelSpeedCalibration("No se contaron pulsos; se conserva el valor anterior.");
+        return;
+    }
+    const double scale = static_cast<double>(pulses) / speedCalibrationDistanceM;
+    if (!std::isfinite(scale) || scale < 0.001 ||
+        scale > configSpeedPulsesPerMeterSpin->maximum()) {
+        cancelSpeedCalibration("Resultado fuera de rango; repetí la calibración.");
+        return;
+    }
+    cancelSpeedCalibration("Calibración lista. Presioná GUARDAR CONFIGURACIÓN.");
+    configSpeedPulsesPerMeterSpin->setValue(scale);
+    updateSpeedUi();
+}
+
+void MainWindow::updateSpeedUi()
+{
+    if (!configSpeedSourceCombo || !configCurrentSpeedLabel ||
+        !configSpeedCalibrationStartButton) return;
+    const bool fresh = speedTelemetryFresh();
+    const bool sensor = configSpeedSourceCombo->currentData().toInt() == 1;
+    configTasselSpeedSpin->setEnabled(!sensor);
+
+    if (speedCalibrationActive) {
+        if (!fresh) {
+            cancelSpeedCalibration("Calibración interrumpida: se perdió el dato del STM32.");
+        } else {
+            const auto speed = state->getSpeedState();
+            const uint32_t elapsed = speed.uptime_ms - speedCalibrationLastUptime;
+            if (speed.total_pulses < speedCalibrationLastPulses || elapsed > 0x80000000U) {
+                cancelSpeedCalibration("Calibración interrumpida: contador o STM32 reiniciado.");
+            } else {
+                speedCalibrationLastPulses = speed.total_pulses;
+                speedCalibrationLastUptime = speed.uptime_ms;
+                configSpeedCalibrationStatusLabel->setText(
+                    QString("Calibrando: %1 pulsos en un tramo de %2 m.")
+                    .arg(static_cast<qulonglong>(speed.total_pulses - speedCalibrationStartPulses))
+                    .arg(speedCalibrationDistanceM, 0, 'f', 2));
+            }
+        }
+    }
+    configSpeedCalibrationStartButton->setEnabled(fresh && !speedCalibrationActive);
+    configSpeedCalibrationFinishButton->setEnabled(fresh && speedCalibrationActive);
+
+    if (sensor && !fresh)
+        configCurrentSpeedLabel->setText("Velocidad actual: SIN DATO");
+    else if (sensor && configSpeedPulsesPerMeterSpin->value() <= 0.0)
+        configCurrentSpeedLabel->setText("Velocidad actual: SIN CALIBRAR");
+    else
+        configCurrentSpeedLabel->setText(
+            QString("Velocidad actual: %1 km/h (%2)")
+            .arg(getForwardSpeedKmh(), 0, 'f', 1)
+            .arg(sensor ? "STM32" : "MANUAL"));
+
+    if (dashboardSpeedValueLabel && dashboardSpeedSourceLabel)
     {
-        return 0.0;
+        const bool uncalibrated = sensor && fresh &&
+            configSpeedPulsesPerMeterSpin->value() <= 0.0;
+        const bool unavailable = sensor && !fresh;
+        dashboardSpeedValueLabel->setText(
+            unavailable ? QString("SIN DATO") :
+            uncalibrated ? QString("SIN CALIBRAR") :
+            QString("%1 km/h").arg(getForwardSpeedKmh(), 0, 'f', 1)
+        );
+        dashboardSpeedValueLabel->setStyleSheet(
+            unavailable || uncalibrated
+                ? "font-size: 18px; font-weight: bold; color: #984500;"
+                : "font-size: 24px; font-weight: bold; color: #172a3a;"
+        );
+        dashboardSpeedSourceLabel->setText(
+            sensor ? "SENSOR STM32" : "MANUAL / PRUEBAS"
+        );
+        dashboardSpeedSourceLabel->setStyleSheet(
+            sensor
+                ? "font-size: 10px; font-weight: bold; color: #176642;"
+                : "font-size: 10px; font-weight: bold; color: #984500;"
+        );
     }
 
-    return configTasselSpeedSpin->value();
+    updateTasselVerificationTiming();
 }
 
 MainWindow::VisionHeightSample
@@ -13249,7 +13560,7 @@ MainWindow::getDelayedVisionSample(
     const double speedKmh =
         getForwardSpeedKmh();
 
-    if (speedKmh <= 0.0)
+    if (speedKmh < 0.1)
     {
         return result;
     }
@@ -13324,14 +13635,16 @@ void MainWindow::updateTasselVerificationTiming()
     const double tolerancePercent =
         configTasselTimingToleranceSpin->value();
 
-    if (speedKmh <= 0.0)
+    // Below 0.1 km/h the time-based verification is suspended.
+    tasselVerifier.setEnabled(speedKmh >= 0.1);
+    if (speedKmh < 0.1)
     {
         configTasselExpectedTimeLabel->setText(
             "Tiempo estimado hasta cámara trasera: --- ms"
         );
 
         configTasselVerificationWindowLabel->setText(
-            "Ventana de verificación: --- ms"
+            "Verificación suspendida: sin velocidad válida o máquina detenida."
         );
 
         return;
@@ -14069,6 +14382,18 @@ void MainWindow::saveConfiguration()
         "TasselVerification"
     );
 
+    settings.setValue("speed_source", configSpeedSourceCombo->currentData().toInt());
+
+    settings.setValue(
+        "speed_pulses_per_meter",
+        configSpeedPulsesPerMeterSpin->value()
+    );
+
+    settings.setValue(
+        "speed_calibration_distance_m",
+        configSpeedCalibrationDistanceSpin->value()
+    );
+
     settings.setValue(
         "estimated_speed_kmh",
         configTasselSpeedSpin
@@ -14130,6 +14455,8 @@ void MainWindow::saveConfiguration()
         configYoloNmsSpin
             ->value()
     );
+    settings.setValue("yolo_onnx_path", configYoloOnnxEdit->text());
+    settings.setValue("yolo_python_path", configYoloPythonEdit->text());
 
     settings.endGroup();
 
@@ -14851,6 +15178,21 @@ void MainWindow::loadConfiguration()
         "TasselVerification"
     );
 
+    const int savedSpeedSource = settings.value("speed_source", 0).toInt();
+    configSpeedSourceCombo->setCurrentIndex(savedSpeedSource == 1 ? 1 : 0);
+
+    configSpeedPulsesPerMeterSpin->setValue(
+        settings.value(
+            "speed_pulses_per_meter", 0.0
+        ).toDouble()
+    );
+
+    configSpeedCalibrationDistanceSpin->setValue(
+        settings.value(
+            "speed_calibration_distance_m", 20.0
+        ).toDouble()
+    );
+
     configTasselSpeedSpin->setValue(
         settings.value(
             "estimated_speed_kmh",
@@ -14956,6 +15298,12 @@ void MainWindow::loadConfiguration()
     configYoloEngineEdit->setText(
         yoloEnginePath
     );
+    configYoloOnnxEdit->setText(settings.value("Vision/yolo_onnx_path",
+        settings.value("RgbVideoSimulation/model_path", QDir::homePath() +
+            "/Dropbox/Ezequiel/Bayer_solutions/Hagie/Pesos/weights.onnx")).toString());
+    configYoloPythonEdit->setText(settings.value("Vision/yolo_python_path",
+        settings.value("RgbVideoSimulation/python_path", QDir::homePath() +
+            "/hagie_ia/.venv/bin/python")).toString());
 
     configYoloConfidenceSpin->setValue(
         yoloConfidenceThreshold

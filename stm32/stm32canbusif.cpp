@@ -246,6 +246,43 @@ void stm32canbus_serialif::handle_packet(
 
     switch (opcode)
     {
+        case 'P':
+        {
+            if (n != 18 || payload[1] > 1)
+            {
+                return;
+            }
+
+            speed_pulse_state speed;
+            speed.valid = payload[1] == 1;
+
+            for (std::size_t i = 2; i < 10; ++i)
+            {
+                speed.total_pulses =
+                    (speed.total_pulses << 8) | uint64_t(payload[i]);
+            }
+
+            for (std::size_t i = 10; i < 14; ++i)
+            {
+                speed.frequency_millihz =
+                    (speed.frequency_millihz << 8) |
+                    uint32_t(payload[i]);
+            }
+
+            for (std::size_t i = 14; i < 18; ++i)
+            {
+                speed.uptime_ms =
+                    (speed.uptime_ms << 8) | uint32_t(payload[i]);
+            }
+
+            if (on_speed_pulse)
+            {
+                on_speed_pulse(speed);
+            }
+            break;
+        }
+
+
         // ----------------------------------------------------
         // 'E' - Estado de los 6 encoders
         // ----------------------------------------------------
@@ -1699,4 +1736,10 @@ void stm32canbus_serialif::send_impl(
         port,
         boost::asio::buffer(buf, n)
     );
+}
+
+void stm32canbus_serialif::set_speed_pulse_callback(
+    speed_pulse_callback callback)
+{
+    on_speed_pulse = std::move(callback);
 }

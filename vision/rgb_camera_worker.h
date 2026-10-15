@@ -45,6 +45,8 @@ public:
     );
 
 
+    void frameProcessed(std::size_t cameraIndex, std::uint64_t timestamp);
+
 private:
 
     bool running;
