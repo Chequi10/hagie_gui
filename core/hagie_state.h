@@ -153,6 +153,16 @@ public:
 
         uint32_t axiomatic_rx_dropped = 0;
 
+        bool ax020800_connected = false;
+        uint32_t ax020800_rx_count = 0;
+        uint32_t ax020800_tx_count = 0;
+        uint32_t ax020800_tx_errors = 0;
+
+        bool ax020800_current_valid = false;
+        uint16_t ax020800_current_1_raw = 0;
+        uint16_t ax020800_current_2_raw = 0;
+        uint32_t ax020800_current_rx_count = 0;
+
         uint32_t uart_error_count = 0;
 
         uint32_t jetson_tx_queue_dropped = 0;

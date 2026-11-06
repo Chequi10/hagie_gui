@@ -3449,6 +3449,40 @@ QWidget *MainWindow::createCommunicationsPage()
         communicationsCanDroppedLabel
     );
 
+    communicationsAx020800StatusLabel =
+        new QLabel("AX020800: ---");
+
+    communicationsAx020800RxLabel =
+        new QLabel("AX020800 RX: ---");
+
+    communicationsAx020800TxLabel =
+        new QLabel("AX020800 TX: ---");
+
+    communicationsAx020800ErrorsLabel =
+        new QLabel("AX020800 errores TX: ---");
+
+    canLayout->addWidget(communicationsAx020800StatusLabel);
+    canLayout->addWidget(communicationsAx020800RxLabel);
+    canLayout->addWidget(communicationsAx020800TxLabel);
+    canLayout->addWidget(communicationsAx020800ErrorsLabel);
+
+    communicationsAx020800CurrentStatusLabel =
+        new QLabel("Telemetría de corriente: ---");
+
+    communicationsAx020800Current1Label =
+        new QLabel("Corriente salida 1 (bruto): ---");
+
+    communicationsAx020800Current2Label =
+        new QLabel("Corriente salida 2 (bruto): ---");
+
+    communicationsAx020800CurrentRxLabel =
+        new QLabel("Mensajes de corriente RX: ---");
+
+    canLayout->addWidget(communicationsAx020800CurrentStatusLabel);
+    canLayout->addWidget(communicationsAx020800Current1Label);
+    canLayout->addWidget(communicationsAx020800Current2Label);
+    canLayout->addWidget(communicationsAx020800CurrentRxLabel);
+
 
     /*
     * ========================================================
@@ -12721,6 +12755,76 @@ void MainWindow::updateDashboard()
         );
     }
 
+
+    if (communicationsAx020800StatusLabel != nullptr)
+    {
+        communicationsAx020800StatusLabel->setText(
+            system.ax020800_connected
+                ? "AX020800: CONECTADO"
+                : "AX020800: DESCONECTADO"
+        );
+    }
+
+    if (communicationsAx020800RxLabel != nullptr)
+    {
+        communicationsAx020800RxLabel->setText(
+            QString("AX020800 RX: %1")
+                .arg(system.ax020800_rx_count)
+        );
+    }
+
+    if (communicationsAx020800TxLabel != nullptr)
+    {
+        communicationsAx020800TxLabel->setText(
+            QString("AX020800 TX: %1")
+                .arg(system.ax020800_tx_count)
+        );
+    }
+
+    if (communicationsAx020800ErrorsLabel != nullptr)
+    {
+        communicationsAx020800ErrorsLabel->setText(
+            QString("AX020800 errores TX: %1")
+                .arg(system.ax020800_tx_errors)
+        );
+    }
+
+    if (communicationsAx020800CurrentStatusLabel != nullptr)
+    {
+        communicationsAx020800CurrentStatusLabel->setText(
+            system.ax020800_current_valid
+                ? "Telemetría de corriente: ACTIVA"
+                : "Telemetría de corriente: SIN SEÑAL"
+        );
+    }
+
+    if (communicationsAx020800Current1Label != nullptr)
+    {
+        communicationsAx020800Current1Label->setText(
+            system.ax020800_current_valid
+                ? QString("Corriente salida 1 (bruto): %1")
+                    .arg(system.ax020800_current_1_raw)
+                : "Corriente salida 1 (bruto): ---"
+        );
+    }
+
+    if (communicationsAx020800Current2Label != nullptr)
+    {
+        communicationsAx020800Current2Label->setText(
+            system.ax020800_current_valid
+                ? QString("Corriente salida 2 (bruto): %1")
+                    .arg(system.ax020800_current_2_raw)
+                : "Corriente salida 2 (bruto): ---"
+        );
+    }
+
+    if (communicationsAx020800CurrentRxLabel != nullptr)
+    {
+        communicationsAx020800CurrentRxLabel->setText(
+            QString("Mensajes de corriente RX: %1")
+                .arg(system.ax020800_current_rx_count)
+        );
+    }
 
     if (communicationsImuStatusLabel != nullptr)
     {

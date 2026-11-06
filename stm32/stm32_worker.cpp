@@ -1842,6 +1842,30 @@ void STM32Worker::configureCallbacks()
             system.axiomatic_rx_dropped =
                 diagnostic.axiomatic_rx_dropped;
 
+            system.ax020800_connected =
+                diagnostic.ax020800_connected;
+
+            system.ax020800_rx_count =
+                diagnostic.ax020800_rx_count;
+
+            system.ax020800_tx_count =
+                diagnostic.ax020800_tx_count;
+
+            system.ax020800_tx_errors =
+                diagnostic.ax020800_tx_errors;
+
+            system.ax020800_current_valid =
+                diagnostic.ax020800_current_valid;
+
+            system.ax020800_current_1_raw =
+                diagnostic.ax020800_current_1_raw;
+
+            system.ax020800_current_2_raw =
+                diagnostic.ax020800_current_2_raw;
+
+            system.ax020800_current_rx_count =
+                diagnostic.ax020800_current_rx_count;
+
             system.uart_error_count =
                 diagnostic.uart_error_count;
 

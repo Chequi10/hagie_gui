@@ -399,6 +399,16 @@ private:
     QLabel *communicationsCanDroppedLabel =
         nullptr;
 
+    QLabel *communicationsAx020800StatusLabel = nullptr;
+    QLabel *communicationsAx020800RxLabel = nullptr;
+    QLabel *communicationsAx020800TxLabel = nullptr;
+    QLabel *communicationsAx020800ErrorsLabel = nullptr;
+
+    QLabel *communicationsAx020800CurrentStatusLabel = nullptr;
+    QLabel *communicationsAx020800Current1Label = nullptr;
+    QLabel *communicationsAx020800Current2Label = nullptr;
+    QLabel *communicationsAx020800CurrentRxLabel = nullptr;
+
     QLabel *communicationsImuStatusLabel =
         nullptr;
 
