@@ -192,6 +192,108 @@ MainWindow::MainWindow(
     addScrollablePage(createTestsPage());
 
 
+
+
+
+    /*
+     * Ajuste de objetivo AUTO TEST desde Dashboard.
+     * Solo modifica el QSpinBox existente.
+     */
+    auto adjustDashboardTarget = [this](int delta)
+    {
+        if (centralStack->currentIndex() != 0)
+            return;
+
+        const int body = trendSelectedBody;
+
+        if (body < 0 ||
+            body >= static_cast<int>(HagieState::BODY_COUNT))
+            return;
+
+        if (!testAutoEnabled[body])
+            return;
+
+        QSpinBox *spin = testTargetHeightSpin[body];
+
+        if (spin == nullptr)
+            return;
+
+        const auto &cal = bodyCalibration[body];
+
+        const int minimum = cal.realMinimumHeightMm;
+        const int maximum = cal.realMaximumHeightMm;
+
+        if (!cal.calibrated ||
+            !cal.referenced ||
+            maximum <= minimum ||
+            minimum < 0 ||
+            maximum > 65535)
+            return;
+
+        spin->setRange(minimum, maximum);
+
+        spin->setValue(
+            spin->value() + delta
+        );
+    };
+
+    QShortcut *targetUpShortcut =
+        new QShortcut(QKeySequence(Qt::Key_Up), this);
+
+    targetUpShortcut->setContext(
+        Qt::ApplicationShortcut
+    );
+
+    connect(
+        targetUpShortcut,
+        &QShortcut::activated,
+        this,
+        [this, adjustDashboardTarget]()
+        {
+            QComboBox *combo =
+                findChild<QComboBox *>(
+                    "dashboardTargetStepCombo"
+                );
+
+            if (combo == nullptr)
+                return;
+
+            adjustDashboardTarget(
+                combo->currentData().toInt()
+            );
+        }
+    );
+
+    QShortcut *targetDownShortcut =
+        new QShortcut(QKeySequence(Qt::Key_Down), this);
+
+    targetDownShortcut->setContext(
+        Qt::ApplicationShortcut
+    );
+
+    connect(
+        targetDownShortcut,
+        &QShortcut::activated,
+        this,
+        [this, adjustDashboardTarget]()
+        {
+            QComboBox *combo =
+                findChild<QComboBox *>(
+                    "dashboardTargetStepCombo"
+                );
+
+            if (combo == nullptr)
+                return;
+
+            adjustDashboardTarget(
+                -combo->currentData().toInt()
+            );
+        }
+    );
+
+
+
+
     /*
      * Página 4
      */
@@ -2123,6 +2225,24 @@ QWidget *MainWindow::createDashboardPage()
     trendScaleCombo->addItem("FIJA");
     trendScaleCombo->addItem("AUTO");
 
+    QLabel *trendStepLabel =
+        new QLabel("Paso objetivo:");
+
+    QComboBox *trendStepCombo =
+        new QComboBox();
+
+    trendStepCombo->setObjectName(
+        "dashboardTargetStepCombo"
+    );
+
+    for (int step : {10, 20, 50, 100, 200, 500})
+    {
+        trendStepCombo->addItem(
+            QString("%1 mm").arg(step),
+            step
+        );
+    }
+
 
     trendControlsLayout->addStretch();
 
@@ -2152,6 +2272,16 @@ QWidget *MainWindow::createDashboardPage()
 
     trendControlsLayout->addWidget(
         trendScaleCombo
+    );
+
+    trendControlsLayout->addSpacing(20);
+
+    trendControlsLayout->addWidget(
+        trendStepLabel
+    );
+
+    trendControlsLayout->addWidget(
+        trendStepCombo
     );
 
     trendControlsLayout->addStretch();
@@ -4889,15 +5019,40 @@ QWidget *MainWindow::createTestsPage()
                 */
                 if (testAutoEnabled[body])
                 {
-                    uint16_t target =
-                        static_cast<uint16_t>(
-                            testTargetHeightSpin[body]
-                                ->value()
-                        );
+                    const auto &cal = bodyCalibration[body];
+
+                    const int minimum = cal.realMinimumHeightMm;
+                    const int maximum = cal.realMaximumHeightMm;
+
+                    /*
+                     * Validar calibración y recorrido.
+                     */
+                    if (!cal.calibrated ||
+                        !cal.referenced ||
+                        maximum <= minimum ||
+                        minimum < 0 ||
+                        maximum > 65535)
+                    {
+                        continue;
+                    }
+
+                    QSpinBox *spin = testTargetHeightSpin[body];
+
+                    if (spin == nullptr)
+                    {
+                        continue;
+                    }
+
+                    /*
+                     * Limitar el objetivo al recorrido calibrado.
+                     */
+                    spin->setRange(minimum, maximum);
+
+                    const int target = spin->value();
 
                     stm32Worker->setTargetHeight(
                         static_cast<uint8_t>(body),
-                        target
+                        static_cast<uint16_t>(target)
                     );
 
                     continue;
@@ -12012,12 +12167,12 @@ void MainWindow::updateDashboard()
         {
             heightTrendWidget->addSample(
                 static_cast<int>(body),
-                static_cast<double>(
-                    bodyState.target_mm
-                ),
-                static_cast<double>(
-                    bodyState.height_mm
-                )
+                static_cast<double>(bodyState.target_mm),
+                static_cast<double>(bodyState.height_mm),
+                static_cast<double>(systemState.ax020800_current_1_raw),
+                static_cast<double>(systemState.ax020800_current_2_raw),
+                body == 0 && systemState.stm32_connected &&
+                    systemState.ax020800_current_valid
             );
         }
 

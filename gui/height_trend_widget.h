@@ -14,7 +14,10 @@ public:
     void addSample(
         int body,
         double target_mm,
-        double encoder_mm
+        double encoder_mm,
+        double current_up_ma = 0.0,
+        double current_down_ma = 0.0,
+        bool current_valid = false
     );
 
     void setSelectedBody(
@@ -45,8 +48,12 @@ private:
         qint64 time_ms;
         double target_mm;
         double encoder_mm;
+        double current_up_ma;
+        double current_down_ma;
+        bool current_valid;
     };
 
+    // HAGIE_AX020800_TREND_V1: OUT1/OUT2 solo para cuerpo 1.
     static constexpr int BODY_COUNT = 6;
 
     QVector<Sample> samples[BODY_COUNT];

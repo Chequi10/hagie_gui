@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <QPainterPath>
 #include <limits>
+#include <cmath>
 
 
 HeightTrendWidget::HeightTrendWidget(
@@ -60,7 +61,10 @@ void HeightTrendWidget::setFixedRange(
 void HeightTrendWidget::addSample(
     int body,
     double target_mm,
-    double encoder_mm
+    double encoder_mm,
+    double current_up_ma,
+    double current_down_ma,
+    bool current_valid
 )
 {
     if (body < 0 ||
@@ -79,6 +83,10 @@ void HeightTrendWidget::addSample(
 
     sample.encoder_mm =
         encoder_mm;
+
+    sample.current_up_ma = current_up_ma;
+    sample.current_down_ma = current_down_ma;
+    sample.current_valid = current_valid;
 
     samples[body].push_back(sample);
 
@@ -147,7 +155,7 @@ void HeightTrendWidget::paintEvent(
 
 
     const int leftMargin   = 85;
-    const int rightMargin  = 20;
+    const int rightMargin  = 85;
     const int topMargin    = 30;
     const int bottomMargin = 35;
 
@@ -367,6 +375,13 @@ if (autoScale)
         };
 
 
+    // Escala independiente de corriente real (mA).
+    constexpr double CURRENT_MAX_MA = 1500.0;
+    auto mapCurrentY = [&](double current_ma) {
+        const double value = std::max(0.0, std::min(CURRENT_MAX_MA, current_ma));
+        return graphRect.bottom() - (value / CURRENT_MAX_MA) * graphRect.height();
+    };
+
     auto mapY =
         [&](double value)
         {
@@ -453,6 +468,21 @@ if (autoScale)
         );
     }
 
+
+    // Eje derecho: corriente del AX020800, 0..1500 mA.
+    if (selectedBody == 0)
+    {
+        painter.setPen(palette().text().color());
+        for (int i = 0; i <= 5; ++i)
+        {
+            const double ma = i * (CURRENT_MAX_MA / 5.0);
+            const int y = static_cast<int>(mapCurrentY(ma));
+            painter.drawText(graphRect.right() + 5, y - 10,
+                             rightMargin - 10, 20,
+                             Qt::AlignLeft | Qt::AlignVCenter,
+                             QString::number(ma, 'f', 0) + " mA");
+        }
+    }
 
     /*
      * Línea objetivo.
@@ -556,6 +586,49 @@ if (autoScale)
         encoderPath
     );
 
+    // Corrientes REALES del AX020800. Si no hay telemetría válida,
+    // interrumpir la curva; no sustituir la medición por cero.
+    if (selectedBody == 0)
+    {
+        auto drawCurrent = [&](bool up, const QColor &color)
+        {
+            QPainterPath path;
+            bool started = false;
+            for (const Sample &sample : bodySamples)
+            {
+                if (sample.time_ms < visibleStart)
+                    continue;
+                if (!sample.current_valid)
+                {
+                    if (started)
+                    {
+                        painter.setPen(QPen(color, 2));
+                        painter.drawPath(path);
+                        path = QPainterPath();
+                        started = false;
+                    }
+                    continue;
+                }
+                const double ma = up ? sample.current_up_ma : sample.current_down_ma;
+                const QPointF point(mapX(sample.time_ms), mapCurrentY(ma));
+                if (!started)
+                {
+                    path.moveTo(point);
+                    started = true;
+                }
+                else
+                    path.lineTo(point);
+            }
+            if (started)
+            {
+                painter.setPen(QPen(color, 2));
+                painter.drawPath(path);
+            }
+        };
+        drawCurrent(true, QColor(0, 155, 70));
+        drawCurrent(false, QColor(230, 135, 20));
+    }
+
     painter.restore();
 
 
@@ -588,6 +661,16 @@ if (autoScale)
         "Encoder"
     );
 
+
+    if (selectedBody == 0)
+    {
+        painter.setPen(QColor(0, 155, 70));
+        painter.drawText(graphRect.left() + 220, graphRect.top() + 20,
+                         "SUBIR (mA)");
+        painter.setPen(QColor(230, 135, 20));
+        painter.drawText(graphRect.left() + 335, graphRect.top() + 20,
+                         "BAJAR (mA)");
+    }
 
     /*
      * Escala temporal.
