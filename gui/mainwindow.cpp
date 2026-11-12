@@ -11012,7 +11012,7 @@ QWidget *MainWindow::createConfigurationPage()
         3,
         0,
         1,
-        4
+        5
     );
 
 
@@ -11020,10 +11020,16 @@ QWidget *MainWindow::createConfigurationPage()
         new QLabel("Cuerpo");
 
     QLabel *compensationUpLabel =
-        new QLabel("Subida");
+        new QLabel("Comp. subida");
 
     QLabel *compensationDownLabel =
-        new QLabel("Bajada");
+        new QLabel("Comp. bajada");
+
+    QLabel *minimumCurrentUpLabel =
+        new QLabel("I mín. subida");
+
+    QLabel *minimumCurrentDownLabel =
+        new QLabel("I mín. bajada");
 
 
     hydraulicLayout->addWidget(
@@ -11042,6 +11048,18 @@ QWidget *MainWindow::createConfigurationPage()
         compensationDownLabel,
         4,
         2
+    );
+
+    hydraulicLayout->addWidget(
+        minimumCurrentUpLabel,
+        4,
+        3
+    );
+
+    hydraulicLayout->addWidget(
+        minimumCurrentDownLabel,
+        4,
+        4
     );
 
 
@@ -11088,6 +11106,46 @@ QWidget *MainWindow::createConfigurationPage()
             0
         );
 
+        configHeightUpMinimumCurrentSpin[body] =
+            new QSpinBox();
+
+        configHeightUpMinimumCurrentSpin[body]->setRange(
+            0,
+            3000
+        );
+
+        configHeightUpMinimumCurrentSpin[body]->setSuffix(
+            " mA"
+        );
+
+        configHeightUpMinimumCurrentSpin[body]->setSingleStep(
+            10
+        );
+
+        configHeightUpMinimumCurrentSpin[body]->setValue(
+            0
+        );
+
+        configHeightDownMinimumCurrentSpin[body] =
+            new QSpinBox();
+
+        configHeightDownMinimumCurrentSpin[body]->setRange(
+            0,
+            3000
+        );
+
+        configHeightDownMinimumCurrentSpin[body]->setSuffix(
+            " mA"
+        );
+
+        configHeightDownMinimumCurrentSpin[body]->setSingleStep(
+            10
+        );
+
+        configHeightDownMinimumCurrentSpin[body]->setValue(
+            0
+        );
+
 
         int row =
             5 +
@@ -11109,6 +11167,18 @@ QWidget *MainWindow::createConfigurationPage()
             configHeightDownCompensationSpin[body],
             row,
             2
+        );
+
+        hydraulicLayout->addWidget(
+            configHeightUpMinimumCurrentSpin[body],
+            row,
+            3
+        );
+
+        hydraulicLayout->addWidget(
+            configHeightDownMinimumCurrentSpin[body],
+            row,
+            4
         );
     }
 
@@ -14545,6 +14615,20 @@ void MainWindow::saveConfiguration()
             configHeightDownCompensationSpin[body]
                 ->value()
         );
+
+        settings.setValue(
+            QString("up_minimum_current_ma_%1")
+                .arg(body + 1),
+            configHeightUpMinimumCurrentSpin[body]
+                ->value()
+        );
+
+        settings.setValue(
+            QString("down_minimum_current_ma_%1")
+                .arg(body + 1),
+            configHeightDownMinimumCurrentSpin[body]
+                ->value()
+        );
     }
 
     settings.endGroup();
@@ -15275,6 +15359,24 @@ void MainWindow::loadConfiguration()
             ->setValue(
                 settings.value(
                     QString("down_compensation_%1")
+                        .arg(body + 1),
+                    0
+                ).toInt()
+            );
+
+        configHeightUpMinimumCurrentSpin[body]
+            ->setValue(
+                settings.value(
+                    QString("up_minimum_current_ma_%1")
+                        .arg(body + 1),
+                    0
+                ).toInt()
+            );
+
+        configHeightDownMinimumCurrentSpin[body]
+            ->setValue(
+                settings.value(
+                    QString("down_minimum_current_ma_%1")
                         .arg(body + 1),
                     0
                 ).toInt()
@@ -16102,6 +16204,22 @@ void MainWindow::syncConfigurationToWorker()
             static_cast<uint8_t>(body),
             static_cast<int8_t>(
                 configHeightDownCompensationSpin[body]
+                    ->value()
+            )
+        );
+
+        stm32Worker->setHeightUpMinimumCurrent(
+            static_cast<uint8_t>(body),
+            static_cast<uint16_t>(
+                configHeightUpMinimumCurrentSpin[body]
+                    ->value()
+            )
+        );
+
+        stm32Worker->setHeightDownMinimumCurrent(
+            static_cast<uint8_t>(body),
+            static_cast<uint16_t>(
+                configHeightDownMinimumCurrentSpin[body]
                     ->value()
             )
         );

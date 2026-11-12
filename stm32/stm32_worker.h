@@ -188,6 +188,17 @@ public:
     );
 
 
+    void setHeightUpMinimumCurrent(
+        uint8_t body,
+        uint16_t current_ma
+    );
+
+    void setHeightDownMinimumCurrent(
+        uint8_t body,
+        uint16_t current_ma
+    );
+
+
     enum class ConfigSyncStatus
     {
         PENDING,
@@ -337,6 +348,16 @@ private:
                 int8_t,
                 HagieState::BODY_COUNT
             > height_down_compensation_percent {};
+
+            std::array<
+                uint16_t,
+                HagieState::BODY_COUNT
+            > height_up_minimum_current_ma {};
+
+            std::array<
+                uint16_t,
+                HagieState::BODY_COUNT
+            > height_down_minimum_current_ma {};
 
 
             // ----------------------------------------------------
@@ -597,12 +618,14 @@ private:
     * 42..47  -> K08 máximo encoder cuerpos 0..5
     * 48..53  -> K09 calibración encoder cuerpos 0..5
     * 54..59  -> K1A habilitación cuerpos 0..5
-    * 60      -> terminada
+    * 60..65  -> K1B corriente minima subida
+    * 66..71  -> K1C corriente minima bajada
+    * 72      -> terminada
     */
 
     static constexpr uint8_t
         CONFIG_SYNC_COMMAND_COUNT =
-            60;
+            72;
 
 
     uint8_t configSyncStep =

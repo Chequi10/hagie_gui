@@ -737,6 +737,16 @@ private:
         HagieState::BODY_COUNT
     > configHeightDownCompensationSpin {};
 
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configHeightUpMinimumCurrentSpin {};
+
+    std::array<
+        QSpinBox *,
+        HagieState::BODY_COUNT
+    > configHeightDownMinimumCurrentSpin {};
+
     QPlainTextEdit *logsTextEdit =
         nullptr;
 

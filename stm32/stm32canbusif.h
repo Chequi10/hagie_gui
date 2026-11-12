@@ -456,6 +456,18 @@ public:
         bool enabled
     );
 
+    // K 0x1B - Corriente minima de subida.
+    void set_height_up_minimum_current(
+        uint8_t body,
+        uint16_t current_ma
+    );
+
+    // K 0x1C - Corriente minima de bajada.
+    void set_height_down_minimum_current(
+        uint8_t body,
+        uint16_t current_ma
+    );
+
 private:
 
     // ============================================================

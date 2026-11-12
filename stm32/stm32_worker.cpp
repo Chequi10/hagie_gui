@@ -1133,6 +1133,52 @@ void STM32Worker::setHeightDownCompensationPercent(
 // SINCRONIZACIÓN CONFIGURACIÓN
 // ============================================================
 
+
+void STM32Worker::setHeightUpMinimumCurrent(
+    uint8_t body,
+    uint16_t current_ma)
+{
+    if (body >= HagieState::BODY_COUNT ||
+        current_ma > 3000)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig
+        .height_up_minimum_current_ma[body] =
+        current_ma;
+
+    runtimeConfig.valid =
+        true;
+}
+
+
+void STM32Worker::setHeightDownMinimumCurrent(
+    uint8_t body,
+    uint16_t current_ma)
+{
+    if (body >= HagieState::BODY_COUNT ||
+        current_ma > 3000)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(
+        configMutex
+    );
+
+    runtimeConfig
+        .height_down_minimum_current_ma[body] =
+        current_ma;
+
+    runtimeConfig.valid =
+        true;
+}
+
 void STM32Worker::enqueueRuntimeConfiguration()
 {
     {
@@ -1549,6 +1595,36 @@ void STM32Worker::sendCurrentConfigurationCommand()
         stm32->set_body_enabled(
             body,
             configCopy.body_enabled[body]
+        );
+    }
+
+    /*
+     * 60..65 -> K1B
+     * Corriente minima de subida.
+     */
+    else if (configSyncStep <= 65)
+    {
+        const uint8_t body =
+            configSyncStep - 60;
+
+        stm32->set_height_up_minimum_current(
+            body,
+            configCopy.height_up_minimum_current_ma[body]
+        );
+    }
+
+    /*
+     * 66..71 -> K1C
+     * Corriente minima de bajada.
+     */
+    else if (configSyncStep <= 71)
+    {
+        const uint8_t body =
+            configSyncStep - 66;
+
+        stm32->set_height_down_minimum_current(
+            body,
+            configCopy.height_down_minimum_current_ma[body]
         );
     }
 
@@ -2576,6 +2652,58 @@ void STM32Worker::configureCallbacks()
                 }
 
 
+                case 60:
+                case 61:
+                case 62:
+                case 63:
+                case 64:
+                case 65:
+                {
+                    const uint8_t body =
+                        configSyncStep - 60;
+
+                    const uint32_t expectedValue =
+                        expected.height_up_minimum_current_ma[body];
+
+                    if (
+                        ack.subcommand == 0x1B &&
+                        ack.body == body &&
+                        ack.value1 == expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
+                case 66:
+                case 67:
+                case 68:
+                case 69:
+                case 70:
+                case 71:
+                {
+                    const uint8_t body =
+                        configSyncStep - 66;
+
+                    const uint32_t expectedValue =
+                        expected.height_down_minimum_current_ma[body];
+
+                    if (
+                        ack.subcommand == 0x1C &&
+                        ack.body == body &&
+                        ack.value1 == expectedValue
+                    )
+                    {
+                        validAck = true;
+                    }
+
+                    break;
+                }
+
+
                 default:
                 {
                     return;
@@ -2620,7 +2748,7 @@ void STM32Worker::configureCallbacks()
 
 
             /*
-             * Fin de los 22 comandos.
+             * Fin de la sincronizacion de configuracion.
              */
             if (
                 configSyncStep >=

@@ -1734,6 +1734,70 @@ void stm32canbus_serialif::set_height_down_compensation_percent(
 // K 0x1A - Habilitación individual de cuerpo
 // ------------------------------------------------------------
 
+
+void stm32canbus_serialif::set_height_up_minimum_current(
+    uint8_t body,
+    uint16_t current_ma)
+{
+    if (body >= BODY_COUNT ||
+        current_ma > 3000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x1B;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (current_ma >> 8) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            current_ma & 0xFF
+        );
+
+    protocol::packet_encoder::send(5);
+}
+
+
+void stm32canbus_serialif::set_height_down_minimum_current(
+    uint8_t body,
+    uint16_t current_ma)
+{
+    if (body >= BODY_COUNT ||
+        current_ma > 3000)
+    {
+        return;
+    }
+
+    uint8_t* payload =
+        protocol::packet_encoder::
+            get_payload_buffer();
+
+    payload[0] = 'K';
+    payload[1] = 0x1C;
+    payload[2] = body;
+
+    payload[3] =
+        static_cast<uint8_t>(
+            (current_ma >> 8) & 0xFF
+        );
+
+    payload[4] =
+        static_cast<uint8_t>(
+            current_ma & 0xFF
+        );
+
+    protocol::packet_encoder::send(5);
+}
+
 void stm32canbus_serialif::set_body_enabled(
     uint8_t body,
     bool enabled)
