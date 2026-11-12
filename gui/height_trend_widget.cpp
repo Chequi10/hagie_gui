@@ -376,7 +376,7 @@ if (autoScale)
 
 
     // Escala independiente de corriente real (mA).
-    constexpr double CURRENT_MAX_MA = 1500.0;
+    constexpr double CURRENT_MAX_MA = 3500.0;
     auto mapCurrentY = [&](double current_ma) {
         const double value = std::max(0.0, std::min(CURRENT_MAX_MA, current_ma));
         return graphRect.bottom() - (value / CURRENT_MAX_MA) * graphRect.height();
@@ -469,7 +469,7 @@ if (autoScale)
     }
 
 
-    // Eje derecho: corriente del AX020800, 0..1500 mA.
+    // Eje derecho: corriente del AX020800, 0..3500 mA.
     if (selectedBody == 0)
     {
         painter.setPen(palette().text().color());
