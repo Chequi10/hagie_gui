@@ -34,6 +34,10 @@ private:
     QProcess* process = nullptr;
     QTimer *killTimer = nullptr, *poll = nullptr;
     QByteArray pending, diagnostics;
+    int binaryWidth = 0, binaryHeight = 0;
+    int binaryFrame = 0;
+    double binaryTime = 0.0;
+    qsizetype binaryBytes = 0;
     bool stopping = false, terminalMessage = false, awaitingConsumption = false;
     std::uint64_t lastTimestamp = 0;
 };

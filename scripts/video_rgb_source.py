@@ -1,6 +1,5 @@
 """Video acquisition only: decoded RGB replaces a camera frame source."""
 import argparse
-import base64
 import contextlib
 import json
 import math
@@ -45,9 +44,15 @@ def run(args):
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             height, width = rgb.shape[:2]
             index += 1
-            emit({'type': 'frame', 'frame': index, 'time_s': (index - 1) / fps,
-                  'width': width, 'height': height,
-                  'rgb': base64.b64encode(rgb.tobytes()).decode('ascii')})
+            payload = rgb.tobytes()
+            header = {'type': 'frame', 'frame': index,
+                      'time_s': (index - 1) / fps,
+                      'width': width, 'height': height,
+                      'bytes': len(payload)}
+            sys.stdout.buffer.write(
+                (json.dumps(header) + '\n').encode('utf-8'))
+            sys.stdout.buffer.write(payload)
+            sys.stdout.buffer.flush()
             # Worker ACK includes inference and configured frame skipping.
             if sys.stdin.readline().strip() != 'next':
                 return

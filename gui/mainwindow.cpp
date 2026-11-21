@@ -2415,7 +2415,7 @@ QWidget *MainWindow::createDashboardPage()
      */
     QPushButton *stopButton =
         new QPushButton(
-            "PARADA TOTAL"
+            "PARADA TOTAL CUERPOS"
         );
 
     stopButton->setMinimumHeight(70);
@@ -8887,25 +8887,57 @@ QWidget *MainWindow::createConfigurationPage()
     videoRgbControls->setVisible(configVisionSourceCombo->currentIndex() == 1);
     videoRgbControls->pythonPath = [this]() { return configYoloPythonEdit->text(); };
     videoRgbControls->onStarted = [this](std::size_t camera) {
-        if (!QFileInfo(configYoloOnnxEdit->text()).isFile()) return false;
+        const QString enginePath =
+            configYoloEngineEdit->text().trimmed();
+
+        if (!QFileInfo(enginePath).isFile())
+            return false;
+
         saveConfiguration();
         yoloInferenceWorker.stop();
+        yoloInferenceWorker.clearVideoCamera();
+
         lastConsumedYoloTimestamp.fill(0);
         tasselCounter.reset();
         tasselVerifier.reset();
+
         videoCameraIndex = camera;
-        videoFrameCache = std::make_shared<VideoRgbFrameSource::Cache>();
-        rgbCameraWorker.setFrameSource(camera,
-            std::make_unique<VideoRgbFrameSource>(camera, videoFrameCache));
+        videoFrameCache =
+            std::make_shared<VideoRgbFrameSource::Cache>();
+
+        rgbCameraWorker.setFrameSource(
+            camera,
+            std::make_unique<VideoRgbFrameSource>(
+                camera, videoFrameCache));
+
         videoRgbActive = true;
-        const bool initialized = yoloInferenceWorker.initializeOnnx(
-            configYoloOnnxEdit->text().toStdString(), configYoloPythonEdit->text().toStdString(),
-            (QCoreApplication::applicationDirPath() + "/onnx_inference.py").toStdString(), camera,
-            static_cast<float>(configYoloConfidenceSpin->value()),
-            static_cast<float>(configYoloNmsSpin->value()));
-        yoloInferenceWorker.setFrameInterval(static_cast<std::size_t>(configAiFrameIntervalSpin->value()));
-        if (initialized && yoloInferenceWorker.start()) return true;
+
+        const auto outputFormat =
+            static_cast<TensorRtTasselDetector::ModelOutputFormat>(
+                configYoloFormatCombo->currentData().toInt());
+
+        const QByteArray path = enginePath.toUtf8();
+
+        const bool initialized =
+            yoloInferenceWorker.initialize(
+                path.constData(),
+                outputFormat,
+                static_cast<float>(
+                    configYoloConfidenceSpin->value()),
+                static_cast<float>(
+                    configYoloNmsSpin->value()));
+
+        yoloInferenceWorker.setVideoCamera(camera);
+
+        yoloInferenceWorker.setFrameInterval(
+            static_cast<std::size_t>(
+                configAiFrameIntervalSpin->value()));
+
+        if (initialized && yoloInferenceWorker.start())
+            return true;
+
         videoRgbControls->onStopped();
+        yoloInferenceWorker.clearVideoCamera();
         return false;
     };
     videoRgbControls->onFrame = [this](const RgbFrameSource::Frame& frame) {
@@ -8920,6 +8952,7 @@ QWidget *MainWindow::createConfigurationPage()
     videoRgbControls->onStopped = [this]() {
         if (!videoRgbActive) return;
         yoloInferenceWorker.stop();
+        yoloInferenceWorker.clearVideoCamera();
         rgbCameraWorker.setFrameSource(videoCameraIndex,
             std::make_unique<SimulatedRgbFrameSource>(videoCameraIndex));
         videoRgbActive = false;

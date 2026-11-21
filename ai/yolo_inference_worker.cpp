@@ -151,6 +151,18 @@ bool YoloInferenceWorker::getLatestResult(
 }
 
 
+void YoloInferenceWorker::setVideoCamera(std::size_t camera)
+{
+    if (camera < CAMERA_COUNT)
+        videoCamera.store(static_cast<int>(camera));
+}
+
+void YoloInferenceWorker::clearVideoCamera()
+{
+    videoCamera.store(-1);
+}
+
+
 void YoloInferenceWorker::workerLoop()
 {
     /*
@@ -198,8 +210,13 @@ void YoloInferenceWorker::workerLoop()
 
     while (running.load())
     {
+        const int selectedVideoCamera = videoCamera.load();
+
         const std::size_t cameraIndex =
-            useOnnx ? onnxCamera : schedule[scheduleIndex];
+            useOnnx ? onnxCamera :
+            selectedVideoCamera >= 0
+                ? static_cast<std::size_t>(selectedVideoCamera)
+                : schedule[scheduleIndex];
 
 
         scheduleIndex =

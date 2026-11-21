@@ -81,7 +81,7 @@ VideoRgbControls::VideoRgbControls(QWidget* parent)
                 "Error de lectura del video: " + QString::fromUtf8(diagnostics));
             setRunning(false);
         });
-    poll->setInterval(20);
+    poll->setInterval(5);
     connect(poll, &QTimer::timeout, this, [this]() {
         if (stopping) return;
         const QString error = detectorError ? detectorError() : QString();
@@ -140,37 +140,105 @@ void VideoRgbControls::stopVideo() {
 }
 void VideoRgbControls::consumeOutput() {
     pending += process->readAllStandardOutput();
-    int newline;
-    while ((newline = pending.indexOf('\n')) >= 0) {
-        const QByteArray line = pending.left(newline); pending.remove(0, newline + 1);
-        const auto object = QJsonDocument::fromJson(line).object();
-        const QString type = object.value("type").toString();
-        if (type == "frame" && !stopping) {
-            const int width = object.value("width").toInt(), height = object.value("height").toInt();
-            const QByteArray rgb = QByteArray::fromBase64(object.value("rgb").toString().toLatin1());
-            if (width <= 0 || height <= 0 || width > 16384 || height > 16384 ||
-                rgb.size() != static_cast<qint64>(width) * height * 3 || rgb.size() > 96 * 1024 * 1024) {
-                terminalMessage = true; status->setText("Fotograma RGB inválido."); stopVideo(); return;
-            }
+
+    while (true) {
+        if (binaryBytes > 0) {
+            if (pending.size() < binaryBytes) break;
+
             RgbFrameSource::Frame frame;
-            frame.width = width; frame.height = height;
-            const auto* bytes = reinterpret_cast<const std::uint8_t*>(rgb.constData());
-            frame.data.assign(bytes, bytes + rgb.size());
-            const auto now = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
-            frame.timestamp_ms = lastTimestamp = std::max(now, lastTimestamp + 1);
-            frame.valid = true; frame.rgb_only = true;
+            frame.width = binaryWidth;
+            frame.height = binaryHeight;
+
+            const auto* bytes =
+                reinterpret_cast<const std::uint8_t*>(pending.constData());
+            frame.data.assign(bytes, bytes + binaryBytes);
+            pending.remove(0, binaryBytes);
+
+            const auto now = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()
+                ).count());
+
+            frame.timestamp_ms =
+                lastTimestamp = std::max(now, lastTimestamp + 1);
+            frame.valid = true;
+            frame.rgb_only = true;
+
+            binaryBytes = 0;
             awaitingConsumption = true;
-            if (onFrame) onFrame(frame);
-            status->setText(QString("Video: %1 s | Fotograma %2 | Resultado en CÁMARAS")
-                .arg(object.value("time_s").toDouble(), 0, 'f', 2).arg(object.value("frame").toInt()));
-        } else if (type == "finished") {
-            terminalMessage = true; status->setText("Video finalizado; RGB simulado restaurado.");
+
+            if (!stopping && onFrame) onFrame(frame);
+
+            if (!stopping) {
+                status->setText(
+                    QString("Video: %1 s | Fotograma %2 | Resultado en CÁMARAS")
+                    .arg(binaryTime, 0, 'f', 2)
+                    .arg(binaryFrame));
+            }
+            continue;
+        }
+
+        const int newline = pending.indexOf('\n');
+        if (newline < 0) break;
+
+        const QByteArray line = pending.left(newline);
+        pending.remove(0, newline + 1);
+
+        QJsonParseError parseError;
+        const auto document =
+            QJsonDocument::fromJson(line, &parseError);
+
+        if (parseError.error != QJsonParseError::NoError ||
+            !document.isObject()) {
+            terminalMessage = true;
+            status->setText("Cabecera de video inválida.");
+            stopVideo();
+            return;
+        }
+
+        const auto object = document.object();
+        const QString type = object.value("type").toString();
+
+        if (type == "frame") {
+            binaryWidth = object.value("width").toInt();
+            binaryHeight = object.value("height").toInt();
+            binaryFrame = object.value("frame").toInt();
+            binaryTime = object.value("time_s").toDouble();
+
+            const qint64 expected =
+                static_cast<qint64>(binaryWidth) * binaryHeight * 3;
+            const qint64 declared =
+                object.value("bytes").toVariant().toLongLong();
+
+            if (binaryWidth <= 0 || binaryHeight <= 0 ||
+                binaryWidth > 16384 || binaryHeight > 16384 ||
+                expected <= 0 || expected > 96LL * 1024 * 1024 ||
+                declared != expected) {
+                terminalMessage = true;
+                status->setText("Fotograma RGB inválido.");
+                stopVideo();
+                return;
+            }
+
+            binaryBytes = static_cast<qsizetype>(expected);
+            continue;
+        }
+
+        if (type == "finished") {
+            terminalMessage = true;
+            status->setText(
+                "Video finalizado; RGB simulado restaurado.");
         } else if (type == "error") {
-            terminalMessage = true; status->setText("Fuente RGB: " + object.value("message").toString());
+            terminalMessage = true;
+            status->setText(
+                "Fuente RGB: " + object.value("message").toString());
         }
     }
+
     if (pending.size() > 128 * 1024 * 1024) {
-        terminalMessage = true; status->setText("Fotograma demasiado grande."); pending.clear(); stopVideo();
+        terminalMessage = true;
+        status->setText("Fotograma demasiado grande.");
+        pending.clear();
+        stopVideo();
     }
 }

@@ -72,6 +72,9 @@ public:
         std::size_t interval
     );
 
+    void setVideoCamera(std::size_t camera);
+    void clearVideoCamera();
+
 
     bool getLatestResult(
         std::size_t cameraIndex,
@@ -85,6 +88,7 @@ private:
     void resetResults();
     bool useOnnx = false;
     std::size_t onnxCamera = 0;
+    std::atomic<int> videoCamera {-1};
     std::string onnxModel, onnxPython, onnxHelper;
     std::string lastError;
     std::atomic<float> confidence {0.25f};
