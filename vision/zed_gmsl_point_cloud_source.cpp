@@ -129,7 +129,7 @@ bool ZedGmslPointCloudSource::start()
         */
         initParameters.coordinate_system =
             sl::COORDINATE_SYSTEM::
-                RIGHT_HANDED_Z_UP_X_FORWARD;
+                RIGHT_HANDED_Z_UP_X_FWD;
 
                 
 
@@ -681,7 +681,7 @@ bool ZedGmslPointCloudSource::getPointCloud(
             *
             * La ZED se configura con:
             *
-            * RIGHT_HANDED_Z_UP_X_FORWARD
+            * RIGHT_HANDED_Z_UP_X_FWD
             *
             * Por lo tanto:
             *
