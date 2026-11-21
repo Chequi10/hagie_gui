@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "video_rgb_controls.h"
+#include "rgbd_playback_dialog.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8866,6 +8867,20 @@ QWidget *MainWindow::createConfigurationPage()
     generalPageLayout->addWidget(
         visionSourceFrame
     );
+
+    // Prueba RGB-D separada de la configuracion y del control de la maquina.
+    auto *rgbdPlaybackButton = new QPushButton(
+        "Probar grabación RGB-D (XYZ)…", generalPage);
+    generalPageLayout->addWidget(rgbdPlaybackButton);
+    rgbdPlaybackButton->setVisible(configVisionSourceCombo->currentIndex() == 1);
+    connect(configVisionSourceCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            rgbdPlaybackButton, [rgbdPlaybackButton](int index) {
+        rgbdPlaybackButton->setVisible(index == 1);
+    });
+    connect(rgbdPlaybackButton, &QPushButton::clicked, this, [this]() {
+        openRgbdPlaybackDialog(this);
+    });
 
     videoRgbControls = new VideoRgbControls(generalPage);
     generalPageLayout->addWidget(videoRgbControls);

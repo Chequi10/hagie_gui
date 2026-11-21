@@ -2,3 +2,8 @@ build/
 .vscode/
 *.user
 *.autosave
+
+*.bak_*
+
+.git_respaldo_*/
+*.bak_*

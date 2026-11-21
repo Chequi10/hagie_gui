@@ -106,13 +106,13 @@ bool SimulatedPointCloudSource::getPointCloud(
             Vision3DProcessor::Point3D point;
 
             point.x =
-                x;
+                x * 1000.0f;
 
             point.y =
-                y;
+                y * 1000.0f;
 
             point.z =
-                z;
+                z * 1000.0f;
 
             point.image_x =
                 imageX;

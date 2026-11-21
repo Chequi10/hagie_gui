@@ -444,3 +444,28 @@ add_executable(onnx_transport_test tests/onnx_transport_test.cpp
     ai/onnx_tassel_detector.cpp ai/tassel_detector.cpp)
 target_include_directories(onnx_transport_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(onnx_transport_test PRIVATE Qt6::Core)
+
+
+# Prueba de grabaciones TUM RGB-D: Qt existente, sin SDK ZED ni OpenCV C++.
+target_sources(hagie_gui PRIVATE
+    vision/tum_rgbd_point_cloud_source.cpp
+    vision/tum_rgbd_point_cloud_source.h
+    gui/rgbd_playback_dialog.cpp
+    gui/rgbd_playback_dialog.h)
+
+add_executable(tum_rgbd_playback_test
+    tests/tum_rgbd_playback_test.cpp
+    vision/tum_rgbd_point_cloud_source.cpp
+    vision/vision_3d_processor.cpp)
+target_include_directories(tum_rgbd_playback_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(tum_rgbd_playback_test PRIVATE Qt6::Widgets)
+
+
+# Referencia de mesa para la prueba RGB-D; no modifica el procesador original.
+target_sources(hagie_gui PRIVATE vision/rgbd_reference_plane.h)
+add_executable(rgbd_reference_plane_test
+    tests/rgbd_reference_plane_test.cpp
+    vision/vision_3d_processor.cpp)
+target_include_directories(rgbd_reference_plane_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(rgbd_reference_plane_test PROPERTIES
+    AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
