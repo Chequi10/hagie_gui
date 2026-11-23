@@ -10,7 +10,7 @@
 
 #ifdef HAGIE_ENABLE_ZED_SDK
 
-#include <sl/Camera.hpp>
+#include <sl/CameraOne.hpp>
 
 #endif
 
@@ -98,11 +98,11 @@ private:
 
 #ifdef HAGIE_ENABLE_ZED_SDK
 
-    sl::Camera camera;
+    sl::CameraOne camera;
 
     sl::Mat zedRgbImage;
 
-    sl::RuntimeParameters runtimeParameters;
+    
 
 #endif
 };

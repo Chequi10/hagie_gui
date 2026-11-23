@@ -102,6 +102,35 @@ Vision3DProcessor::getCameraConfig(
     return cameraConfigs[camera];
 }
 
+
+// ============================================================
+// ORIENTACIÓN INDIVIDUAL DE CÁMARA
+// ============================================================
+
+void Vision3DProcessor::setCameraOrientation(
+    std::size_t camera,
+    const Orientation& cameraOrientation)
+{
+    if (camera >= CAMERA_COUNT)
+    {
+        return;
+    }
+
+    cameraOrientations[camera] = cameraOrientation;
+}
+
+Vision3DProcessor::Orientation
+Vision3DProcessor::getCameraOrientation(
+    std::size_t camera) const
+{
+    if (camera >= CAMERA_COUNT)
+    {
+        return Orientation {};
+    }
+
+    return cameraOrientations[camera];
+}
+
 void Vision3DProcessor::setAxisMapping(
     const AxisMapping& mapping)
 {
@@ -187,7 +216,7 @@ bool Vision3DProcessor::findBodyForPosition(
 
 
         if (position.x < region.min_x ||
-            position.x > region.max_x)
+            position.x >= region.max_x)
         {
             continue;
         }
@@ -300,10 +329,13 @@ Vision3DProcessor::processPointCloud(
 
         VisionHeightSource::BodyVisionResult instantResult =
     calculateBodyHeight(
-        cloud,
-        body,
-        config.geometry
-    );
+            cloud,
+            body,
+            config.geometry,
+            cameraOrientations[camera].valid
+                ? cameraOrientations[camera]
+                : orientation
+        );
 
 
         result.bodies[body] =
@@ -423,11 +455,22 @@ Vision3DProcessor::levelPointWithOrientation(
     const Point3D& point,
     const CameraGeometry& geometry) const
 {
+    return levelPointWithOrientation(
+        point, geometry, orientation
+    );
+}
+
+Vision3DProcessor::Point3D
+Vision3DProcessor::levelPointWithOrientation(
+    const Point3D& point,
+    const CameraGeometry& geometry,
+    const Orientation& selectedOrientation) const
+{
     /*
      * Si la IMU todavía no es válida,
      * mantenemos el comportamiento actual.
      */
-    if (!orientation.valid)
+    if (!selectedOrientation.valid)
     {
         return point;
     }
@@ -443,7 +486,7 @@ Vision3DProcessor::levelPointWithOrientation(
      */
     float roll =
         -(
-            orientation.roll_deg +
+            selectedOrientation.roll_deg +
             geometry.roll_offset_deg
         )
         * DEG_TO_RAD;
@@ -451,7 +494,7 @@ Vision3DProcessor::levelPointWithOrientation(
 
     float pitch =
         -(
-            orientation.pitch_deg +
+            selectedOrientation.pitch_deg +
             geometry.pitch_offset_deg
         )
         * DEG_TO_RAD;
@@ -516,6 +559,7 @@ Vision3DProcessor::levelPointWithOrientation(
 }
 
 bool Vision3DProcessor::getDetectionPosition3D(
+    std::size_t camera,
     const PointCloud& cloud,
     int imageX,
     int imageY,
@@ -525,6 +569,16 @@ bool Vision3DProcessor::getDetectionPosition3D(
     Point3D& position
 ) const
 {
+    if (camera >= CAMERA_COUNT)
+    {
+        return false;
+    }
+
+    const Orientation& selectedOrientation =
+        cameraOrientations[camera].valid
+            ? cameraOrientations[camera]
+            : orientation;
+
     if (imageWidth <= 0 ||
         imageHeight <= 0)
     {
@@ -629,8 +683,23 @@ bool Vision3DProcessor::getDetectionPosition3D(
         Point3D leveledPoint =
             levelPointWithOrientation(
                 machinePoint,
-                geometry
+                geometry,
+                selectedOrientation
             );
+
+        if (geometry.camera_height_mm > 0.0f)
+        {
+            Point3D localLeveled =
+                levelPointWithOrientation(
+                    normalizedPoint,
+                    geometry,
+                    selectedOrientation
+                );
+
+            leveledPoint.z =
+                geometry.camera_height_mm
+                + localLeveled.z;
+        }
 
 
         if (!std::isfinite(leveledPoint.x) ||
@@ -641,8 +710,14 @@ bool Vision3DProcessor::getDetectionPosition3D(
         }
 
 
+        /*
+         * X lateral: conservar la posición física
+         * respecto de la máquina, sin rotación IMU.
+         *
+         * Y y Z: utilizar coordenadas compensadas.
+         */
         positionsX.push_back(
-            leveledPoint.x
+            machinePoint.x
         );
 
         positionsY.push_back(
@@ -960,6 +1035,18 @@ Vision3DProcessor::calculateBodyHeight(
     std::size_t body,
     const CameraGeometry& geometry) const
 {
+    return calculateBodyHeight(
+        cloud, body, geometry, orientation
+    );
+}
+
+VisionHeightSource::BodyVisionResult
+Vision3DProcessor::calculateBodyHeight(
+    const PointCloud& cloud,
+    std::size_t body,
+    const CameraGeometry& geometry,
+    const Orientation& selectedOrientation) const
+{
     VisionHeightSource::BodyVisionResult result;
 
 
@@ -1008,10 +1095,35 @@ Vision3DProcessor::calculateBodyHeight(
          *    utilizando la IMU.
          */
         Point3D leveledPoint =
-        levelPointWithOrientation(
-            machinePoint,
-            geometry
-        );
+            levelPointWithOrientation(
+                machinePoint,
+                geometry,
+                selectedOrientation
+            );
+
+        /*
+         * Referencia de altura de cámara.
+         *
+         * Si camera_height_mm > 0:
+         * nivelamos el punto local y sumamos
+         * la altura calibrada respecto del suelo.
+         *
+         * Si vale 0, conservamos el cálculo
+         * original para compatibilidad.
+         */
+        if (geometry.camera_height_mm > 0.0f)
+        {
+            Point3D localLeveled =
+                levelPointWithOrientation(
+                    normalizedPoint,
+                    geometry,
+                    selectedOrientation
+                );
+
+            leveledPoint.z =
+                geometry.camera_height_mm
+                + localLeveled.z;
+        }
 
 
         /*

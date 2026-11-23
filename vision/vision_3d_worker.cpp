@@ -509,6 +509,33 @@ bool Vision3DWorker::processCamera(
         return false;
     }
 
+    /*
+     * Leer la orientación de la IMU correspondiente
+     * a la nube recién adquirida.
+     */
+    PointCloudSource::CameraOrientation cameraOrientation;
+
+    Vision3DProcessor::Orientation orientation;
+
+    if (source->getCameraOrientation(cameraOrientation))
+    {
+        cameraOrientations[camera] = cameraOrientation;
+
+        orientation.valid = cameraOrientation.valid;
+        orientation.roll_deg = cameraOrientation.roll_deg;
+        orientation.pitch_deg = cameraOrientation.pitch_deg;
+    }
+    else
+    {
+        cameraOrientations[camera] =
+            PointCloudSource::CameraOrientation {};
+    }
+
+    processor->setCameraOrientation(
+        camera,
+        orientation
+    );
+
 
     /*
     * Timestamp asociado a esta nube.

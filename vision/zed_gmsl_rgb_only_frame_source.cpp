@@ -36,7 +36,7 @@ ZedGmslRgbOnlyFrameSource::start()
 {
 #ifdef HAGIE_ENABLE_ZED_SDK
 
-    sl::InitParameters initParameters;
+    sl::InitParametersOne initParameters;
 
 
     /*
@@ -70,8 +70,7 @@ ZedGmslRgbOnlyFrameSource::start()
      * Cámara trasera usada solamente para RGB.
      * No necesitamos cálculo de profundidad.
      */
-    initParameters.depth_mode =
-        sl::DEPTH_MODE::NONE;
+    
 
 
     sl::ERROR_CODE error =
@@ -202,9 +201,7 @@ ZedGmslRgbOnlyFrameSource::getFrame(
      * Capturar un nuevo frame.
      */
     sl::ERROR_CODE grabResult =
-        camera.grab(
-            runtimeParameters
-        );
+        camera.grab();
 
 
     if (grabResult != sl::ERROR_CODE::SUCCESS)

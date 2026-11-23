@@ -276,6 +276,16 @@ public:
 
     Orientation getOrientation() const;
 
+    // Orientación individual de cada cámara.
+    void setCameraOrientation(
+        std::size_t camera,
+        const Orientation& cameraOrientation
+    );
+
+    Orientation getCameraOrientation(
+        std::size_t camera
+    ) const;
+
 
     void setCameraConfig(
         std::size_t camera,
@@ -356,6 +366,7 @@ public:
     ) const;
 
     bool getDetectionPosition3D(
+        std::size_t camera,
         const PointCloud& cloud,
         int imageX,
         int imageY,
@@ -427,6 +438,12 @@ private:
         const CameraGeometry& geometry
     ) const;
 
+    Point3D levelPointWithOrientation(
+        const Point3D& point,
+        const CameraGeometry& geometry,
+        const Orientation& selectedOrientation
+    ) const;
+
 
     TemporalFilterConfig temporalFilterConfig;
 
@@ -462,12 +479,23 @@ private:
         const CameraGeometry& geometry
     ) const;
 
+    VisionHeightSource::BodyVisionResult calculateBodyHeight(
+        const PointCloud& cloud,
+        std::size_t body,
+        const CameraGeometry& geometry,
+        const Orientation& selectedOrientation
+    ) const;
+
 
     // ========================================================
     // CONFIGURACIÓN ACTUAL
     // ========================================================
 
     Orientation orientation;
+
+    // Orientaciones individuales de las cámaras.
+    std::array<Orientation, CAMERA_COUNT>
+        cameraOrientations {};
 
 
     CameraGeometry cameraGeometry;

@@ -2874,6 +2874,7 @@ void MainWindow::updateCameraPage()
 
 
                     if (!vision3DProcessor->getDetectionPosition3D(
+                            camera,
                             cloud3D,
                             detection.x,
                             detection.y,

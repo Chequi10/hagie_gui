@@ -1,10 +1,17 @@
 #include "vision/zed_gmsl_point_cloud_source.h"
 
+#ifdef HAGIE_ENABLE_ZED_SDK
+#include <sl/CameraOne.hpp>
+#endif
+
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
 #include <string>
 #include <chrono>
+#include <algorithm>
+#include <limits>
+#include <iostream>
 
 
 ZedGmslPointCloudSource::ZedGmslPointCloudSource(
@@ -631,6 +638,17 @@ bool ZedGmslPointCloudSource::getPointCloud(
     );
 
 
+    std::size_t sampledPoints = 0;
+    std::size_t finitePoints = 0;
+
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float minZ = std::numeric_limits<float>::max();
+
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
+    float maxZ = std::numeric_limits<float>::lowest();
+
     for (int y = 0;
          y < height;
          y += SAMPLE_STEP)
@@ -639,6 +657,8 @@ bool ZedGmslPointCloudSource::getPointCloud(
              x < width;
              x += SAMPLE_STEP)
         {
+            ++sampledPoints;
+
             sl::float4 point;
 
 
@@ -667,6 +687,8 @@ bool ZedGmslPointCloudSource::getPointCloud(
                 continue;
             }
 
+
+            ++finitePoints;
 
             /*
              * Convertir al formato común
@@ -723,12 +745,130 @@ bool ZedGmslPointCloudSource::getPointCloud(
                 true;
 
 
+            minX = std::min(minX, convertedPoint.x);
+            minY = std::min(minY, convertedPoint.y);
+            minZ = std::min(minZ, convertedPoint.z);
+
+            maxX = std::max(maxX, convertedPoint.x);
+            maxY = std::max(maxY, convertedPoint.y);
+            maxZ = std::max(maxZ, convertedPoint.z);
+
             cloud.push_back(
                 convertedPoint
 );
         }
     }
 
+
+    /*
+     * DIAGNOSTICO DE NUBE 3D REAL
+     * Mostrar cada 30 cuadros.
+     */
+    static std::uint64_t diagnosticFrame = 0;
+
+    if ((++diagnosticFrame % 30) == 0)
+    {
+        std::cerr
+            << "\\n[ZED 3D] Camara: "
+            << cameraIndex
+            << " | Serial: " << serialNumber
+            << "\\nMuestreados: " << sampledPoints
+            << " | Finitos: " << finitePoints
+            << " | En nube: " << cloud.size()
+            << std::endl;
+
+        if (!cloud.empty())
+        {
+            /*
+             * MEDICION DE UNA REGION CENTRAL
+             * de la imagen RGB.
+             */
+            const int centerX = width / 2;
+            const int centerY = height / 2;
+
+            const int radiusX = width / 10;
+            const int radiusY = height / 10;
+
+            std::vector<float> centerXValues;
+            std::vector<float> centerYValues;
+            std::vector<float> centerZValues;
+
+            for (const auto& point : cloud)
+            {
+                if (!point.image_coordinates_valid)
+                    continue;
+
+                if (std::abs(point.image_x - centerX) > radiusX ||
+                    std::abs(point.image_y - centerY) > radiusY)
+                    continue;
+
+                centerXValues.push_back(point.x);
+                centerYValues.push_back(point.y);
+                centerZValues.push_back(point.z);
+            }
+
+            if (!centerYValues.empty())
+            {
+                auto median = [](std::vector<float>& values)
+                {
+                    std::sort(values.begin(), values.end());
+                    return values[values.size() / 2];
+                };
+
+                float measuredX = median(centerXValues);
+                float measuredY = median(centerYValues);
+                float measuredZ = median(centerZValues);
+
+                std::sort(centerZValues.begin(), centerZValues.end());
+
+                const std::size_t p95Index =
+                    static_cast<std::size_t>(
+                        0.95f * (centerZValues.size() - 1)
+                    );
+
+                const float p95Z = centerZValues[p95Index];
+
+                std::cerr
+                    << "[REGION RGB 20%] Pixeles: "
+                    << centerX << "," << centerY
+                    << " | Puntos: " << centerYValues.size()
+                    << " | X=" << measuredX
+                    << " Y=" << measuredY
+                    << " Z=" << measuredZ
+                    << " P95_Z=" << p95Z
+                    << " mm"
+                    << std::endl;
+            }
+            else
+            {
+                std::cerr
+                    << "[CENTRO RGB] Sin puntos validos"
+                    << std::endl;
+            }
+
+            std::cerr
+                << "X: " << minX << " a " << maxX
+                << " mm | Y: " << minY << " a " << maxY
+                << " mm | Z: " << minZ << " a " << maxZ
+                << " mm"
+                << std::endl;
+
+            for (std::size_t i = 0;
+                 i < std::min<std::size_t>(3, cloud.size());
+                 ++i)
+            {
+                const auto& point = cloud[i];
+
+                std::cerr
+                    << "P" << i + 1
+                    << ": X=" << point.x
+                    << " Y=" << point.y
+                    << " Z=" << point.z
+                    << " mm"
+                    << std::endl;
+            }
+        }
+    }
 
     /*
      * Una nube vacía se considera inválida.
@@ -834,28 +974,33 @@ ZedGmslPointCloudSource::detectConnectedSerialNumbers()
 
 #ifdef HAGIE_ENABLE_ZED_SDK
 
-    /*
-     * ========================================================
-     * HARDWARE REAL
-     * ========================================================
-     */
-    auto devices =
+    const auto stereoDevices =
         sl::Camera::getDeviceList();
 
+    const auto monoDevices =
+        sl::CameraOne::getDeviceList();
 
-    for (const auto& device : devices)
+    for (const auto& device : stereoDevices)
     {
-        if (device.serial_number == 0)
+        if (device.serial_number != 0 &&
+            std::find(serialNumbers.begin(),
+                      serialNumbers.end(),
+                      device.serial_number) == serialNumbers.end())
         {
-            continue;
+            serialNumbers.push_back(device.serial_number);
         }
-
-
-        serialNumbers.push_back(
-            device.serial_number
-        );
     }
 
+    for (const auto& device : monoDevices)
+    {
+        if (device.serial_number != 0 &&
+            std::find(serialNumbers.begin(),
+                      serialNumbers.end(),
+                      device.serial_number) == serialNumbers.end())
+        {
+            serialNumbers.push_back(device.serial_number);
+        }
+    }
 
 #else
 

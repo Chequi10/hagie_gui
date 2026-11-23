@@ -35,6 +35,23 @@ static void printResult(
 }
 
 
+
+/*
+ * Conversión para pruebas históricas.
+ * Las nubes antiguas están expresadas en metros.
+ * El procesador trabaja en milímetros.
+ */
+static void convertirNubeAMilimetros(
+    Vision3DProcessor::PointCloud& cloud)
+{
+    for (auto& point : cloud)
+    {
+        point.x *= 1000.0f;
+        point.y *= 1000.0f;
+        point.z *= 1000.0f;
+    }
+}
+
 int main()
 {
     /*
@@ -96,6 +113,8 @@ int main()
             {10.0f, 0.0f, 5.0f}
         );
 
+
+        convertirNubeAMilimetros(cloud);
 
         VisionHeightSource::VisionResult result =
             processor.processPointCloud(
@@ -227,6 +246,8 @@ int main()
         );
 
 
+        convertirNubeAMilimetros(cloud);
+
         VisionHeightSource::VisionResult result =
             processor.processPointCloud(
                 cloud
@@ -295,6 +316,8 @@ int main()
         {-2.5f, 0.0f, 0.40f}
     );
 
+    convertirNubeAMilimetros(cloudImuZero);
+
     VisionHeightSource::VisionResult resultImuZero =
         processorImuZero.processPointCloud(
             cloudImuZero
@@ -335,6 +358,8 @@ int main()
     cloudImuRoll.push_back(
         {-2.5f, 0.0f, 0.40f}
     );
+
+    convertirNubeAMilimetros(cloudImuRoll);
 
     VisionHeightSource::VisionResult resultImuRoll =
         processorImuRoll.processPointCloud(
@@ -455,6 +480,8 @@ int main()
     );
 
 
+    convertirNubeAMilimetros(physicalCloud);
+
     VisionHeightSource::VisionResult physicalResult =
         processorPhysicalTest.processPointCloud(
             physicalCloud
@@ -554,6 +581,8 @@ int main()
     /*
     * Procesar específicamente como CAMARA 0.
     */
+    convertirNubeAMilimetros(cameraCloud);
+
     VisionHeightSource::VisionResult cameraResult =
         processorCamera.processPointCloud(
             0,
@@ -708,17 +737,23 @@ int main()
     /*
     * Procesar cada cámara independientemente.
     */
+    convertirNubeAMilimetros(cloudCamera0);
+
     VisionHeightSource::VisionResult resultCamera0 =
         processorThreeCameras.processPointCloud(
             0,
             cloudCamera0
         );
 
+    convertirNubeAMilimetros(cloudCamera1);
+
     VisionHeightSource::VisionResult resultCamera1 =
         processorThreeCameras.processPointCloud(
             1,
             cloudCamera1
         );
+
+    convertirNubeAMilimetros(cloudCamera2);
 
     VisionHeightSource::VisionResult resultCamera2 =
         processorThreeCameras.processPointCloud(
@@ -911,11 +946,15 @@ int main()
     * Procesar cada cámara con
     * su geometría propia.
     */
+    convertirNubeAMilimetros(positionCloud0);
+
     VisionHeightSource::VisionResult positionResult0 =
         processorCameraPosition.processPointCloud(
             0,
             positionCloud0
         );
+
+    convertirNubeAMilimetros(positionCloud1);
 
     VisionHeightSource::VisionResult positionResult1 =
         processorCameraPosition.processPointCloud(
@@ -1030,6 +1069,8 @@ int main()
     );
 
 
+    convertirNubeAMilimetros(p95Cloud);
+
     VisionHeightSource::VisionResult p95Result =
         processorP95.processPointCloud(
             p95Cloud
@@ -1126,6 +1167,8 @@ int main()
     );
 
 
+    convertirNubeAMilimetros(cloudFourPoints);
+
     VisionHeightSource::VisionResult resultFourPoints =
         processorMinPoints.processPointCloud(
             cloudFourPoints
@@ -1166,9 +1209,8 @@ int main()
         cloudFourPoints;
 
     cloudFivePoints.push_back(
-        {-2.5f, 0.0f, 0.440f}
+        {-2500.0f, 0.0f, 440.0f}
     );
-
 
     VisionHeightSource::VisionResult resultFivePoints =
         processorMinPoints.processPointCloud(
@@ -1314,6 +1356,8 @@ int main()
     );
 
 
+    convertirNubeAMilimetros(invalidCloud);
+
     VisionHeightSource::VisionResult invalidResult =
         processorInvalidPoints.processPointCloud(
             invalidCloud
@@ -1409,6 +1453,8 @@ int main()
         }
     );
 
+
+    convertirNubeAMilimetros(temporalCloud);
 
     VisionHeightSource::VisionResult temporalResult =
         processorTemporal.processPointCloud(
@@ -1747,6 +1793,10 @@ int main()
         outsideDetectionPoint
     );
 
+    // Convertir metros históricos a milímetros.
+    convertirNubeAMilimetros(detectionCloud);
+
+
 
     /*
     * Obtener posición física de la panoja.
@@ -1755,6 +1805,7 @@ int main()
 
     bool detectionPositionValid =
         processorDetection3D.getDetectionPosition3D(
+            0,
             detectionCloud,
             100,
             50,
@@ -1770,19 +1821,19 @@ int main()
         std::cout
             << "Posicion X: "
             << detectionPosition.x
-            << " m"
+            << " mm"
             << std::endl;
 
         std::cout
             << "Posicion Y: "
             << detectionPosition.y
-            << " m"
+            << " mm"
             << std::endl;
 
         std::cout
             << "Posicion Z: "
             << detectionPosition.z
-            << " m"
+            << " mm"
             << std::endl;
 
         std::cout
@@ -1816,14 +1867,14 @@ int main()
     bool detectionTestOk =
         detectionPositionValid &&
         std::fabs(
-            detectionPosition.x - (-1.50f)
-        ) < 0.001f &&
+            detectionPosition.x - (-1500.0f)
+        ) < 1.0f &&
         std::fabs(
-            detectionPosition.y - 2.40f
-        ) < 0.001f &&
+            detectionPosition.y - 2400.0f
+        ) < 1.0f &&
         std::fabs(
-            detectionPosition.z - 1.25f
-        ) < 0.001f &&
+            detectionPosition.z - 1250.0f
+        ) < 1.0f &&
         detectionPosition.image_x == 120 &&
         detectionPosition.image_y == 70;
 
@@ -2170,6 +2221,7 @@ int main()
 
     const bool validGeometryA =
         cameraGeometryProcessor.getDetectionPosition3D(
+            0,
             geometryCloud,
             90,
             90,
@@ -2182,6 +2234,7 @@ int main()
 
     const bool validGeometryB =
         cameraGeometryProcessor.getDetectionPosition3D(
+            0,
             geometryCloud,
             90,
             90,
@@ -2373,6 +2426,7 @@ int main()
 
     const bool backgroundFilterValid =
         backgroundFilterProcessor.getDetectionPosition3D(
+            0,
             backgroundFilterCloud,
             100,
             50,
@@ -2435,6 +2489,589 @@ int main()
         << "TEST FILTRO DE FONDO OK"
         << std::endl;
 
+
+
+    /*
+     * TEST 18 - ALTURA DE CAMARA
+     * Cámara a 2000 mm, cultivo a 1300 mm.
+     */
+    {
+        std::cout
+            << "\nTEST 18 - ALTURA DE CAMARA E IMU\n";
+
+        const float PI = 3.14159265358979323846f;
+        const float DEG = PI / 180.0f;
+
+        const float angles[6][2] = {
+            {0, 0}, {5, 0}, {-5, 0},
+            {0, 10}, {0, -10}, {7, 12}
+        };
+
+        bool allOk = true;
+
+        for (const auto& a : angles)
+        {
+            float roll = a[0];
+            float pitch = a[1];
+
+            Vision3DProcessor processor;
+
+            Vision3DProcessor::CameraConfig config;
+            config.enabled = true;
+            config.body_enabled[0] = true;
+            config.geometry.camera_height_mm = 2000.0f;
+            config.geometry.position_x_mm = -2500.0f;
+
+            processor.setCameraConfig(0, config);
+
+            Vision3DProcessor::Orientation imu;
+            imu.valid = true;
+            imu.roll_deg = roll;
+            imu.pitch_deg = pitch;
+
+            processor.setOrientation(imu);
+
+            /*
+             * Punto nivelado relativo a cámara.
+             * X=0, Y=500, Z=-700 mm.
+             *
+             * Aplicamos la inclinación inversa
+             * de la compensación del procesador.
+             */
+            float x = 0.0f;
+            float y = 500.0f;
+            float z = -700.0f;
+
+            float cr = std::cos(roll * DEG);
+            float sr = std::sin(roll * DEG);
+            float cp = std::cos(pitch * DEG);
+            float sp = std::sin(pitch * DEG);
+
+            // Inversa de la rotación Pitch.
+            float y1 = cp * y - sp * z;
+            float z1 = sp * y + cp * z;
+
+            // Inversa de la rotación Roll.
+            float x2 = cr * x + sr * z1;
+            float z2 = -sr * x + cr * z1;
+
+            Vision3DProcessor::PointCloud cloud;
+            cloud.push_back({x2, y1, z2});
+
+            auto result =
+                processor.processPointCloud(0, cloud);
+
+            bool valid = result.bodies[0].valid;
+            int height = valid
+                ? result.bodies[0].height_mm : -1;
+
+            bool ok = valid &&
+                std::abs(height - 1300) <= 2;
+
+            allOk = allOk && ok;
+
+            std::cout
+                << "Roll=" << roll
+                << " Pitch=" << pitch
+                << " Altura=" << height
+                << " mm " << (ok ? "OK" : "ERROR")
+                << std::endl;
+        }
+
+        if (!allOk)
+        {
+            std::cerr << "TEST 18 ERROR\n";
+            return 1;
+        }
+
+        std::cout << "TEST 18 OK\n";
+    }
+
+
+    /*
+     * TEST 19 - PANOJAS CON IMU
+     * Altura de cámara: 2000 mm.
+     * Altura de panoja: 1300 mm.
+     * Cuerpo esperado: 1.
+     */
+    {
+        std::cout
+            << "\nTEST 19 - PANOJAS CON IMU\n";
+
+        constexpr float DEG =
+            3.14159265358979323846f / 180.0f;
+
+        const float angles[6][2] = {
+            {0, 0}, {5, 0}, {-5, 0},
+            {0, 10}, {0, -10}, {7, 12}
+        };
+
+        bool allOk = true;
+
+        for (const auto& a : angles)
+        {
+            float roll = a[0];
+            float pitch = a[1];
+
+            Vision3DProcessor processor;
+
+            Vision3DProcessor::CameraConfig config;
+            config.enabled = true;
+            config.body_enabled[0] = true;
+            config.geometry.camera_height_mm = 2000.0f;
+            config.geometry.position_x_mm = -2500.0f;
+
+            processor.setCameraConfig(0, config);
+
+            Vision3DProcessor::Orientation generalImu;
+            generalImu.valid = true;
+            generalImu.roll_deg = 20.0f;
+            generalImu.pitch_deg = -15.0f;
+            processor.setOrientation(generalImu);
+
+            Vision3DProcessor::Orientation cameraImu;
+            cameraImu.valid = true;
+            cameraImu.roll_deg = roll;
+            cameraImu.pitch_deg = pitch;
+            processor.setCameraOrientation(0, cameraImu);
+
+            // Punto relativo a la cámara, en mm.
+            float x = 0.0f;
+            float y = 500.0f;
+            float z = -700.0f;
+
+            float cr = std::cos(roll * DEG);
+            float sr = std::sin(roll * DEG);
+            float cp = std::cos(pitch * DEG);
+            float sp = std::sin(pitch * DEG);
+
+            float y1 = cp * y - sp * z;
+            float z1 = sp * y + cp * z;
+            float x2 = cr * x + sr * z1;
+            float z2 = -sr * x + cr * z1;
+
+            Vision3DProcessor::PointCloud cloud;
+
+            for (int i = 0; i < 5; ++i)
+            {
+                Vision3DProcessor::Point3D point;
+                point.x = x2;
+                point.y = y1;
+                point.z = z2;
+                point.image_x = 120 + i;
+                point.image_y = 70 + i;
+                point.image_coordinates_valid = true;
+                cloud.push_back(point);
+            }
+
+            Vision3DProcessor::Point3D position;
+
+            bool valid =
+                processor.getDetectionPosition3D(
+                    0,
+                    cloud,
+                    100, 50, 60, 60,
+                    config.geometry,
+                    position
+                );
+
+            std::size_t body = 99;
+
+            bool assigned = valid &&
+                processor.findBodyForPosition(
+                    0, position, body
+                );
+
+            bool ok =
+                valid &&
+                assigned &&
+                body == 0 &&
+                std::fabs(position.z - 1300.0f) <= 2.0f;
+
+            allOk = allOk && ok;
+
+            std::cout
+                << "Roll=" << roll
+                << " Pitch=" << pitch
+                << " Altura="
+                << (valid ? position.z : -1.0f)
+                << " mm Cuerpo="
+                << (assigned ? static_cast<int>(body + 1) : -1)
+                << " " << (ok ? "OK" : "ERROR")
+                << std::endl;
+        }
+
+        if (!allOk)
+        {
+            std::cerr << "TEST 19 ERROR\n";
+            return 1;
+        }
+
+        std::cout << "TEST 19 OK\n";
+    }
+
+
+    /*
+     * ========================================================
+     * TEST 20 - ASIGNACION LATERAL ESTABLE CON IMU
+     *
+     * La panoja está físicamente en X = -2050 mm.
+     * Debe permanecer en el cuerpo 1.
+     * ========================================================
+     */
+    {
+        std::cout
+            << "\nTEST 20 - ASIGNACION LATERAL CON IMU\n";
+
+        const float angles[] = {
+            0.0f, 5.0f, -5.0f, 10.0f, -10.0f
+        };
+
+        bool allOk = true;
+
+        for (float roll : angles)
+        {
+            Vision3DProcessor processor;
+
+            Vision3DProcessor::CameraConfig config;
+            config.enabled = true;
+            config.body_enabled[0] = true;
+            config.body_enabled[1] = true;
+            config.geometry.position_x_mm = -2500.0f;
+            config.geometry.camera_height_mm = 2000.0f;
+
+            processor.setCameraConfig(0, config);
+
+            Vision3DProcessor::Orientation imu;
+            imu.valid = true;
+            imu.roll_deg = roll;
+            imu.pitch_deg = 0.0f;
+
+            processor.setCameraOrientation(0, imu);
+
+            Vision3DProcessor::PointCloud cloud;
+
+            for (int i = 0; i < 5; ++i)
+            {
+                Vision3DProcessor::Point3D point;
+
+                point.x = 450.0f;
+                point.y = 500.0f;
+                point.z = -700.0f;
+
+                point.image_x = 120 + i;
+                point.image_y = 70 + i;
+                point.image_coordinates_valid = true;
+
+                cloud.push_back(point);
+            }
+
+            Vision3DProcessor::Point3D position;
+
+            bool valid = processor.getDetectionPosition3D(
+                0, cloud, 100, 50, 60, 60,
+                config.geometry, position
+            );
+
+            std::size_t body = 99;
+
+            bool assigned = valid &&
+                processor.findBodyForPosition(
+                    0, position, body
+                );
+
+            bool ok = valid &&
+                assigned &&
+                body == 0 &&
+                std::fabs(position.x - (-2050.0f)) < 0.1f;
+
+            allOk = allOk && ok;
+
+            std::cout
+                << "Roll=" << roll
+                << " X=" << (valid ? position.x : -1.0f)
+                << " Cuerpo=" << (assigned ? int(body + 1) : -1)
+                << " " << (ok ? "OK" : "ERROR")
+                << std::endl;
+        }
+
+        if (!allOk)
+        {
+            std::cerr << "TEST 20 ERROR\n";
+            return 1;
+        }
+
+        std::cout << "TEST 20 OK\n";
+    }
+
+
+    /*
+     * TEST 21 - CAMARAS Y CUERPOS
+     *
+     * Cinco cámaras delanteras.
+     * Seis cuerpos.
+     * Roll/Pitch simultáneos.
+     * Verificación de habilitaciones y límites.
+     */
+    {
+        std::cout
+            << "\nTEST 21 - CAMARAS Y CUERPOS\n";
+
+        Vision3DProcessor processor;
+
+        constexpr float PI =
+            3.14159265358979323846f;
+
+        constexpr float DEG = PI / 180.0f;
+
+        const float centers[6] = {
+            -2500.0f, -1500.0f, -500.0f,
+             500.0f,  1500.0f, 2500.0f
+        };
+
+        const bool enabled[5][6] = {
+            {true,  true,  false, false, false, false},
+            {false, true,  true,  false, false, false},
+            {false, false, true,  true,  false, false},
+            {false, false, false, true,  true,  false},
+            {false, false, false, false, true,  true }
+        };
+
+        int passed = 0;
+        int total = 0;
+
+        for (std::size_t camera = 0; camera < 5; ++camera)
+        {
+            Vision3DProcessor::CameraConfig config;
+            config.enabled = true;
+            config.geometry.camera_height_mm = 2000.0f;
+
+            for (std::size_t b = 0; b < 6; ++b)
+            {
+                config.body_enabled[b] = enabled[camera][b];
+            }
+
+            processor.setCameraConfig(camera, config);
+
+            Vision3DProcessor::Orientation imu;
+            imu.valid = true;
+            imu.roll_deg = 7.0f;
+            imu.pitch_deg = 12.0f;
+
+            processor.setCameraOrientation(camera, imu);
+
+            for (std::size_t b = 0; b < 6; ++b)
+            {
+                ++total;
+
+                Vision3DProcessor::PointCloud cloud;
+
+                // Punto de altura 1300 mm en sistema nivelado.
+                float x = centers[b];
+                float y = 500.0f;
+                float z = -700.0f;
+
+                float cr = std::cos(imu.roll_deg * DEG);
+                float sr = std::sin(imu.roll_deg * DEG);
+                float cp = std::cos(imu.pitch_deg * DEG);
+                float sp = std::sin(imu.pitch_deg * DEG);
+
+                float y1 = cp * y - sp * z;
+                float z1 = sp * y + cp * z;
+
+                float x2 = cr * x + sr * z1;
+                float z2 = -sr * x + cr * z1;
+
+                for (int i = 0; i < 5; ++i)
+                {
+                    Vision3DProcessor::Point3D point;
+                    point.x = x2;
+                    point.y = y1;
+                    point.z = z2;
+                    point.image_x = 120 + i;
+                    point.image_y = 70 + i;
+                    point.image_coordinates_valid = true;
+                    cloud.push_back(point);
+                }
+
+                Vision3DProcessor::Point3D position;
+
+                bool valid =
+                    processor.getDetectionPosition3D(
+                        camera,
+                        cloud,
+                        100, 50, 60, 60,
+                        config.geometry,
+                        position
+                    );
+
+                std::size_t detectedBody = 99;
+
+                bool assigned = valid &&
+                    processor.findBodyForPosition(
+                        camera, position, detectedBody
+                    );
+
+                bool expected = enabled[camera][b];
+
+                bool ok = expected
+                    ? (assigned && detectedBody == b)
+                    : !assigned;
+
+                if (ok)
+                    ++passed;
+
+                std::cout
+                    << "Camara=" << camera + 1
+                    << " Cuerpo=" << b + 1
+                    << " Habilitado=" << expected
+                    << " Asignado="
+                    << (assigned ? int(detectedBody + 1) : 0)
+                    << " " << (ok ? "OK" : "ERROR")
+                    << std::endl;
+            }
+        }
+
+        std::cout
+            << "TEST 21: "
+            << passed << "/" << total
+            << " verificaciones correctas\n";
+
+        if (passed != total)
+        {
+            std::cerr << "TEST 21 ERROR\n";
+            return 1;
+        }
+
+        std::cout << "TEST 21 OK\n";
+    }
+
+
+    /*
+     * TEST 22 - LIMITES ENTRE CUERPOS
+     *
+     * Verifica:
+     * - Antes del límite
+     * - Exactamente en el límite
+     * - Después del límite
+     * - Cámara deshabilitada
+     * - Cuerpo deshabilitado
+     */
+    {
+        std::cout
+            << "\nTEST 22 - LIMITES ENTRE CUERPOS\n";
+
+        Vision3DProcessor processor;
+
+        Vision3DProcessor::CameraConfig config;
+        config.enabled = true;
+        config.geometry.camera_height_mm = 2000.0f;
+
+        for (std::size_t b = 0; b < 6; ++b)
+        {
+            config.body_enabled[b] = true;
+        }
+
+        processor.setCameraConfig(0, config);
+
+        Vision3DProcessor::Orientation imu;
+        imu.valid = true;
+        imu.roll_deg = 5.0f;
+        imu.pitch_deg = 10.0f;
+
+        processor.setCameraOrientation(0, imu);
+
+        int passed = 0;
+        int total = 0;
+
+        auto check = [&](float x, int expectedBody)
+        {
+            ++total;
+
+            Vision3DProcessor::PointCloud cloud;
+
+            for (int i = 0; i < 5; ++i)
+            {
+                Vision3DProcessor::Point3D point;
+                point.x = x;
+                point.y = 500.0f;
+                point.z = -700.0f;
+                point.image_x = 120 + i;
+                point.image_y = 70 + i;
+                point.image_coordinates_valid = true;
+                cloud.push_back(point);
+            }
+
+            Vision3DProcessor::Point3D position;
+
+            bool valid =
+                processor.getDetectionPosition3D(
+                    0, cloud,
+                    100, 50, 60, 60,
+                    config.geometry,
+                    position
+                );
+
+            std::size_t body = 99;
+
+            bool assigned = valid &&
+                processor.findBodyForPosition(
+                    0, position, body
+                );
+
+            bool ok = expectedBody == 0
+                ? !assigned
+                : assigned &&
+                  static_cast<int>(body + 1) == expectedBody;
+
+            if (ok)
+                ++passed;
+
+            std::cout
+                << "X=" << x
+                << " Esperado=" << expectedBody
+                << " Detectado="
+                << (assigned ? int(body + 1) : 0)
+                << " " << (ok ? "OK" : "ERROR")
+                << std::endl;
+        };
+
+        const float limits[5] = {
+            -2000.0f, -1000.0f, 0.0f,
+            1000.0f, 2000.0f
+        };
+
+        for (int i = 0; i < 5; ++i)
+        {
+            check(limits[i] - 1.0f, i + 1);
+            check(limits[i], i + 2);
+            check(limits[i] + 1.0f, i + 2);
+        }
+
+        // Cámara deshabilitada.
+        config.enabled = false;
+        processor.setCameraConfig(0, config);
+        check(-2500.0f, 0);
+
+        // Cámara habilitada, cuerpo 1 deshabilitado.
+        config.enabled = true;
+        config.body_enabled[0] = false;
+        processor.setCameraConfig(0, config);
+        check(-2500.0f, 0);
+
+        std::cout
+            << "TEST 22: "
+            << passed << "/" << total
+            << " verificaciones correctas\n";
+
+        if (passed != total)
+        {
+            std::cerr << "TEST 22 ERROR\n";
+            return 1;
+        }
+
+        std::cout << "TEST 22 OK\n";
+    }
 
     return 0;
 }
