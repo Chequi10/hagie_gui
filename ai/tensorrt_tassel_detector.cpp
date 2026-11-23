@@ -767,16 +767,7 @@ bool TensorRtTasselDetector::decodeOutputs(
     }
 
 
-    std::cout
-        << "[TensorRT] Raw YOLO output: detections="
-        << detectionCount
-        << " attributes="
-        << attributeCount
-        << " layout="
-        << (attributesFirst
-                ? "1xAxN"
-                : "1xNxA")
-        << std::endl;
+
 
 
      /*

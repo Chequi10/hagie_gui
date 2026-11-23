@@ -13724,6 +13724,11 @@ void MainWindow::loadVisionCameraIntoWidgets(
     configVisionCameraPitch->setValue(
         config.geometry.pitch_offset_deg
     );
+
+    /*
+     * Actualizar estado ZED al cambiar de cámara.
+     */
+    refreshZedCameraDetection();
 }
 
 void MainWindow::applyVisionBodyRegions()
@@ -15683,9 +15688,15 @@ void MainWindow::loadConfiguration()
     if (visionSourceIndex >= 0)
     {
         configVisionSourceCombo
+            ->blockSignals(true);
+
+        configVisionSourceCombo
             ->setCurrentIndex(
                 visionSourceIndex
             );
+
+        configVisionSourceCombo
+            ->blockSignals(false);
     }
 
         int yoloFormatIndex =
@@ -15750,6 +15761,13 @@ void MainWindow::loadConfiguration()
                 "enabled",
                 false
             ).toBool();
+
+        qInfo(
+            "ZED CONFIG CARGADA: Camera %zu enabled=%d grupo=%s",
+            camera + 1,
+            static_cast<int>(config.enabled),
+            qPrintable(settings.group())
+        );
 
         visionCameraSerialNumbers[camera] =
             static_cast<uint32_t>(
@@ -16013,6 +16031,20 @@ void MainWindow::loadConfiguration()
         }
     }
 
+    /*
+     * Activar la fuente de vision una vez cargada
+     * toda la configuracion de las camaras.
+     */
+    QTimer::singleShot(0, this, [this]()
+    {
+        if (configVisionSourceCombo != nullptr)
+        {
+            const int index =
+                configVisionSourceCombo->currentIndex();
+
+            Q_EMIT configVisionSourceCombo->currentIndexChanged(index);
+        }
+    });
 }
 void MainWindow::syncConfigurationToWorker()
 {

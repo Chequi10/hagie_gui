@@ -201,38 +201,11 @@ bool ZedGmslPointCloudSource::start()
 bool ZedGmslPointCloudSource::getCameraOrientation(
     CameraOrientation& orientation)
 {
-    orientation =
-        CameraOrientation {};
+    std::lock_guard<std::mutex> lock(orientationMutex);
 
+    orientation = latestOrientation;
 
-#ifdef HAGIE_ENABLE_ZED_SDK
-
-    if (!running.load())
-    {
-        return false;
-    }
-
-    /*
-     * La lectura real de la IMU ZED
-     * se implementará usando el SDK
-     * cuando compilemos en la Jetson
-     * con HAGIE_ENABLE_ZED_SDK.
-     *
-     * Por ahora dejamos la interfaz
-     * correctamente conectada.
-     */
-
-    return false;
-
-#else
-
-    /*
-     * En la ThinkPad no hay ZED SDK
-     * ni hardware real.
-     */
-    return false;
-
-#endif
+    return running.load() && orientation.valid;
 }
 
 void ZedGmslPointCloudSource::stop()
@@ -412,6 +385,35 @@ bool ZedGmslPointCloudSource::getPointCloud(
 
 
         return false;
+    }
+
+    /*
+     * Leer IMU sincronizada con el frame ZED.
+     */
+    {
+        CameraOrientation currentOrientation {};
+
+        sl::SensorsData sensorsData;
+
+        const sl::ERROR_CODE imuResult =
+            camera.getSensorsData(
+                sensorsData,
+                sl::TIME_REFERENCE::IMAGE
+            );
+
+        if (imuResult == sl::ERROR_CODE::SUCCESS &&
+            sensorsData.imu.is_available)
+        {
+            const sl::float3 angles =
+                sensorsData.imu.pose.getEulerAngles(false);
+
+            currentOrientation.roll_deg = angles.x;
+            currentOrientation.pitch_deg = angles.y;
+            currentOrientation.valid = true;
+        }
+
+        std::lock_guard<std::mutex> lock(orientationMutex);
+        latestOrientation = currentOrientation;
     }
 
     lastSuccessfulGrabMs =

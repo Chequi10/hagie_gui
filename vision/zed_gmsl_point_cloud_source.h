@@ -150,6 +150,14 @@ private:
 
     std::atomic<bool> running {false};
 
+    /*
+     * Ultima orientacion recibida de la IMU ZED.
+     * Protegida para acceso entre hilos.
+     */
+    mutable std::mutex orientationMutex;
+    CameraOrientation latestOrientation {};
+
+
     SharedRgbFramePtr sharedRgbFrame;
 
     std::uint64_t lastPointCloudTimestampMs = 0;
