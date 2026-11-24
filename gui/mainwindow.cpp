@@ -12284,14 +12284,39 @@ void MainWindow::updateDashboard()
 
         if (heightTrendWidget != nullptr)
         {
+            double currentUp = 0.0;
+            double currentDown = 0.0;
+            bool currentValid = false;
+
+            if (systemState.stm32_connected)
+            {
+                if (body == 3)
+                {
+                    currentUp = systemState.ax020800_current_1_raw;
+                    currentDown = systemState.ax020800_current_2_raw;
+                    currentValid = systemState.ax020800_current_valid;
+                }
+                else if (body == 4)
+                {
+                    currentUp = systemState.ax020800_current_3_raw;
+                    currentDown = systemState.ax020800_current_4_raw;
+                    currentValid = systemState.ax020800_current_3to6_valid;
+                }
+                else if (body == 5)
+                {
+                    currentUp = systemState.ax020800_current_5_raw;
+                    currentDown = systemState.ax020800_current_6_raw;
+                    currentValid = systemState.ax020800_current_3to6_valid;
+                }
+            }
+
             heightTrendWidget->addSample(
                 static_cast<int>(body),
                 static_cast<double>(bodyState.target_mm),
                 static_cast<double>(bodyState.height_mm),
-                static_cast<double>(systemState.ax020800_current_1_raw),
-                static_cast<double>(systemState.ax020800_current_2_raw),
-                body == 0 && systemState.stm32_connected &&
-                    systemState.ax020800_current_valid
+                currentUp,
+                currentDown,
+                currentValid
             );
         }
 

@@ -470,7 +470,7 @@ if (autoScale)
 
 
     // Eje derecho: corriente del AX020800, 0..3500 mA.
-    if (selectedBody == 0)
+    if (true)
     {
         painter.setPen(palette().text().color());
         for (int i = 0; i <= 5; ++i)
@@ -588,7 +588,7 @@ if (autoScale)
 
     // Corrientes REALES del AX020800. Si no hay telemetría válida,
     // interrumpir la curva; no sustituir la medición por cero.
-    if (selectedBody == 0)
+    if (true)
     {
         auto drawCurrent = [&](bool up, const QColor &color)
         {
@@ -662,7 +662,7 @@ if (autoScale)
     );
 
 
-    if (selectedBody == 0)
+    if (true)
     {
         painter.setPen(QColor(0, 155, 70));
         painter.drawText(graphRect.left() + 220, graphRect.top() + 20,

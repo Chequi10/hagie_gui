@@ -135,8 +135,13 @@ public:
         uint32_t ax020800_tx_errors = 0;
 
         bool ax020800_current_valid = false;
+        bool ax020800_current_3to6_valid = false;
         uint16_t ax020800_current_1_raw = 0;
         uint16_t ax020800_current_2_raw = 0;
+        uint16_t ax020800_current_3_raw = 0;
+        uint16_t ax020800_current_4_raw = 0;
+        uint16_t ax020800_current_5_raw = 0;
+        uint16_t ax020800_current_6_raw = 0;
         uint32_t ax020800_current_rx_count = 0;
         
         uint32_t uart_error_count = 0;

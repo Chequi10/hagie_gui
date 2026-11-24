@@ -520,14 +520,14 @@ void stm32canbus_serialif::handle_packet(
 
         case 'G':
         {
-            if (n != 47 && n != 60 && n != 69)
+            if (n != 47 && n != 60 && n != 69 && n != 77)
             {
                 return;
             }
 
             diagnostic_state state;
 
-            if (n == 60 || n == 69)
+            if (n == 60 || n == 69 || n == 77)
             {
                 state.ax020800_connected = payload[47] != 0;
 
@@ -545,7 +545,7 @@ void stm32canbus_serialif::handle_packet(
                 state.ax020800_tx_errors = read32(56);
             }
 
-            if (n == 69)
+            if (n == 69 || n == 77)
             {
                 state.ax020800_current_valid =
                     payload[60] != 0;
@@ -563,6 +563,24 @@ void stm32canbus_serialif::handle_packet(
                     (static_cast<uint32_t>(payload[66]) << 16) |
                     (static_cast<uint32_t>(payload[67]) << 8) |
                      static_cast<uint32_t>(payload[68]);
+
+            if (n == 77)
+            {
+                state.ax020800_current_3to6_valid =
+                    state.ax020800_current_valid;
+
+                auto read16 = [&](int index) -> uint16_t
+                {
+                    return (static_cast<uint16_t>(payload[index]) << 8) |
+                            static_cast<uint16_t>(payload[index + 1]);
+                };
+
+                state.ax020800_current_3_raw = read16(69);
+                state.ax020800_current_4_raw = read16(71);
+                state.ax020800_current_5_raw = read16(73);
+                state.ax020800_current_6_raw = read16(75);
+            }
+
             }
 
             state.axiomatic_rx_dropped =

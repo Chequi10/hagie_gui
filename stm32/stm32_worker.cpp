@@ -1933,11 +1933,26 @@ void STM32Worker::configureCallbacks()
             system.ax020800_current_valid =
                 diagnostic.ax020800_current_valid;
 
+            system.ax020800_current_3to6_valid =
+                diagnostic.ax020800_current_3to6_valid;
+
             system.ax020800_current_1_raw =
                 diagnostic.ax020800_current_1_raw;
 
             system.ax020800_current_2_raw =
                 diagnostic.ax020800_current_2_raw;
+
+            system.ax020800_current_3_raw =
+                diagnostic.ax020800_current_3_raw;
+
+            system.ax020800_current_4_raw =
+                diagnostic.ax020800_current_4_raw;
+
+            system.ax020800_current_5_raw =
+                diagnostic.ax020800_current_5_raw;
+
+            system.ax020800_current_6_raw =
+                diagnostic.ax020800_current_6_raw;
 
             system.ax020800_current_rx_count =
                 diagnostic.ax020800_current_rx_count;
