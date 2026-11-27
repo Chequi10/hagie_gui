@@ -48,6 +48,17 @@ public:
 
     ~Vision3DWorker();
 
+    struct SynchronizedFrame
+    {
+        RgbFrameSource::Frame rgb;
+        VisionHeightSource::VisionResult result;
+        bool valid = false;
+    };
+
+    std::shared_ptr<const SynchronizedFrame>
+    getSynchronizedFrame(std::size_t camera) const;
+
+
 
     /*
      * No permitimos copiar el worker.
@@ -248,6 +259,13 @@ private:
      * ========================================================
      */
 
+    mutable std::mutex synchronizedFrameMutex;
+
+    std::array<
+        std::shared_ptr<const SynchronizedFrame>,
+        CAMERA_COUNT
+    > synchronizedFrames {};
+
     std::atomic<bool> running {false};
 
     std::thread workerThread;
@@ -271,7 +289,7 @@ private:
      * real de las cámaras.
      */
     static constexpr std::chrono::milliseconds
-        LOOP_INTERVAL {50};
+        LOOP_INTERVAL {5};
 
 
     /*

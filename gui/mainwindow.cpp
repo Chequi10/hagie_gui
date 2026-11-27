@@ -607,12 +607,18 @@ MainWindow::MainWindow(
         &MainWindow::updateDashboard
     );
 
+    auto *cameraTimer = new QTimer(this);
+
+    cameraTimer->setTimerType(Qt::PreciseTimer);
+
     connect(
-        dashboardTimer,
+        cameraTimer,
         &QTimer::timeout,
         this,
         &MainWindow::updateCameraPage
     );
+
+    cameraTimer->start(33);
 
 
     dashboardTimer->start(
@@ -3073,12 +3079,16 @@ void MainWindow::updateCameraPage()
         configVisionSourceCombo->currentIndex() == 2;
     const bool svoMode = visionMode == 3;
 
+    const bool detectionEnabled =
+        tasselDetectionEnabled && !svoMode;
+
     const bool inferenceMode =
-        !svoMode && (realYoloMode || videoRgbActive);
+        detectionEnabled &&
+        (realYoloMode || videoRgbActive);
 
 
     for (std::size_t camera = 0;
-        !svoMode && camera < RGB_CAMERA_COUNT;
+        detectionEnabled && camera < RGB_CAMERA_COUNT;
         ++camera)
     
     {
@@ -3522,8 +3532,30 @@ void MainWindow::updateCameraPage()
 
     RgbFrameSource::Frame frame;
 
+    const bool synchronizedView =
+        (showRegionBox || showRegion) &&
+        selectedRgbCamera < Vision3DWorker::CAMERA_COUNT &&
+        vision3DWorker != nullptr;
 
-    if (!rgbCameraWorker.getFrame(
+    std::shared_ptr<
+        const Vision3DWorker::SynchronizedFrame
+    > synchronizedFrame;
+
+    if (synchronizedView)
+    {
+        synchronizedFrame =
+            vision3DWorker->getSynchronizedFrame(
+                selectedRgbCamera);
+
+        if (synchronizedFrame &&
+            synchronizedFrame->valid)
+        {
+            frame = synchronizedFrame->rgb;
+        }
+    }
+
+    if (!frame.valid &&
+        !rgbCameraWorker.getFrame(
             selectedRgbCamera,
             frame
         ))
@@ -3591,7 +3623,8 @@ void MainWindow::updateCameraPage()
         if (yoloInferenceWorker.getLatestResult(selectedRgbCamera, yoloDisplayResult) &&
             yoloDisplayResult.detectionResult.valid)
         {
-            if (yoloDisplayResult.rgbOnly) {
+            if (yoloDisplayResult.rgbOnly &&
+                !synchronizedView) {
                 frame = std::move(yoloDisplayResult.rgbFrame);
                 QImage rgb(frame.data.data(), static_cast<int>(frame.width),
                     static_cast<int>(frame.height), static_cast<int>(frame.width * 3), QImage::Format_RGB888);
@@ -3603,7 +3636,7 @@ void MainWindow::updateCameraPage()
             }
         }
     }
-    else if (!svoMode)
+    else if (detectionEnabled)
     {
         detectionResultValid =
             tasselDetector.processFrame(
@@ -3614,14 +3647,11 @@ void MainWindow::updateCameraPage()
     }
 
 
-    if (showRegionBox &&
-        visionHeightSource != nullptr)
+    if (showRegionBox && synchronizedFrame)
     {
-        const auto result =
-            visionHeightSource->getResult();
-
         const auto& region =
-            result.bodies[cameraDiagnosticBody];
+            synchronizedFrame->result.bodies[
+                cameraDiagnosticBody];
 
         const bool synchronized =
             region.camera_index ==
@@ -3677,13 +3707,11 @@ void MainWindow::updateCameraPage()
         }
     }
 
-    if (showRegion && visionHeightSource != nullptr)
+    if (showRegion && synchronizedFrame)
     {
-        const auto regionResult =
-            visionHeightSource->getResult();
-
         const auto& region =
-            regionResult.bodies[cameraDiagnosticBody];
+            synchronizedFrame->result.bodies[
+                cameraDiagnosticBody];
 
         const bool synchronized =
             region.region_pixels &&
@@ -3756,6 +3784,12 @@ void MainWindow::updateCameraPage()
         }
 
 
+    }
+
+    if (detectionEnabled)
+    {
+        QPainter painter(&displayImage);
+
         const TasselCounter::State counterState =
             tasselCounter.getState();
 
@@ -3777,7 +3811,10 @@ void MainWindow::updateCameraPage()
             QString(
                 "Detectadas: %1"
             ).arg(
-                detectionResult.detections.size()
+                detectionResultValid
+                    ? QString::number(
+                        detectionResult.detections.size())
+                    : QString("---")
             )
         );
 
@@ -9418,7 +9455,7 @@ QWidget *MainWindow::createConfigurationPage()
                         * INICIAR DETECTOR YOLO TENSORRT
                         * ========================================================
                         */
-                                                if (tensorRtConfigValid)
+                                                if (tasselDetectionEnabled && tensorRtConfigValid)
                         {
                             const int formatValue =
                                 configYoloFormatCombo
@@ -9536,6 +9573,13 @@ QWidget *MainWindow::createConfigurationPage()
     videoRgbControls->setVisible(configVisionSourceCombo->currentIndex() == 1);
     videoRgbControls->pythonPath = [this]() { return configYoloPythonEdit->text(); };
     videoRgbControls->onStarted = [this](std::size_t camera) {
+        if (!tasselDetectionEnabled)
+        {
+            addLogMessage(
+                "IA: habilitar deteccion de panojas primero");
+            return false;
+        }
+
         const QString enginePath =
             configYoloEngineEdit->text().trimmed();
 
@@ -9652,6 +9696,87 @@ QWidget *MainWindow::createConfigurationPage()
     yoloConfigLayout->addWidget(
         yoloConfigTitle
     );
+
+    configTasselDetectionCheck =
+        new QCheckBox("Habilitar detección de panojas");
+
+    configTasselDetectionCheck->setChecked(false);
+
+    yoloConfigLayout->addWidget(
+        configTasselDetectionCheck);
+
+    connect(
+        configTasselDetectionCheck,
+        &QCheckBox::toggled,
+        this,
+        [this](bool enabled)
+        {
+            tasselDetectionEnabled = enabled;
+
+            if (videoRgbControls)
+                videoRgbControls->stopVideo();
+
+            yoloInferenceWorker.stop();
+            yoloInferenceWorker.clearVideoCamera();
+
+            lastConsumedYoloTimestamp.fill(0);
+            tasselCounter.reset();
+            tasselVerifier.reset();
+
+            if (state != nullptr)
+            {
+                auto system = state->getSystemState();
+                system.ai_running = false;
+                state->setSystemState(system);
+            }
+
+            if (!enabled)
+            {
+                addLogMessage(
+                    "IA: deteccion de panojas deshabilitada");
+                return;
+            }
+
+            if (configVisionSourceCombo->currentIndex() != 2)
+                return;
+
+            const QString enginePath =
+                configYoloEngineEdit->text().trimmed();
+
+            if (!QFileInfo(enginePath).isFile())
+            {
+                addLogMessage("IA: engine no encontrado");
+                return;
+            }
+
+            const auto format =
+                static_cast<
+                    TensorRtTasselDetector::ModelOutputFormat
+                >(configYoloFormatCombo->currentData().toInt());
+
+            const QByteArray path = enginePath.toUtf8();
+
+            yoloInferenceWorker.setFrameInterval(
+                static_cast<std::size_t>(
+                    configAiFrameIntervalSpin->value()));
+
+            if (yoloInferenceWorker.initialize(
+                    path.constData(),
+                    format,
+                    static_cast<float>(
+                        configYoloConfidenceSpin->value()),
+                    static_cast<float>(
+                        configYoloNmsSpin->value()))
+                && yoloInferenceWorker.start())
+            {
+                addLogMessage("IA: detector de panojas iniciado");
+            }
+            else
+            {
+                addLogMessage("IA: error al iniciar detector");
+            }
+        });
+
 
 
     /*
@@ -9864,6 +9989,26 @@ QWidget *MainWindow::createConfigurationPage()
     };
     connect(configYoloConfidenceSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, applyThresholds);
     connect(configYoloNmsSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, applyThresholds);
+
+    const auto updateDetectorControls =
+        [this, yoloConfigFrame](bool enabled)
+        {
+            for (auto *widget :
+                 yoloConfigFrame->findChildren<QWidget*>())
+            {
+                if (widget != configTasselDetectionCheck)
+                    widget->setEnabled(enabled);
+            }
+        };
+
+    connect(
+        configTasselDetectionCheck,
+        &QCheckBox::toggled,
+        this,
+        updateDetectorControls);
+
+    updateDetectorControls(
+        configTasselDetectionCheck->isChecked());
 
     generalPageLayout->addWidget(
         yoloConfigFrame
@@ -15509,6 +15654,10 @@ void MainWindow::saveConfiguration()
     );
 
     settings.setValue(
+        "tassel_detection_enabled",
+        tasselDetectionEnabled);
+
+    settings.setValue(
         "yolo_engine_path",
         configYoloEngineEdit
             ->text()
@@ -16314,6 +16463,30 @@ void MainWindow::loadConfiguration()
     settings.beginGroup(
         "Vision"
     );
+
+    tasselDetectionEnabled =
+        settings.value(
+            "tassel_detection_enabled",
+            false).toBool();
+
+    {
+        const QSignalBlocker blocker(
+            configTasselDetectionCheck);
+
+        configTasselDetectionCheck->setChecked(
+            tasselDetectionEnabled);
+
+        auto *detectorFrame =
+            configTasselDetectionCheck->parentWidget();
+
+        for (auto *widget :
+             detectorFrame->findChildren<QWidget*>())
+        {
+            if (widget != configTasselDetectionCheck)
+                widget->setEnabled(tasselDetectionEnabled);
+        }
+
+    }
 
     int visionSourceMode =
         settings.value(

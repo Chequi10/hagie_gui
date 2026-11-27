@@ -592,45 +592,37 @@ bool ZedGmslPointCloudSource::getPointCloud(
     * Para el resto de Hagie guardamos solamente
     * tres componentes RGB.
     */
-    for (std::size_t y = 0;
-        y < rgbFrame.height;
-        ++y)
+    const auto* rgbPtr =
+        zedRgbImage.getPtr<sl::uchar4>(sl::MEM::CPU);
+
+    const auto rgbStep =
+        zedRgbImage.getStep<sl::uchar4>(sl::MEM::CPU);
+
+    if (rgbPtr == nullptr ||
+        rgbStep < rgbFrame.width)
     {
-        for (std::size_t x = 0;
-            x < rgbFrame.width;
-            ++x)
-        {
-            sl::uchar4 pixel;
-
-
-            if (zedRgbImage.getValue(
-                    static_cast<int>(x),
-                    static_cast<int>(y),
-                    &pixel
-                ) != sl::ERROR_CODE::SUCCESS)
-            {
-                continue;
-            }
-
-
-            const std::size_t offset =
-                (
-                    y * rgbFrame.width +
-                    x
-                ) * RGB_CHANNELS;
-
-
-            rgbFrame.data[offset + 0] =
-                pixel[2];
-
-            rgbFrame.data[offset + 1] =
-                pixel[1];
-
-            rgbFrame.data[offset + 2] =
-                pixel[0];
-        }
+        return false;
     }
 
+    for (std::size_t y = 0;
+         y < rgbFrame.height; ++y)
+    {
+        const auto* row = rgbPtr + y * rgbStep;
+
+        auto* destination =
+            rgbFrame.data.data() +
+            y * rgbFrame.width * RGB_CHANNELS;
+
+        for (std::size_t x = 0;
+             x < rgbFrame.width; ++x)
+        {
+            const auto& pixel = row[x];
+
+            destination[3*x + 0] = pixel[2];
+            destination[3*x + 1] = pixel[1];
+            destination[3*x + 2] = pixel[0];
+        }
+    }
 
     rgbFrame.timestamp_ms =
         captureTimestampMs;
@@ -704,33 +696,31 @@ bool ZedGmslPointCloudSource::getPointCloud(
     float maxY = std::numeric_limits<float>::lowest();
     float maxZ = std::numeric_limits<float>::lowest();
 
+    const auto* xyzPtr =
+        zedPointCloud.getPtr<sl::float4>(sl::MEM::CPU);
+
+    const auto xyzStep =
+        zedPointCloud.getStep<sl::float4>(sl::MEM::CPU);
+
+    if (xyzPtr == nullptr ||
+        xyzStep < static_cast<std::size_t>(width))
+    {
+        return false;
+    }
+
     for (int y = 0;
          y < height;
          y += SAMPLE_STEP)
     {
+        const auto* row = xyzPtr + y * xyzStep;
+
         for (int x = 0;
              x < width;
              x += SAMPLE_STEP)
         {
             ++sampledPoints;
 
-            sl::float4 point;
-
-
-            sl::ERROR_CODE pointError =
-                zedPointCloud.getValue(
-                    x,
-                    y,
-                    &point
-                );
-
-
-            if (pointError !=
-                sl::ERROR_CODE::SUCCESS)
-            {
-                continue;
-            }
-
+            const auto& point = row[x];
 
             /*
              * Descartar NaN / infinito.

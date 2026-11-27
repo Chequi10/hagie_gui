@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "vision/vision_3d_processor.h"
+#include "vision/rgb_frame_source.h"
 
 
 class PointCloudSource
@@ -53,6 +54,13 @@ public:
         CameraIntrinsics& intrinsics) const
     {
         intrinsics = CameraIntrinsics {};
+        return false;
+    }
+
+    virtual bool getLatestRgbFrame(
+        RgbFrameSource::Frame& frame) const
+    {
+        frame = RgbFrameSource::Frame {};
         return false;
     }
 

@@ -64,6 +64,18 @@ public:
     SharedRgbFramePtr getSharedRgbFrame() const
     { return sharedRgbFrame_; }
 
+    bool getLatestRgbFrame(
+        RgbFrameSource::Frame& frame) const override
+    {
+        std::lock_guard<std::mutex> lock(
+            sharedRgbFrame_->mutex);
+
+        frame = sharedRgbFrame_->frame;
+
+        return frame.valid;
+    }
+
+
     bool getCaptureTimestampMs(
         std::uint64_t& timestampMs) const override
     {

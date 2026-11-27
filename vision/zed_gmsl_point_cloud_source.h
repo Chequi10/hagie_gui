@@ -121,7 +121,7 @@ public:
 
     bool getLatestRgbFrame(
         RgbFrameSource::Frame& frame
-    ) const;
+    ) const override;
 
     SharedRgbFramePtr getSharedRgbFrame() const;
 

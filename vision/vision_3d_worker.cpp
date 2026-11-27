@@ -460,6 +460,14 @@ void Vision3DWorker::stop()
             pointCloudSources[camera]->stop();
         }
     }
+
+    {
+        std::lock_guard<std::mutex> lock(
+            synchronizedFrameMutex);
+
+        synchronizedFrames.fill(nullptr);
+    }
+
 }
 
 
@@ -507,6 +515,13 @@ bool Vision3DWorker::processCamera(
 
     if (!source->getPointCloud(cloud))
     {
+        {
+            std::lock_guard<std::mutex> lock(
+                synchronizedFrameMutex);
+
+            synchronizedFrames[camera].reset();
+        }
+
         cameraOrientations[camera] =
             PointCloudSource::CameraOrientation {};
 
@@ -674,6 +689,31 @@ bool Vision3DWorker::processCamera(
         }
     }
 
+
+    // Publicar RGB y resultado 3D de la misma captura.
+    auto synchronized =
+        std::make_shared<SynchronizedFrame>();
+
+    if (captureTimestampMs != 0 &&
+        source->getLatestRgbFrame(synchronized->rgb) &&
+        synchronized->rgb.timestamp_ms == captureTimestampMs)
+    {
+        synchronized->result = result;
+        synchronized->valid = true;
+
+        std::lock_guard<std::mutex> lock(
+            synchronizedFrameMutex);
+
+        synchronizedFrames[camera] =
+            std::move(synchronized);
+    }
+    else
+    {
+        std::lock_guard<std::mutex> lock(
+            synchronizedFrameMutex);
+
+        synchronizedFrames[camera].reset();
+    }
 
     return true;
 }
@@ -858,4 +898,17 @@ void Vision3DWorker::workerLoop()
             LOOP_INTERVAL
         );
     }
+}
+
+std::shared_ptr<const Vision3DWorker::SynchronizedFrame>
+Vision3DWorker::getSynchronizedFrame(
+    std::size_t camera) const
+{
+    if (camera >= CAMERA_COUNT || !running.load())
+        return nullptr;
+
+    std::lock_guard<std::mutex> lock(
+        synchronizedFrameMutex);
+
+    return synchronizedFrames[camera];
 }

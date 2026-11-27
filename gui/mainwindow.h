@@ -855,6 +855,10 @@ private:
     */
     QComboBox *configVisionSourceCombo = nullptr;
 
+    QCheckBox *configTasselDetectionCheck = nullptr;
+
+    bool tasselDetectionEnabled = false;
+
     QComboBox *configYoloFormatCombo =
         nullptr;
 
