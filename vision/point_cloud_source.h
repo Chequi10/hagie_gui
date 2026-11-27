@@ -36,6 +36,26 @@ public:
         bool valid = false;
     };
 
+    struct CameraIntrinsics
+    {
+        float fx = 0.0f;
+        float fy = 0.0f;
+        float cx = 0.0f;
+        float cy = 0.0f;
+
+        int width = 0;
+        int height = 0;
+
+        bool valid = false;
+    };
+
+    virtual bool getCameraIntrinsics(
+        CameraIntrinsics& intrinsics) const
+    {
+        intrinsics = CameraIntrinsics {};
+        return false;
+    }
+
     virtual ~PointCloudSource() = default;
 
 
@@ -84,6 +104,12 @@ public:
      * Las fuentes que no tengan timestamp propio pueden
      * dejar la implementación por defecto.
      */
+    virtual bool getCaptureTimestampMs(
+        std::uint64_t& timestampMs) const
+    {
+        return getLastPointCloudTimestampMs(timestampMs);
+    }
+
     virtual bool getLastPointCloudTimestampMs(
         std::uint64_t& timestampMs
     ) const

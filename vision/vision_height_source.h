@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <memory>
+#include <vector>
 #include <thread>
 
 
@@ -44,6 +46,20 @@ public:
      * Más adelante nos permitirá detectar
      * datos viejos o una cámara congelada.
      */
+    struct RegionPixel
+    {
+        int x;
+        int y;
+    };
+
+    struct RegionLine
+    {
+        double x1;
+        double y1;
+        double x2;
+        double y2;
+    };
+
     struct BodyVisionResult
     {
         uint16_t height_mm = 0;
@@ -51,6 +67,31 @@ public:
         bool valid = false;
 
         uint64_t timestamp_ms = 0;
+
+        // Diagnostico del procesamiento 3D
+        std::shared_ptr<const std::vector<RegionPixel>>
+            region_pixels;
+
+        uint64_t region_frame_timestamp_ms = 0;
+
+        std::vector<RegionLine> region_lines;
+
+        int region_image_width = 0;
+        int region_image_height = 0;
+
+
+        bool diagnostics_available = false;
+        bool p95_valid = false;
+        float p95_mm = 0.0f;
+        std::size_t valid_points = 0;
+        std::size_t required_points = 0;
+
+        int camera_index = -1;
+        float camera_height_mm = 0.0f;
+
+        bool orientation_valid = false;
+        float roll_deg = 0.0f;
+        float pitch_deg = 0.0f;
     };
 
 

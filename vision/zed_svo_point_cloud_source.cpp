@@ -2,6 +2,8 @@
 #include "vision/zed_orientation_adapter.h"
 
 #include <cmath>
+#include <chrono>
+#include <cstring>
 #include <QElapsedTimer>
 #include <QDebug>
 #include <algorithm>
@@ -20,9 +22,14 @@ struct ZedSvoPointCloudSource::Impl
 #endif
 };
 
-ZedSvoPointCloudSource::ZedSvoPointCloudSource(QString file)
+ZedSvoPointCloudSource::ZedSvoPointCloudSource(
+    QString file,
+    std::size_t cameraIndex,
+    bool automaticPlayback)
     : impl_(std::make_unique<Impl>()),
-      file_(std::move(file))
+      file_(std::move(file)),
+      cameraIndex_(cameraIndex),
+      automaticPlayback_(automaticPlayback)
 {
 }
 
@@ -80,6 +87,17 @@ bool ZedSvoPointCloudSource::start()
         return false;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(
+            playbackControl_->mutex);
+
+        playbackControl_->ready = true;
+        playbackControl_->finished = false;
+        playbackControl_->currentFrame = 0;
+        playbackControl_->totalFrames = count_;
+        playbackControl_->fps = fps_;
+    }
+
     return true;
 
 #else
@@ -90,6 +108,17 @@ bool ZedSvoPointCloudSource::start()
 #endif
 }
 
+void ZedSvoPointCloudSource::invalidateSharedFrame()
+{
+    lastTimestampMs_ = 0;
+    frameCaptureTimestampMs_ = 0;
+
+    std::lock_guard<std::mutex> lock(
+        sharedRgbFrame_->mutex);
+
+    sharedRgbFrame_->frame = RgbFrameSource::Frame {};
+}
+
 void ZedSvoPointCloudSource::stop()
 {
 #ifdef HAGIE_ENABLE_ZED_SDK
@@ -97,11 +126,71 @@ void ZedSvoPointCloudSource::stop()
         impl_->camera.close();
 #endif
 
+    {
+        std::lock_guard<std::mutex> lock(
+            playbackControl_->mutex);
+
+        playbackControl_->ready = false;
+        playbackControl_->finished = false;
+        playbackControl_->currentFrame = 0;
+        playbackControl_->totalFrames = 0;
+        playbackControl_->requestedFrame.reset();
+    }
+
+    invalidateSharedFrame();
+    frameDelivered_ = false;
+    orientation_ = CameraOrientation {};
     running_ = false;
     count_ = 0;
     cloud_.clear();
     rgb_ = QImage();
     depth_ = QImage();
+}
+
+
+bool ZedSvoPointCloudSource::getCameraIntrinsics(
+    CameraIntrinsics& intrinsics) const
+{
+    intrinsics = CameraIntrinsics {};
+
+#ifdef HAGIE_ENABLE_ZED_SDK
+
+    if (!isRunning())
+        return false;
+
+    const auto info =
+        impl_->camera.getCameraInformation();
+
+    const auto& config =
+        info.camera_configuration;
+
+    const auto& calibration =
+        config.calibration_parameters.left_cam;
+
+    intrinsics.fx = calibration.fx;
+    intrinsics.fy = calibration.fy;
+    intrinsics.cx = calibration.cx;
+    intrinsics.cy = calibration.cy;
+
+    intrinsics.width =
+        static_cast<int>(config.resolution.width);
+
+    intrinsics.height =
+        static_cast<int>(config.resolution.height);
+
+    intrinsics.valid =
+        intrinsics.fx > 0.0f &&
+        intrinsics.fy > 0.0f &&
+        intrinsics.width > 0 &&
+        intrinsics.height > 0;
+
+    return intrinsics.valid;
+
+#else
+
+    return false;
+
+#endif
 }
 
 bool ZedSvoPointCloudSource::isRunning() const
@@ -133,6 +222,13 @@ bool ZedSvoPointCloudSource::seekFrame(std::size_t index)
     }
 
     const auto grabMs = timer.elapsed();
+
+    const auto captureTimestampMs =
+        static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()).count());
 
     CameraOrientation frameOrientation {};
 
@@ -279,9 +375,9 @@ bool ZedSvoPointCloudSource::seekFrame(std::size_t index)
 
             Vision3DProcessor::Point3D point;
 
-            point.x = -p.y;
-            point.y = -p.z;
-            point.z = p.x;
+            point.x = p.y;
+            point.y = p.x;
+            point.z = p.z;
 
             // Coordenadas referidas a la imagen RGB.
             point.image_x = int(
@@ -302,6 +398,48 @@ bool ZedSvoPointCloudSource::seekFrame(std::size_t index)
 
     orientation_ = frameOrientation;
     index_ = index;
+
+    {
+        std::lock_guard<std::mutex> lock(
+            playbackControl_->mutex);
+
+        playbackControl_->currentFrame = index_;
+        playbackControl_->finished = false;
+    }
+
+    lastTimestampMs_ = captureTimestampMs;
+    frameCaptureTimestampMs_ = captureTimestampMs;
+
+    if (automaticPlayback_) {
+        RgbFrameSource::Frame frame;
+
+        frame.width = rgb_.width();
+        frame.height = rgb_.height();
+
+        const std::size_t rowBytes =
+            frame.width * 3;
+
+        frame.data.resize(
+            rowBytes * frame.height);
+
+        for (std::size_t y = 0;
+             y < frame.height; ++y) {
+
+            std::memcpy(
+                frame.data.data() + y * rowBytes,
+                rgb_.constScanLine(int(y)),
+                rowBytes);
+        }
+
+        frame.timestamp_ms = captureTimestampMs;
+        frame.valid = true;
+        frame.rgb_only = false;
+
+        std::lock_guard<std::mutex> lock(
+            sharedRgbFrame_->mutex);
+
+        sharedRgbFrame_->frame = std::move(frame);
+    }
 
     const auto totalMs = timer.elapsed();
 
@@ -327,7 +465,70 @@ bool ZedSvoPointCloudSource::seekFrame(std::size_t index)
 bool ZedSvoPointCloudSource::getPointCloud(
     Vision3DProcessor::PointCloud& cloud)
 {
-    if (!running_) return false;
+    cloud.clear();
+
+    if (!running_)
+        return false;
+
+    if (automaticPlayback_) {
+
+        bool paused = false;
+        std::optional<std::size_t> requestedFrame;
+
+        {
+            std::lock_guard<std::mutex> lock(
+                playbackControl_->mutex);
+
+            paused = playbackControl_->paused;
+
+            requestedFrame =
+                playbackControl_->requestedFrame;
+
+            playbackControl_->requestedFrame.reset();
+        }
+
+        if (requestedFrame.has_value()) {
+
+            const auto target =
+                std::min(*requestedFrame, count_ - 1);
+
+            if (target != index_ && !seekFrame(target)) {
+                orientation_ = CameraOrientation {};
+                invalidateSharedFrame();
+                return false;
+            }
+
+        } else if (!paused && frameDelivered_) {
+
+            if (index_ + 1 >= count_) {
+
+                {
+                    std::lock_guard<std::mutex> lock(
+                        playbackControl_->mutex);
+
+                    playbackControl_->paused = true;
+                    playbackControl_->finished = true;
+                }
+
+            } else if (!seekFrame(index_ + 1)) {
+
+                orientation_ = CameraOrientation {};
+                invalidateSharedFrame();
+                return false;
+            }
+        }
+
+        // Permite reprocesar el fotograma pausado
+        // cuando se modifica una region o geometria.
+        lastTimestampMs_ =
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<
+                    std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()).count());
+    }
+
+    frameDelivered_ = true;
 
     cloud = cloud_;
     return !cloud.empty();
@@ -367,9 +568,9 @@ bool ZedSvoPointCloudSource::pointAt(
         p.x <= 0)
         return false;
 
-    point.x = -p.y;
-    point.y = -p.z;
-    point.z = p.x;
+    point.x = p.y;
+            point.y = p.x;
+            point.z = p.z;
 
     point.image_x = u;
     point.image_y = v;

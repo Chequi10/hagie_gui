@@ -416,17 +416,8 @@ private:
         for (auto point : source_->points()) {
             if (!canvas_->roi.contains(
                     point.image_x, point.image_y) ||
-                point.z > maximum_->value())
+                point.y > maximum_->value())
                 continue;
-
-            // Coordenadas opticas -> Hagie.
-            const float opticalX = point.x;
-            const float opticalY = point.y;
-            const float opticalZ = point.z;
-
-            point.x = -opticalX;
-            point.y = opticalZ;
-            point.z = -opticalY;
 
             selected.push_back(point);
         }

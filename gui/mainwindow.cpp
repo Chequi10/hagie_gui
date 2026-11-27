@@ -1,3 +1,5 @@
+#include <QLineF>
+#include <chrono>
 #include "mainwindow.h"
 #include "video_rgb_controls.h"
 #include "rgbd_playback_dialog.h"
@@ -42,6 +44,9 @@
 #include <QPlainTextEdit>
 #include <QDateTime>
 #include <QFileDialog>
+#include <QSlider>
+#include <QSignalBlocker>
+#include "vision/zed_svo_point_cloud_source.h"
 #include <QFile>
 #include <QTextStream>
 #include <QImage>
@@ -2543,6 +2548,267 @@ QWidget *MainWindow::createCamerasPage()
     /*
      * Miniaturas.
      */
+    // Controles de reproduccion SVO2.
+    // Alturas de cultivo.
+    cameraHeightPanel = new QWidget(page);
+
+    auto *heightLayout =
+        new QHBoxLayout(cameraHeightPanel);
+
+    heightLayout->setContentsMargins(0, 0, 0, 0);
+    heightLayout->setSpacing(6);
+
+    for (std::size_t body = 0; body < 6; ++body)
+    {
+        auto *label = new QPushButton(
+            QString("CUERPO %1\n--- mm")
+                .arg(body + 1));
+
+        label->setCursor(Qt::PointingHandCursor);
+
+        connect(label, &QPushButton::clicked,
+                this, [this, body]() {
+            cameraDiagnosticBody = body;
+        });
+        label->setMinimumHeight(58);
+
+        label->setStyleSheet(
+            "background-color: #eeeeee;"
+            "color: #777777;"
+            "border: 1px solid #aaaaaa;"
+            "border-radius: 4px;"
+            "font-size: 17px;"
+            "font-weight: bold;");
+
+        cameraBodyHeightLabels[body] = label;
+
+        heightLayout->addWidget(label, 1);
+    }
+
+    layout->addWidget(cameraHeightPanel);
+
+    cameraDiagnosticLabel = new QLabel(
+        "DIAGNOSTICO 3D - SIN DATOS");
+
+    cameraDiagnosticLabel->setAlignment(Qt::AlignCenter);
+    cameraDiagnosticLabel->setWordWrap(true);
+
+    cameraDiagnosticLabel->setStyleSheet(
+        "background-color: #eeeeee;"
+        "color: #222222;"
+        "border: 1px solid #aaaaaa;"
+        "border-radius: 4px;"
+        "padding: 6px;"
+        "font-size: 14px;");
+
+    layout->addWidget(cameraDiagnosticLabel);
+
+    cameraRegionButton =
+        new QPushButton("MOSTRAR PUNTOS");
+
+    cameraRegionButton->setCheckable(true);
+    cameraRegionButton->setChecked(false);
+
+    cameraRegionBoxButton =
+        new QPushButton("MOSTRAR CAJA 3D");
+
+    cameraRegionBoxButton->setCheckable(true);
+    cameraRegionBoxButton->setChecked(false);
+
+    auto *regionButtonsLayout = new QHBoxLayout();
+
+    regionButtonsLayout->addWidget(
+        cameraRegionBoxButton, 1);
+
+    regionButtonsLayout->addWidget(
+        cameraRegionButton, 1);
+
+    layout->addLayout(regionButtonsLayout);
+
+    auto *svoPanel = new QWidget(page);
+    auto *svoLayout = new QHBoxLayout(svoPanel);
+
+    svoLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto *restartButton = new QPushButton("REINICIAR");
+    auto *previousButton = new QPushButton("<");
+    auto *playButton = new QPushButton("PAUSAR");
+    auto *nextButton = new QPushButton(">");
+    auto *slider = new QSlider(Qt::Horizontal);
+    auto *frameLabel = new QLabel("0 / 0");
+
+    slider->setRange(0, 0);
+
+    svoLayout->addWidget(restartButton);
+    svoLayout->addWidget(previousButton);
+    svoLayout->addWidget(playButton);
+    svoLayout->addWidget(nextButton);
+    svoLayout->addWidget(slider, 1);
+    svoLayout->addWidget(frameLabel);
+
+    layout->addWidget(svoPanel);
+    svoPanel->hide();
+
+    auto requestFrame = [this](int action)
+    {
+        auto control = svoPlaybackControl;
+
+        if (!control)
+            return;
+
+        std::lock_guard<std::mutex> lock(control->mutex);
+
+        if (!control->ready || control->totalFrames == 0)
+            return;
+
+        control->paused = true;
+        control->finished = false;
+
+        auto frame = control->requestedFrame.value_or(
+            control->currentFrame);
+
+        if (action == 0)
+            frame = 0;
+        else if (action < 0 && frame > 0)
+            --frame;
+        else if (action > 0 &&
+                 frame + 1 < control->totalFrames)
+            ++frame;
+
+        control->requestedFrame = frame;
+    };
+
+    connect(restartButton, &QPushButton::clicked,
+            this, [requestFrame]() {
+        requestFrame(0);
+    });
+
+    connect(previousButton, &QPushButton::clicked,
+            this, [requestFrame]() {
+        requestFrame(-1);
+    });
+
+    connect(nextButton, &QPushButton::clicked,
+            this, [requestFrame]() {
+        requestFrame(1);
+    });
+
+    connect(playButton, &QPushButton::clicked,
+            this, [this]() {
+
+        auto control = svoPlaybackControl;
+
+        if (!control)
+            return;
+
+        std::lock_guard<std::mutex> lock(control->mutex);
+
+        if (!control->ready)
+            return;
+
+        if (control->finished) {
+            control->requestedFrame = 0;
+            control->finished = false;
+            control->paused = false;
+        } else {
+            control->paused = !control->paused;
+        }
+    });
+
+    connect(slider, &QSlider::sliderPressed,
+            this, [this]() {
+
+        auto control = svoPlaybackControl;
+
+        if (!control)
+            return;
+
+        std::lock_guard<std::mutex> lock(control->mutex);
+        control->paused = true;
+    });
+
+    connect(slider, &QSlider::valueChanged,
+            this, [this](int value) {
+
+        auto control = svoPlaybackControl;
+
+        if (!control)
+            return;
+
+        std::lock_guard<std::mutex> lock(control->mutex);
+
+        if (!control->ready)
+            return;
+
+        control->paused = true;
+        control->finished = false;
+        control->requestedFrame =
+            static_cast<std::size_t>(value);
+    });
+
+    auto *svoTimer = new QTimer(svoPanel);
+
+    connect(svoTimer, &QTimer::timeout,
+            this, [this, svoPanel, slider,
+                   frameLabel, playButton]() {
+
+        const bool svoMode =
+            configVisionSourceCombo != nullptr &&
+            configVisionSourceCombo->currentIndex() == 3;
+
+        svoPanel->setVisible(svoMode);
+
+        if (!svoMode)
+            return;
+
+        auto control = svoPlaybackControl;
+
+        if (!control) {
+            svoPanel->setEnabled(false);
+            frameLabel->setText("SIN GRABACION");
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(control->mutex);
+
+        svoPanel->setEnabled(control->ready);
+
+        if (!control->ready) {
+            frameLabel->setText("SIN DATOS");
+            return;
+        }
+
+        if (!slider->isSliderDown()) {
+            const QSignalBlocker blocker(slider);
+
+            slider->setRange(
+                0,
+                control->totalFrames > 0
+                    ? int(control->totalFrames - 1)
+                    : 0);
+
+            slider->setValue(
+                int(control->currentFrame));
+        }
+
+        playButton->setText(
+            control->paused
+                ? "REPRODUCIR"
+                : "PAUSAR");
+
+        const double fps =
+            control->fps > 0 ? control->fps : 30.0;
+
+        frameLabel->setText(
+            QString("%1 / %2 | %3 s")
+                .arg(qulonglong(control->currentFrame + 1))
+                .arg(qulonglong(control->totalFrames))
+                .arg(control->currentFrame / fps,
+                     0, 'f', 2));
+    });
+
+    svoTimer->start(100);
+
     QHBoxLayout *cameraSelector =
         new QHBoxLayout();
 
@@ -2619,6 +2885,168 @@ QWidget *MainWindow::createCamerasPage()
 
 void MainWindow::updateCameraPage()
 {
+    const int visionMode =
+        configVisionSourceCombo != nullptr
+            ? configVisionSourceCombo->currentIndex()
+            : -1;
+
+    const bool showHeights =
+        visionMode >= 1 && visionMode <= 3;
+
+    if (cameraHeightPanel != nullptr)
+        cameraHeightPanel->setVisible(showHeights);
+
+    if (cameraDiagnosticLabel != nullptr)
+        cameraDiagnosticLabel->setVisible(showHeights);
+
+    const bool regionAvailable =
+        visionMode == 2 || visionMode == 3;
+
+    if (cameraRegionButton != nullptr)
+        cameraRegionButton->setVisible(regionAvailable);
+
+    if (cameraRegionBoxButton != nullptr)
+        cameraRegionBoxButton->setVisible(
+            regionAvailable);
+
+    const bool showRegionBox =
+        regionAvailable &&
+        cameraRegionBoxButton != nullptr &&
+        cameraRegionBoxButton->isChecked();
+
+    if (cameraRegionBoxButton != nullptr)
+    {
+        cameraRegionBoxButton->setText(
+            showRegionBox
+                ? "OCULTAR CAJA 3D"
+                : "MOSTRAR CAJA 3D");
+    }
+
+    const bool showRegion =
+        regionAvailable &&
+        cameraRegionButton != nullptr &&
+        cameraRegionButton->isChecked();
+
+    if (vision3DProcessor != nullptr)
+    {
+        vision3DProcessor->setRegionVisualizationBody(
+            showRegion
+                ? static_cast<int>(cameraDiagnosticBody)
+                : -1);
+    }
+
+    if (cameraRegionButton != nullptr)
+    {
+        cameraRegionButton->setText(
+            showRegion
+                ? "OCULTAR PUNTOS"
+                : "MOSTRAR PUNTOS");
+    }
+
+    if (showHeights && visionHeightSource != nullptr)
+    {
+        const auto result =
+            visionHeightSource->getResult();
+
+        const auto nowMs = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                std::chrono::steady_clock::now()
+                    .time_since_epoch()).count());
+
+        if (cameraDiagnosticLabel != nullptr)
+        {
+            const auto& d =
+                result.bodies[cameraDiagnosticBody];
+
+            QString diagnostic = QString(
+                "DIAGNOSTICO 3D - CUERPO %1")
+                .arg(cameraDiagnosticBody + 1);
+
+            const bool fresh =
+                d.timestamp_ms != 0 &&
+                nowMs >= d.timestamp_ms &&
+                nowMs - d.timestamp_ms <= 1000;
+
+            if (d.diagnostics_available && fresh)
+            {
+                diagnostic += QString(
+                    " | CAMARA %1\n"
+                    "P95: %2 | Altura filtrada: %3"
+                    " | Puntos: %4 / %5\n"
+                    "Altura camara: %6 mm"
+                    " | Roll: %7 | Pitch: %8")
+                    .arg(d.camera_index >= 0
+                        ? QString::number(d.camera_index + 1)
+                        : QString("---"))
+                    .arg(d.p95_valid
+                        ? QString::number(d.p95_mm, 'f', 1)
+                            + " mm"
+                        : QString("---"))
+                    .arg(d.valid
+                        ? QString::number(d.height_mm)
+                            + " mm"
+                        : QString("---"))
+                    .arg(qulonglong(d.valid_points))
+                    .arg(qulonglong(d.required_points))
+                    .arg(d.camera_height_mm, 0, 'f', 1)
+                    .arg(d.orientation_valid
+                        ? QString::number(d.roll_deg, 'f', 2)
+                            + "°"
+                        : QString("NO VALIDO"))
+                    .arg(d.orientation_valid
+                        ? QString::number(d.pitch_deg, 'f', 2)
+                            + "°"
+                        : QString("NO VALIDO"));
+            }
+            else
+            {
+                diagnostic += "\nSIN DIAGNOSTICO ACTUAL";
+            }
+
+            cameraDiagnosticLabel->setText(diagnostic);
+        }
+
+        for (std::size_t body = 0; body < 6; ++body)
+        {
+            auto *label = cameraBodyHeightLabels[body];
+
+            if (label == nullptr)
+                continue;
+
+            const auto& measurement =
+                result.bodies[body];
+
+            const bool valid =
+                measurement.valid &&
+                measurement.timestamp_ms != 0 &&
+                nowMs >= measurement.timestamp_ms &&
+                nowMs - measurement.timestamp_ms <= 1000;
+
+            label->setText(
+                QString("CUERPO %1\n%2 mm")
+                    .arg(body + 1)
+                    .arg(valid
+                        ? QString::number(measurement.height_mm)
+                        : QString("---")));
+
+            label->setStyleSheet(
+                valid
+                ? "background-color: #e4f5e7;"
+                  "color: #176b32;"
+                  "border: 1px solid #65a875;"
+                  "border-radius: 4px;"
+                  "font-size: 17px;"
+                  "font-weight: bold;"
+                : "background-color: #eeeeee;"
+                  "color: #777777;"
+                  "border: 1px solid #aaaaaa;"
+                  "border-radius: 4px;"
+                  "font-size: 17px;"
+                  "font-weight: bold;");
+        }
+    }
+
     if (mainCameraLabel == nullptr)
     {
         return;
@@ -2643,11 +3071,14 @@ void MainWindow::updateCameraPage()
     const bool realYoloMode =
         configVisionSourceCombo != nullptr &&
         configVisionSourceCombo->currentIndex() == 2;
-    const bool inferenceMode = realYoloMode || videoRgbActive;
+    const bool svoMode = visionMode == 3;
+
+    const bool inferenceMode =
+        !svoMode && (realYoloMode || videoRgbActive);
 
 
     for (std::size_t camera = 0;
-        camera < RGB_CAMERA_COUNT;
+        !svoMode && camera < RGB_CAMERA_COUNT;
         ++camera)
     
     {
@@ -3172,7 +3603,7 @@ void MainWindow::updateCameraPage()
             }
         }
     }
-    else
+    else if (!svoMode)
     {
         detectionResultValid =
             tasselDetector.processFrame(
@@ -3182,6 +3613,117 @@ void MainWindow::updateCameraPage()
             );
     }
 
+
+    if (showRegionBox &&
+        visionHeightSource != nullptr)
+    {
+        const auto result =
+            visionHeightSource->getResult();
+
+        const auto& region =
+            result.bodies[cameraDiagnosticBody];
+
+        const bool synchronized =
+            region.camera_index ==
+                static_cast<int>(selectedRgbCamera) &&
+            region.region_frame_timestamp_ms != 0 &&
+            region.region_frame_timestamp_ms ==
+                frame.timestamp_ms &&
+            region.region_image_width > 0 &&
+            region.region_image_height > 0;
+
+        if (synchronized)
+        {
+            const double sx =
+                double(displayImage.width()) /
+                region.region_image_width;
+
+            const double sy =
+                double(displayImage.height()) /
+                region.region_image_height;
+
+            QPainter painter(&displayImage);
+
+            painter.setRenderHint(
+                QPainter::Antialiasing, true);
+
+            painter.setClipRect(displayImage.rect());
+
+            QPen pen(QColor(30, 145, 255));
+            pen.setWidth(4);
+
+            painter.setPen(pen);
+
+            for (const auto& line :
+                 region.region_lines)
+            {
+                painter.drawLine(
+                    QLineF(
+                        line.x1 * sx,
+                        line.y1 * sy,
+                        line.x2 * sx,
+                        line.y2 * sy));
+            }
+        }
+        else
+        {
+            QPainter painter(&displayImage);
+
+            painter.setPen(Qt::yellow);
+
+            painter.drawText(
+                15, 30,
+                "CAJA 3D: SIN DATOS SINCRONIZADOS");
+        }
+    }
+
+    if (showRegion && visionHeightSource != nullptr)
+    {
+        const auto regionResult =
+            visionHeightSource->getResult();
+
+        const auto& region =
+            regionResult.bodies[cameraDiagnosticBody];
+
+        const bool synchronized =
+            region.region_pixels &&
+            region.camera_index ==
+                static_cast<int>(selectedRgbCamera) &&
+            region.region_frame_timestamp_ms != 0 &&
+            region.region_frame_timestamp_ms ==
+                frame.timestamp_ms;
+
+        if (synchronized)
+        {
+            QPainter regionPainter(&displayImage);
+
+            QPen regionPen(QColor(0, 255, 0, 150));
+            regionPen.setWidth(2);
+
+            regionPainter.setPen(regionPen);
+
+            for (const auto& pixel : *region.region_pixels)
+            {
+                if (pixel.x >= 0 &&
+                    pixel.y >= 0 &&
+                    pixel.x < displayImage.width() &&
+                    pixel.y < displayImage.height())
+                {
+                    regionPainter.drawPoint(
+                        pixel.x, pixel.y);
+                }
+            }
+        }
+        else
+        {
+            QPainter regionPainter(&displayImage);
+            regionPainter.setPen(Qt::yellow);
+
+            regionPainter.drawText(
+                15, displayImage.height() - 20,
+                "REGION 3D: ESPERANDO DATOS SINCRONIZADOS");
+        }
+    }
 
     if (detectionResultValid)
     {
@@ -8057,6 +8599,11 @@ QWidget *MainWindow::createConfigurationPage()
         2
     );
 
+    configVisionSourceCombo->addItem(
+        "GRABACIÓN ZED SVO2",
+        3
+    );
+
 
     connect(
         configVisionSourceCombo,
@@ -8066,6 +8613,13 @@ QWidget *MainWindow::createConfigurationPage()
         this,
         [this](int index)
         {
+            svoPlaybackControl.reset();
+
+            if (index == 3 && stm32Worker != nullptr)
+            {
+                stm32Worker->setPlaybackInterlock(true);
+            }
+
             if (videoRgbControls) videoRgbControls->stopVideo();
             /*
             * Detener inferencia antes de reemplazar
@@ -8082,6 +8636,98 @@ QWidget *MainWindow::createConfigurationPage()
             
             if (visionHeightSource == nullptr)
             {
+                return;
+            }
+
+            if (index == 3)
+            {
+                if (vision3DWorker == nullptr)
+                    return;
+
+                vision3DWorker->stop();
+
+                vision3DWorker->clearMachineOrientationOverride();
+
+
+                if (vision3DProcessor != nullptr)
+                {
+                    vision3DProcessor->resetTemporalFilter();
+                }
+
+                for (auto& history : visionHeightHistory)
+                {
+                    history.clear();
+                }
+
+                lastVisionHistoryTimestamp.fill(0);
+
+
+
+                visionHeightSource->setSourceMode(
+                    VisionHeightSource::SourceMode::EXTERNAL);
+
+                visionHeightSource->submitResult(
+                    VisionHeightSource::VisionResult {});
+
+                for (std::size_t camera = 0;
+                     camera < 7; ++camera)
+                {
+                    rgbCameraWorker.clearFrameSource(camera);
+                }
+
+                for (std::size_t camera = 0;
+                     camera < 5; ++camera)
+                {
+                    vision3DWorker->clearPointCloudSource(camera);
+                }
+
+                const QString file =
+                    QFileDialog::getOpenFileName(
+                        this,
+                        "Grabación ZED - Cámara 1",
+                        QDir::homePath() + "/hagie_recordings",
+                        "Grabaciones ZED (*.svo2 *.svo)");
+
+                if (file.isEmpty())
+                {
+                    addLogMessage(
+                        "SVO2: reproducción no iniciada");
+                    return;
+                }
+
+                auto source =
+                    std::make_unique<ZedSvoPointCloudSource>(
+                        file, 0, true);
+
+                auto playbackControl =
+                    source->getPlaybackControl();
+
+                auto rgbSource =
+                    std::make_unique<ZedGmslRgbFrameSource>(
+                        0, source->getSharedRgbFrame());
+
+                if (!rgbCameraWorker.setFrameSource(
+                        0, std::move(rgbSource)))
+                {
+                    addLogMessage("SVO2: error fuente RGB");
+                    return;
+                }
+
+                if (!vision3DWorker->setPointCloudSource(
+                        0, std::move(source)))
+                {
+                    rgbCameraWorker.clearFrameSource(0);
+                    addLogMessage("SVO2: error fuente 3D");
+                    return;
+                }
+
+                svoPlaybackControl = playbackControl;
+
+                vision3DWorker->start();
+
+                addLogMessage(
+                    "SVO2: reproducción cámara 1 - hidráulica bloqueada");
+
                 return;
             }
 
@@ -8105,7 +8751,9 @@ QWidget *MainWindow::createConfigurationPage()
             else
             {
                 visionSourceText =
-                    "DESCONOCIDA";
+                    index == 3
+                        ? "GRABACIÓN ZED SVO2"
+                        : "DESCONOCIDA";
             }
 
             addLogMessage(

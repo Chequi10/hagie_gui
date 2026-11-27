@@ -101,6 +101,11 @@ public:
 
     bool isRunning() const override;
 
+    bool getCameraIntrinsics(
+        CameraIntrinsics& intrinsics
+    ) const override;
+
+
 
     bool getPointCloud(
         Vision3DProcessor::PointCloud& cloud

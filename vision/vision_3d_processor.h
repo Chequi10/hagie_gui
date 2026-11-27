@@ -3,6 +3,7 @@
 
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -386,6 +387,18 @@ public:
 
     void resetTemporalFilter();
 
+    bool getRegionVertices(
+        std::size_t camera,
+        std::size_t body,
+        std::array<Point3D, 8>& vertices
+    ) const;
+
+
+    void setRegionVisualizationBody(int body)
+    {
+        regionVisualizationBody.store(body);
+    }
+
     bool isResultFresh(
         const VisionHeightSource::BodyVisionResult& result,
         uint64_t now_ms,
@@ -444,6 +457,8 @@ private:
         const Orientation& selectedOrientation
     ) const;
 
+
+    std::atomic<int> regionVisualizationBody {-1};
 
     TemporalFilterConfig temporalFilterConfig;
 

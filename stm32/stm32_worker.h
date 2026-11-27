@@ -94,6 +94,13 @@ public:
 
     void stopAllValves();
 
+    void setPlaybackInterlock(bool enabled);
+
+    bool isPlaybackInterlocked() const
+    {
+        return playbackInterlocked.load();
+    }
+
 
     void clearBodyFault(
         uint8_t body
@@ -583,6 +590,10 @@ private:
 
     std::thread workerThread;
 
+
+    std::atomic<bool> playbackInterlocked {false};
+
+    std::mutex motionMutex;
 
     std::mutex txMutex;
 

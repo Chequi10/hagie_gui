@@ -238,6 +238,52 @@ void ZedGmslPointCloudSource::stop()
 }
 
 
+
+bool ZedGmslPointCloudSource::getCameraIntrinsics(
+    CameraIntrinsics& intrinsics) const
+{
+    intrinsics = CameraIntrinsics {};
+
+#ifdef HAGIE_ENABLE_ZED_SDK
+
+    if (!isRunning())
+        return false;
+
+    const auto info =
+        camera.getCameraInformation();
+
+    const auto& config =
+        info.camera_configuration;
+
+    const auto& calibration =
+        config.calibration_parameters.left_cam;
+
+    intrinsics.fx = calibration.fx;
+    intrinsics.fy = calibration.fy;
+    intrinsics.cx = calibration.cx;
+    intrinsics.cy = calibration.cy;
+
+    intrinsics.width =
+        static_cast<int>(config.resolution.width);
+
+    intrinsics.height =
+        static_cast<int>(config.resolution.height);
+
+    intrinsics.valid =
+        intrinsics.fx > 0.0f &&
+        intrinsics.fy > 0.0f &&
+        intrinsics.width > 0 &&
+        intrinsics.height > 0;
+
+    return intrinsics.valid;
+
+#else
+
+    return false;
+
+#endif
+}
+
 bool ZedGmslPointCloudSource::isRunning() const
 {
     return running.load();
@@ -413,14 +459,7 @@ bool ZedGmslPointCloudSource::getPointCloud(
         if (imuResult == sl::ERROR_CODE::SUCCESS &&
             sensorsData.imu.is_available)
         {
-            const sl::float3 angles =
-                sensorsData.imu.pose.getEulerAngles(false);
-
-            currentOrientation.roll_deg = angles.x;
-            currentOrientation.pitch_deg = angles.y;
-            currentOrientation.valid = true;
-
-            const auto adapted =
+            currentOrientation =
                 ZedOrientationAdapter::fromRotation(
                     sensorsData.imu.pose.getRotationMatrix());
 
@@ -429,11 +468,9 @@ bool ZedGmslPointCloudSource::getPointCloud(
             if (++imuCounter % 15 == 0)
             {
                 qInfo() << "[HAGIE IMU REAL]"
-                        << "Euler X:" << angles.x
-                        << "Euler Y:" << angles.y
-                        << "Roll:" << adapted.roll_deg
-                        << "Pitch:" << adapted.pitch_deg
-                        << "Valida:" << adapted.valid;
+                        << "Roll:" << currentOrientation.roll_deg
+                        << "Pitch:" << currentOrientation.pitch_deg
+                        << "Valida:" << currentOrientation.valid;
             }
         }
 

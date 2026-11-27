@@ -15,6 +15,7 @@
 #include "core/hagie_state.h"
 #include "vision/vision_3d_processor.h"
 #include "vision/rgb_camera_worker.h"
+#include "vision/zed_svo_point_cloud_source.h"
 #include "vision/simulated_rgb_frame_source.h"
 #include "vision/video_rgb_frame_source.h"
 #include "gui/video_rgb_controls.h"
@@ -946,6 +947,22 @@ private:
         std::uint64_t,
         RgbCameraWorker::CAMERA_COUNT
     > lastConsumedYoloTimestamp {};
+
+    ZedSvoPointCloudSource::PlaybackControlPtr
+        svoPlaybackControl;
+
+    QWidget *cameraHeightPanel = nullptr;
+
+    std::array<QPushButton*, 6>
+        cameraBodyHeightLabels {};
+
+    QLabel *cameraDiagnosticLabel = nullptr;
+
+    std::size_t cameraDiagnosticBody = 4;
+
+    QPushButton *cameraRegionButton = nullptr;
+    QPushButton *cameraRegionBoxButton = nullptr;
+
 
     QLabel *mainCameraLabel =
         nullptr;

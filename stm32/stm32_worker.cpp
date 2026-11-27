@@ -320,6 +320,16 @@ void STM32Worker::processTxQueue()
         }
 
 
+        std::lock_guard<std::mutex> motionLock(
+            motionMutex);
+
+        if (playbackInterlocked.load() &&
+            (command.type == CommandType::SET_TARGET_HEIGHT ||
+             command.type == CommandType::SET_VALVE_COMMAND))
+        {
+            continue;
+        }
+
         switch (command.type)
         {
             case CommandType::SET_TARGET_HEIGHT:
@@ -549,6 +559,13 @@ void STM32Worker::setTargetHeight(
     uint8_t body,
     uint16_t height_mm)
 {
+
+    std::lock_guard<std::mutex> motionLock(
+        motionMutex);
+
+    if (playbackInterlocked.load())
+        return;
+
     if (!running)
     {
         return;
@@ -587,6 +604,13 @@ void STM32Worker::setValveCommand(
     uint8_t body,
     int16_t command)
 {
+
+    std::lock_guard<std::mutex> motionLock(
+        motionMutex);
+
+    if (playbackInterlocked.load())
+        return;
+
     if (!running)
     {
         return;
@@ -612,6 +636,48 @@ void STM32Worker::setValveCommand(
     }
 }
 
+
+void STM32Worker::setPlaybackInterlock(bool enabled)
+{
+    std::lock_guard<std::mutex> motionLock(
+        motionMutex);
+
+    playbackInterlocked.store(enabled);
+
+    {
+        std::lock_guard<std::mutex> lock(txMutex);
+
+        for (auto it = txQueue.begin();
+             it != txQueue.end();)
+        {
+            if (it->type == CommandType::SET_TARGET_HEIGHT ||
+                it->type == CommandType::SET_VALVE_COMMAND)
+            {
+                it = txQueue.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        if (enabled)
+        {
+            txQueue.push_front(
+                {CommandType::STOP_ALL_VALVES, 0, 0});
+        }
+    }
+
+    if (state != nullptr)
+    {
+        for (std::size_t body = 0;
+             body < HagieState::BODY_COUNT;
+             ++body)
+        {
+            state->setBodyAutoMode(body, false);
+        }
+    }
+}
 
 void STM32Worker::stopAllValves()
 {

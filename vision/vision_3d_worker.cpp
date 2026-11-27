@@ -1,3 +1,4 @@
+#include "vision/region_3d_projection.h"
 #include "vision/vision_3d_worker.h"
 
 
@@ -506,6 +507,20 @@ bool Vision3DWorker::processCamera(
 
     if (!source->getPointCloud(cloud))
     {
+        cameraOrientations[camera] =
+            PointCloudSource::CameraOrientation {};
+
+        processor->setCameraOrientation(
+            camera,
+            Vision3DProcessor::Orientation {});
+
+        std::lock_guard<std::mutex> lock(
+            latestPointCloudMutex);
+
+        latestPointClouds[camera].clear();
+        latestPointCloudValid[camera] = false;
+        latestPointCloudTimestampMs[camera] = 0;
+
         return false;
     }
 
@@ -598,6 +613,66 @@ bool Vision3DWorker::processCamera(
             camera,
             cloud
         );
+
+    // Identificador de captura RGB y XYZ.
+    std::uint64_t captureTimestampMs = 0;
+
+    if (source->getCaptureTimestampMs(
+            captureTimestampMs))
+    {
+        PointCloudSource::CameraIntrinsics intrinsics;
+
+        const bool calibrated =
+            source->getCameraIntrinsics(intrinsics);
+
+        for (std::size_t index = 0;
+             index < result.bodies.size();
+             ++index)
+        {
+            auto& body = result.bodies[index];
+
+            if (body.region_pixels)
+            {
+                body.region_frame_timestamp_ms =
+                    captureTimestampMs;
+            }
+
+            if (!calibrated)
+                continue;
+
+            std::array<
+                Vision3DProcessor::Point3D, 8
+            > vertices {};
+
+            if (!processor->getRegionVertices(
+                    camera, index, vertices))
+                continue;
+
+            const auto lines =
+                Region3DProjection::project(
+                    vertices,
+                    intrinsics,
+                    intrinsics.width,
+                    intrinsics.height);
+
+            body.region_image_width =
+                intrinsics.width;
+
+            body.region_image_height =
+                intrinsics.height;
+
+            body.region_frame_timestamp_ms =
+                captureTimestampMs;
+
+            for (const auto& line : lines)
+            {
+                body.region_lines.push_back({
+                    line.x1(), line.y1(),
+                    line.x2(), line.y2()
+                });
+            }
+        }
+    }
 
 
     return true;
@@ -765,6 +840,12 @@ void Vision3DWorker::workerLoop()
             heightSource->submitResult(
                 mergedResult
             );
+        }
+        else if (heightSource != nullptr &&
+                 running.load())
+        {
+            heightSource->submitResult(
+                VisionHeightSource::VisionResult {});
         }
 
 

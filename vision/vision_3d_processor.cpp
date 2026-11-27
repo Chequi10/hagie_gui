@@ -337,6 +337,9 @@ Vision3DProcessor::processPointCloud(
                 : orientation
         );
 
+        instantResult.camera_index =
+            static_cast<int>(camera);
+
 
         result.bodies[body] =
             applyTemporalFilter(
@@ -935,8 +938,21 @@ Vision3DProcessor::calculateBodyHeight(
      * No aceptar la medición si no tenemos
      * suficientes puntos válidos.
      */
-    if (validHeights.size() <
-        region.min_points)
+    result.diagnostics_available = true;
+    result.valid_points = validHeights.size();
+    result.required_points = region.min_points;
+
+    result.timestamp_ms =
+        static_cast<uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
+        );
+
+    if (validHeights.empty() ||
+        validHeights.size() < region.min_points)
     {
         result.valid =
             false;
@@ -1001,6 +1017,9 @@ Vision3DProcessor::calculateBodyHeight(
     }
 
 
+    result.p95_mm = heightMm;
+    result.p95_valid = true;
+
     result.height_mm =
         static_cast<uint16_t>(
             heightMm
@@ -1049,6 +1068,11 @@ Vision3DProcessor::calculateBodyHeight(
 {
     VisionHeightSource::BodyVisionResult result;
 
+    result.camera_height_mm = geometry.camera_height_mm;
+    result.orientation_valid = selectedOrientation.valid;
+    result.roll_deg = selectedOrientation.roll_deg;
+    result.pitch_deg = selectedOrientation.pitch_deg;
+
 
     if (body >= BODY_COUNT)
     {
@@ -1065,6 +1089,17 @@ Vision3DProcessor::calculateBodyHeight(
      * para este cuerpo.
      */
     std::vector<float> validHeights;
+
+    std::shared_ptr<
+        std::vector<VisionHeightSource::RegionPixel>
+    > regionPixels;
+
+    if (regionVisualizationBody.load() ==
+        static_cast<int>(body))
+    {
+        regionPixels = std::make_shared<
+            std::vector<VisionHeightSource::RegionPixel>>();
+    }
 
 
     for (const Point3D& point : cloud)
@@ -1177,14 +1212,38 @@ Vision3DProcessor::calculateBodyHeight(
         validHeights.push_back(
             leveledPoint.z
         );
+
+        if (regionPixels &&
+            point.image_coordinates_valid)
+        {
+            regionPixels->push_back({
+                point.image_x,
+                point.image_y
+            });
+        }
     }
 
 
     /*
      * Cantidad mínima de puntos.
      */
-    if (validHeights.size() <
-        region.min_points)
+    result.region_pixels = regionPixels;
+
+    result.diagnostics_available = true;
+    result.valid_points = validHeights.size();
+    result.required_points = region.min_points;
+
+    result.timestamp_ms =
+        static_cast<uint64_t>(
+            std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now()
+                        .time_since_epoch()
+                ).count()
+        );
+
+    if (validHeights.empty() ||
+        validHeights.size() < region.min_points)
     {
         result.valid =
             false;
@@ -1237,6 +1296,9 @@ Vision3DProcessor::calculateBodyHeight(
         return result;
     }
 
+
+    result.p95_mm = heightMm;
+    result.p95_valid = true;
 
     result.height_mm =
         static_cast<uint16_t>(
@@ -1443,11 +1505,171 @@ Vision3DProcessor::mergeCameraResults(
         }
         else
         {
-            merged.bodies[body].valid =
-                false;
+            // Conservar el diagnostico aunque
+            // la medicion no sea valida.
+            for (std::size_t camera = 0;
+                 camera < CAMERA_COUNT;
+                 ++camera)
+            {
+                const auto& candidate =
+                    cameraResults[camera].bodies[body];
+
+                auto& diagnostic = merged.bodies[body];
+
+                if (candidate.diagnostics_available &&
+                    (!diagnostic.diagnostics_available ||
+                     candidate.valid_points >
+                         diagnostic.valid_points))
+                {
+                    diagnostic = candidate;
+                }
+            }
+
+            merged.bodies[body].valid = false;
         }
     }
 
 
     return merged;
+}
+
+bool Vision3DProcessor::getRegionVertices(
+    std::size_t camera,
+    std::size_t body,
+    std::array<Point3D, 8>& vertices) const
+{
+    vertices = {};
+
+    if (camera >= CAMERA_COUNT ||
+        body >= BODY_COUNT)
+        return false;
+
+    const auto& config = cameraConfigs[camera];
+
+    if (!config.enabled ||
+        !config.body_enabled[body])
+        return false;
+
+    const auto& geometry = config.geometry;
+    const auto& region = bodyRegions[body];
+
+    const auto selectedOrientation =
+        cameraOrientations[camera].valid
+            ? cameraOrientations[camera]
+            : orientation;
+
+    // Misma transformacion utilizada por el P95.
+    auto transform = [&](const Point3D& point)
+    {
+        const auto normalized =
+            normalizeAxes(point);
+
+        const auto machine =
+            transformCameraToMachine(
+                normalized, geometry);
+
+        auto leveled =
+            levelPointWithOrientation(
+                machine,
+                geometry,
+                selectedOrientation);
+
+        if (geometry.camera_height_mm > 0.0f)
+        {
+            const auto local =
+                levelPointWithOrientation(
+                    normalized,
+                    geometry,
+                    selectedOrientation);
+
+            leveled.z =
+                geometry.camera_height_mm + local.z;
+        }
+
+        Point3D result;
+        result.x = machine.x;
+        result.y = leveled.y;
+        result.z = leveled.z;
+
+        return result;
+    };
+
+    // Construir la transformacion afin.
+    Point3D origin {};
+    Point3D ex {}, ey {}, ez {};
+
+    constexpr double step = 1000.0;
+
+    ex.x = step;
+    ey.y = step;
+    ez.z = step;
+
+    const auto o = transform(origin);
+    const auto x = transform(ex);
+    const auto y = transform(ey);
+    const auto z = transform(ez);
+
+    const double a = (x.x - o.x) / step;
+    const double b = (y.x - o.x) / step;
+    const double c = (z.x - o.x) / step;
+
+    const double d = (x.y - o.y) / step;
+    const double e = (y.y - o.y) / step;
+    const double f = (z.y - o.y) / step;
+
+    const double g = (x.z - o.z) / step;
+    const double h = (y.z - o.z) / step;
+    const double i = (z.z - o.z) / step;
+
+    const double det =
+        a * (e*i - f*h)
+        - b * (d*i - f*g)
+        + c * (d*h - e*g);
+
+    if (!std::isfinite(det) ||
+        std::abs(det) < 0.0001)
+        return false;
+
+    // Invertir la transformacion para cada vertice.
+    for (std::size_t n = 0; n < 8; ++n)
+    {
+        const double X =
+            ((n & 1) ? region.max_x
+                     : region.min_x) - o.x;
+
+        const double Y =
+            ((n & 2) ? region.max_y
+                     : region.min_y) - o.y;
+
+        const double Z =
+            ((n & 4) ? region.max_z
+                     : region.min_z) - o.z;
+
+        auto& v = vertices[n];
+
+        v.x = (
+            (e*i-f*h)*X +
+            (c*h-b*i)*Y +
+            (b*f-c*e)*Z
+        ) / det;
+
+        v.y = (
+            (f*g-d*i)*X +
+            (a*i-c*g)*Y +
+            (c*d-a*f)*Z
+        ) / det;
+
+        v.z = (
+            (d*h-e*g)*X +
+            (b*g-a*h)*Y +
+            (a*e-b*d)*Z
+        ) / det;
+
+        if (!std::isfinite(v.x) ||
+            !std::isfinite(v.y) ||
+            !std::isfinite(v.z))
+            return false;
+    }
+
+    return true;
 }
