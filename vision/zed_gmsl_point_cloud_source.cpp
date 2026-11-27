@@ -1,3 +1,5 @@
+#include "vision/zed_orientation_adapter.h"
+#include <QDebug>
 #include "vision/zed_gmsl_point_cloud_source.h"
 
 #ifdef HAGIE_ENABLE_ZED_SDK
@@ -417,6 +419,22 @@ bool ZedGmslPointCloudSource::getPointCloud(
             currentOrientation.roll_deg = angles.x;
             currentOrientation.pitch_deg = angles.y;
             currentOrientation.valid = true;
+
+            const auto adapted =
+                ZedOrientationAdapter::fromRotation(
+                    sensorsData.imu.pose.getRotationMatrix());
+
+            static thread_local unsigned int imuCounter = 0;
+
+            if (++imuCounter % 15 == 0)
+            {
+                qInfo() << "[HAGIE IMU REAL]"
+                        << "Euler X:" << angles.x
+                        << "Euler Y:" << angles.y
+                        << "Roll:" << adapted.roll_deg
+                        << "Pitch:" << adapted.pitch_deg
+                        << "Valida:" << adapted.valid;
+            }
         }
 
         std::lock_guard<std::mutex> lock(orientationMutex);

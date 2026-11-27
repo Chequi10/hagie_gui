@@ -8871,7 +8871,7 @@ QWidget *MainWindow::createConfigurationPage()
 
     // Prueba RGB-D separada de la configuracion y del control de la maquina.
     auto *rgbdPlaybackButton = new QPushButton(
-        "Probar grabación RGB-D (XYZ)…", generalPage);
+        "Probar grabación ZED (SVO2)…", generalPage);
     generalPageLayout->addWidget(rgbdPlaybackButton);
     rgbdPlaybackButton->setVisible(configVisionSourceCombo->currentIndex() == 1);
     connect(configVisionSourceCombo,

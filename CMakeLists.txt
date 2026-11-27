@@ -469,3 +469,9 @@ add_executable(rgbd_reference_plane_test
 target_include_directories(rgbd_reference_plane_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(rgbd_reference_plane_test PROPERTIES
     AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
+# Reproduccion de grabaciones ZED SVO/SVO2.
+target_sources(hagie_gui PRIVATE
+    vision/zed_svo_point_cloud_source.cpp
+    vision/zed_svo_point_cloud_source.h
+)
